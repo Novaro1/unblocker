@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Veil</title>
+    <link rel="stylesheet" href="/index.css" />
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <!-- Splash / intro screen -->
+    <div id="splash" aria-hidden="true">
+      <div id="splash-content">
+        <div id="splash-logo-mark">
+          <svg width="38" height="38" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="4" y1="21" x2="28" y2="21" stroke="rgba(255,255,255,0.28)" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M8 26 L16 13 L24 26" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div id="splash-title">
+          <span>V</span><span>E</span><span>I</span><span>L</span>
+        </div>
+        <div id="splash-sub">The web, unveiled.</div>
+      </div>
+      <div id="splash-hint">Click or press any key to skip</div>
+      <div id="splash-progress"></div>
+    </div>
+
+    <!-- Aurora background blobs -->
+    <!-- Custom background layer (image or gradient, behind aurora) -->
+    <div id="custom-bg" aria-hidden="true"></div>
+
+    <div class="aurora" aria-hidden="true">
+      <div class="aurora-blob b1"></div>
+      <div class="aurora-blob b2"></div>
+      <div class="aurora-blob b3"></div>
+      <div class="aurora-blob b4"></div>
+    </div>
+
+    <!-- Interactive starfield canvas (transparent, sits above aurora) -->
+    <canvas id="veil-stars" aria-hidden="true"></canvas>
+
+    <!-- Cursor glow orb -->
+    <div id="cursor-glow" aria-hidden="true"></div>
+
+    <!-- Warp flash overlay — triggered by fx.js on form submit -->
+    <div id="warp-flash" aria-hidden="true"></div>
+
+    <!-- Home screen -->
+    <div class="home">
+      <!-- History button — top-right, left of settings gear -->
+      <button class="history-home-btn" id="btn-history-home" title="History" aria-label="Open history">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M8 5v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <!-- Settings gear — top-right corner of home screen -->
+      <button class="settings-gear" id="btn-settings-home" title="Settings" aria-label="Open settings">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <circle cx="9" cy="9" r="2.8" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.9 3.9l1.4 1.4M12.7 12.7l1.4 1.4M3.9 14.1l1.4-1.4M12.7 5.3l1.4-1.4"
+                stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <header>
+        <div class="logo-wrap" aria-hidden="true">
+          <div class="logo-mark">
+            <svg class="logo-svg" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <line x1="4" y1="21" x2="28" y2="21" stroke="rgba(255,255,255,0.28)" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M8 26 L16 13 L24 26" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <h1>Veil</h1>
+        <p class="subtitle">The web, unveiled.</p>
+      </header>
+
+      <main>
+        <form id="sj-form">
+          <div class="search-bar">
+            <input
+              id="sj-address"
+              type="text"
+              placeholder="Search or enter a URL..."
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+            />
+            <button type="submit" id="sj-submit-btn">
+              <span id="sj-btn-label">Go</span>
+              <span id="sj-btn-spinner" class="spinner" style="display:none;"></span>
+            </button>
+          </div>
+
+          <div class="engine-row">
+            <span class="engine-label">Search with</span>
+            <div class="engine-chips">
+              <label class="chip">
+                <input type="radio" name="engine" value="https://www.google.com/search?q=%s" checked />
+                <span>Google</span>
+              </label>
+              <label class="chip">
+                <input type="radio" name="engine" value="https://www.bing.com/search?q=%s" />
+                <span>Bing</span>
+              </label>
+              <label class="chip">
+                <input type="radio" name="engine" value="https://duckduckgo.com/?q=%s" />
+                <span>DuckDuckGo</span>
+              </label>
+            </div>
+          </div>
+
+          <input id="sj-search-engine" type="hidden" value="https://www.google.com/search?q=%s" />
+        </form>
+
+        <div id="error-container" style="display:none;">
+          <p id="sj-error"></p>
+          <pre id="sj-error-code"></pre>
+        </div>
+      </main>
+
+      <!-- Quick access tiles -->
+      <section class="quick-links" id="quick-access">
+        <div class="ql-label">Quick Access</div>
+        <div class="ql-grid" id="ql-grid"></div>
+      </section>
+
+      <!-- Games section -->
+      <section class="games-section" id="games-section">
+        <div class="gs-header">
+          <div class="ql-label" style="margin:0;">Games</div>
+          <div class="gs-header-btns">
+            <button class="gs-icon-btn" id="gs-edit" title="Edit games" aria-label="Edit games">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M9.5 1.5a1.414 1.414 0 0 1 2 2L4 11H1v-3L9.5 1.5Z"
+                      stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="gs-icon-btn gs-toggle" id="gs-toggle" title="Collapse games" aria-label="Toggle games">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="gs-grid" id="gs-grid"></div>
+      </section>
+
+
+      <footer>
+        <p>Powered by <a href="https://github.com/MercuryWorkshop/scramjet" target="_blank">Scramjet</a></p>
+      </footer>
+    </div>
+
+    <!-- Browser chrome — shown when a site is loaded -->
+    <div id="sj-frame-container" style="display:none;">
+
+      <!-- Tab bar -->
+      <div id="tab-bar">
+        <button id="btn-new-tab" title="New tab" aria-label="New tab">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <path d="M5.5 1v9M1 5.5h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="toolbar">
+        <button class="toolbar-btn" id="btn-back" title="Back" disabled>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="btn-forward" title="Forward" disabled>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="btn-reload" title="Reload">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M13.5 8A5.5 5.5 0 1 1 10.75 3.25" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M11.9 3.85 L10.75 3.25 L10.1 4.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="url-bar-wrap">
+          <input id="sj-url-bar" type="text" spellcheck="false" autocomplete="off"
+                 autocorrect="off" autocapitalize="off" placeholder="Enter a URL..." />
+          <div id="sj-load-bar"></div>
+        </div>
+        <button class="toolbar-btn" id="btn-home" title="Home">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M2 7L8 2L14 7V14H10V10H6V14H2V7Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="btn-history" title="History">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <circle cx="7.5" cy="7.5" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7.5 4.5v3.2l2 1.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <div class="toolbar-sep" aria-hidden="true"></div>
+
+        <button class="toolbar-btn" id="btn-bookmark" title="Bookmark this page">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <path d="M3 2h9a1 1 0 0 1 1 1v10l-5.5-3L2 13V3a1 1 0 0 1 1-1Z"
+                  stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"
+                  class="bm-path"/>
+          </svg>
+        </button>
+
+        <button class="toolbar-btn" id="btn-copy-url" title="Copy URL">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <rect x="5" y="1" width="9" height="11" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M1 4h3.5V14H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <button class="toolbar-btn" id="btn-fullscreen" title="Fullscreen">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <path class="fs-expand" d="M2 5V2h3M10 2h3v3M13 10v3h-3M5 13H2v-3"
+                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path class="fs-contract" style="display:none"
+                  d="M5 2v3H2M13 5h-3V2M10 13v-3h3M2 10h3v3"
+                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <div class="toolbar-sep" aria-hidden="true"></div>
+
+        <button class="toolbar-btn" id="btn-settings-toolbar" title="Settings" aria-label="Open settings">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <circle cx="7.5" cy="7.5" r="2.2" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7.5 1v1.5M7.5 12.5V14M1 7.5h1.5M12.5 7.5H14M3.2 3.2l1.1 1.1M10.7 10.7l1.1 1.1M3.2 11.8l1.1-1.1M10.7 4.3l1.1-1.1"
+                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Tab frames live here (appended dynamically) -->
+      <div id="tab-frame-area"></div>
+    </div>
+
+    <!-- History panel -->
+    <div id="history-overlay" aria-hidden="true"></div>
+    <div id="history-panel" role="dialog" aria-label="History" aria-hidden="true">
+      <div class="settings-header">
+        <span class="settings-title">History</span>
+        <button class="settings-close" id="history-close" aria-label="Close history">&times;</button>
+      </div>
+      <div class="history-search-wrap">
+        <input type="text" id="history-search" placeholder="Search history…" autocomplete="off" spellcheck="false" />
+      </div>
+      <div id="history-list"></div>
+      <div class="history-footer">
+        <button id="history-clear-all">Clear All History</button>
+      </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div id="settings-overlay" aria-hidden="true"></div>
+    <div id="settings-panel" role="dialog" aria-label="Settings" aria-hidden="true">
+      <div class="settings-header">
+        <span class="settings-title">Settings</span>
+        <button class="settings-close" id="btn-settings-close" aria-label="Close settings">&times;</button>
+      </div>
+
+      <div class="settings-body">
+
+        <!-- Tab Cloak -->
+        <section class="settings-section">
+          <div class="settings-section-title">Tab Cloak</div>
+          <p class="settings-section-desc">Disguise this tab from onlookers.</p>
+
+          <div class="settings-row">
+            <label class="settings-label" for="cloak-preset">Preset</label>
+            <select id="cloak-preset" class="settings-select">
+              <option value="none">None</option>
+              <option value="docs">Google Docs</option>
+              <option value="classroom">Google Classroom</option>
+              <option value="gmail">Gmail</option>
+              <option value="desmos">Desmos</option>
+              <option value="khan">Khan Academy</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </div>
+
+          <div class="settings-row" id="cloak-custom-row" style="display:none;">
+            <label class="settings-label" for="cloak-custom-title">Tab title</label>
+            <input type="text" id="cloak-custom-title" class="settings-input" placeholder="e.g. Google Docs" />
+          </div>
+          <div class="settings-row" id="cloak-favicon-row" style="display:none;">
+            <label class="settings-label" for="cloak-custom-favicon">Favicon URL</label>
+            <input type="text" id="cloak-custom-favicon" class="settings-input" placeholder="https://…/favicon.ico" />
+          </div>
+        </section>
+
+        <!-- Panic Key -->
+        <section class="settings-section">
+          <div class="settings-section-title">Panic Key</div>
+          <p class="settings-section-desc">Instantly navigate away. Works when this page is focused — click the URL bar first if browsing a site.</p>
+
+          <div class="settings-row">
+            <span class="settings-label">Enable</span>
+            <label class="toggle">
+              <input type="checkbox" id="panic-enabled" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Key combo</span>
+            <button id="panic-key-capture" class="panic-key-display" type="button">Alt + X</button>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label" for="panic-url-select">Navigate to</label>
+            <select id="panic-url-select" class="settings-select">
+              <option value="classroom">Google Classroom</option>
+              <option value="google">Google</option>
+              <option value="gmail">Gmail</option>
+              <option value="desmos">Desmos</option>
+              <option value="khan">Khan Academy</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </div>
+          <div class="settings-row" id="panic-url-custom-row" style="display:none;">
+            <label class="settings-label" for="panic-url-custom">URL</label>
+            <input type="url" id="panic-url-custom" class="settings-input" placeholder="https://…" />
+          </div>
+        </section>
+
+        <!-- Appearance -->
+        <section class="settings-section">
+          <div class="settings-section-title">Appearance</div>
+
+          <div class="settings-row settings-row--col">
+            <span class="settings-label">Theme</span>
+            <div class="theme-grid" id="theme-picker">
+              <button class="theme-swatch active" data-theme="veil"    title="Veil"></button>
+              <button class="theme-swatch"        data-theme="ember"   title="Ember"></button>
+              <button class="theme-swatch"        data-theme="emerald" title="Emerald"></button>
+              <button class="theme-swatch"        data-theme="rose"    title="Rose"></button>
+              <button class="theme-swatch"        data-theme="ocean"   title="Ocean"></button>
+              <button class="theme-swatch"        data-theme="void"    title="Void"></button>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <span class="settings-label">Starfield</span>
+            <label class="toggle">
+              <input type="checkbox" id="fx-stars" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Aurora</span>
+            <label class="toggle">
+              <input type="checkbox" id="fx-aurora" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">CRT Scanlines</span>
+            <label class="toggle">
+              <input type="checkbox" id="fx-scanlines" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Cursor Glow</span>
+            <label class="toggle">
+              <input type="checkbox" id="fx-cursor" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Edge Darkening</span>
+            <label class="toggle">
+              <input type="checkbox" id="fx-vignette" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Lag Reduction</span>
+            <label class="toggle">
+              <input type="checkbox" id="perf-mode-toggle" />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Background -->
+        <section class="settings-section">
+          <div class="settings-section-title">Background</div>
+          <p class="settings-section-desc">Custom home screen background. Aurora &amp; stars layer on top.</p>
+
+          <div class="settings-row settings-row--col">
+            <span class="settings-label">Image URL</span>
+            <input type="text" id="bg-url" class="settings-input bg-url-input" placeholder="https://…/image.jpg or .gif" />
+          </div>
+
+          <div class="settings-row settings-row--col">
+            <span class="settings-label">Gradient</span>
+            <div class="bg-gradient-grid" id="bg-gradient-picker">
+              <button class="bg-swatch active" data-gradient=""       title="None">×</button>
+              <button class="bg-swatch"        data-gradient="sunset" title="Sunset"></button>
+              <button class="bg-swatch"        data-gradient="cosmos" title="Cosmos"></button>
+              <button class="bg-swatch"        data-gradient="forest" title="Forest"></button>
+              <button class="bg-swatch"        data-gradient="ocean"  title="Ocean"></button>
+              <button class="bg-swatch"        data-gradient="dusk"   title="Dusk"></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Privacy -->
+        <section class="settings-section">
+          <div class="settings-section-title">Privacy</div>
+
+          <div class="settings-row">
+            <span class="settings-label">Save History</span>
+            <label class="toggle">
+              <input type="checkbox" id="priv-history" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="settings-row settings-row--actions">
+            <button class="settings-btn-danger" id="btn-clear-history">Clear History</button>
+            <button class="settings-btn-danger" id="btn-clear-bookmarks">Clear Bookmarks</button>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <script src="/history.js"></script>
+    <script src="/panic.js"></script>
+    <script src="/splash.js"></script>
+    <script src="/autocomplete.js"></script>
+    <script src="/tabs.js"></script>
+    <script src="/scram/scramjet.all.js"></script>
+    <script src="/baremux/index.js"></script>
+    <script src="/register-sw.js"></script>
+    <script src="/search.js"></script>
+    <script src="/index.js"></script>
+    <script src="/fx.js"></script>
+    <script src="/shortcuts.js"></script>
+    <script src="/games.js"></script>
+    <script src="/settings.js"></script>
+  </body>
+</html>

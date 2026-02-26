@@ -1,0 +1,98 @@
+[
+  {
+    "name": "Agar.io",
+    "url": "https://agar.io",
+    "emoji": "🧫",
+    "hue": 120
+  },
+  {
+    "name": "Slither.io",
+    "url": "https://slither.io",
+    "emoji": "🐍",
+    "hue": 140
+  },
+  {
+    "name": "Town of Salem",
+    "url": "https://www.townofsalem.io",
+    "emoji": "🎭",
+    "hue": 300
+  },
+  {
+    "name": "Krunker.io",
+    "url": "https://krunker.io",
+    "emoji": "🔫",
+    "hue": 10
+  },
+  {
+    "name": "ZombsRoyale.io",
+    "url": "https://zombsroyale.io",
+    "emoji": "🧟",
+    "hue": 110
+  },
+  {
+    "name": "Shell Shockers",
+    "url": "https://shellshock.io",
+    "emoji": "🥚",
+    "hue": 50
+  },
+  {
+    "name": "Travian: Legends",
+    "url": "https://www.travian.com",
+    "emoji": "🏰",
+    "hue": 35
+  },
+  {
+    "name": "Transformice",
+    "url": "https://transformice.com",
+    "emoji": "🐭",
+    "hue": 25
+  },
+  {
+    "name": "Candy Box!",
+    "url": "http://candybox2.net",
+    "emoji": "🍬",
+    "hue": 330
+  },
+  {
+    "name": "Cookie Clicker",
+    "url": "https://orteil.dashnet.org/cookieclicker",
+    "emoji": "🍪",
+    "hue": 30
+  },
+  {
+    "name": "A Dark Room",
+    "url": "https://adarkroom.doublespeakgames.com",
+    "emoji": "🔥",
+    "hue": 15
+  },
+  {
+    "name": "GeoGuessr",
+    "url": "https://www.geoguessr.com",
+    "emoji": "🌍",
+    "hue": 200
+  },
+  {
+    "name": "Pokémon Showdown",
+    "url": "https://play.pokemonshowdown.com",
+    "emoji": "⚡",
+    "hue": 55
+  },
+  {
+    "name": "Skribbl.io",
+    "url": "https://skribbl.io",
+    "emoji": "🎨",
+    "hue": 280
+  },
+  {
+    "name": "Chess.com",
+    "url": "https://www.chess.com/play",
+    "emoji": "♟️",
+    "hue": 0
+  },
+  {
+    "name": "Catan Universe",
+    "url": "https://www.catanuniverse.com",
+    "emoji": "🌾",
+    "hue": 70
+  }
+]

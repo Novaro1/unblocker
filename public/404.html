@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 — Veil</title>
+    <link rel="stylesheet" href="/index.css" />
+    <style>
+      .error-page {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 2rem;
+        gap: 0.75rem;
+        position: relative;
+        z-index: 1;
+      }
+      .error-code {
+        font-size: 6.5rem;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.06em;
+        background: linear-gradient(135deg, #6366f1, #a5b4fc);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        opacity: 0.3;
+      }
+      .error-msg {
+        font-size: 1rem;
+        color: var(--muted);
+      }
+      .error-home {
+        margin-top: 0.5rem;
+        display: inline-block;
+        padding: 0.45rem 1.2rem;
+        background: rgba(99, 102, 241, 0.1);
+        border: 1px solid rgba(99, 102, 241, 0.35);
+        border-radius: 999px;
+        color: #c7d2fe;
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: background 0.15s, border-color 0.15s;
+      }
+      .error-home:hover {
+        background: rgba(99, 102, 241, 0.18);
+        border-color: rgba(99, 102, 241, 0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="error-page">
+      <div class="error-code">404</div>
+      <p class="error-msg">This page doesn't exist.</p>
+      <a href="/" class="error-home">Back to Veil</a>
+    </div>
+  </body>
+</html>
