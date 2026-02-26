@@ -73,6 +73,11 @@ fastify.register(fastifyStatic, {
   decorateReply: false,
 });
 
+// Caddy on-demand TLS ask endpoint — always approve
+fastify.get('/caddy-ask', (_req, reply) => {
+  reply.code(200).send('ok');
+});
+
 fastify.setNotFoundHandler((_req, reply) => {
   return reply.code(404).type("text/html").sendFile("404.html");
 });
