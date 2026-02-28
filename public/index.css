@@ -1668,6 +1668,56 @@ body.perf-mode .ql-tile:hover {
   --danger:         #ea4335;
 }
 
+/* ── Chrome theme overrides ───────────────────────────────────────────────── */
+:root[data-theme="chrome"] .aurora,
+:root[data-theme="chrome"] #veil-stars,
+:root[data-theme="chrome"] #cursor-glow { display: none !important; }
+
+:root[data-theme="chrome"] body { background: #ffffff; }
+
+:root[data-theme="chrome"] .toolbar {
+  background: #f1f3f4;
+  border-bottom: 1px solid #dadce0;
+  box-shadow: none;
+}
+
+:root[data-theme="chrome"] .toolbar::before { display: none; }
+
+:root[data-theme="chrome"] .toolbar-btn { color: #5f6368; }
+:root[data-theme="chrome"] .toolbar-btn:hover:not(:disabled) { background: #e8eaed; color: #202124; }
+
+:root[data-theme="chrome"] #sj-url-bar {
+  background: #ffffff;
+  color: #202124;
+  border: 1px solid #dadce0;
+  box-shadow: none;
+}
+
+:root[data-theme="chrome"] #sj-url-bar:focus {
+  background: #ffffff;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+}
+
+:root[data-theme="chrome"] #tab-bar {
+  background: #dee1e6;
+  border-bottom: 1px solid #c4c7cc;
+}
+
+:root[data-theme="chrome"] #tab-bar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
+
+:root[data-theme="chrome"] .tab-btn {
+  color: #5f6368;
+  background: transparent;
+}
+
+:root[data-theme="chrome"] .tab-btn.active {
+  background: #ffffff;
+  color: #202124;
+}
+
+:root[data-theme="chrome"] .tab-btn:hover:not(.active) { background: rgba(0,0,0,0.06); }
+
 /* ── Theme picker ─────────────────────────────────────────────────────────── */
 .theme-grid {
   display: grid;
