@@ -9,8 +9,9 @@ import fastifyStatic from "@fastify/static";
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
 import { baremuxPath } from "@mercuryworkshop/bare-mux/node";
 
-const publicPath   = fileURLToPath(new URL("../public/", import.meta.url));
-const tokensPath   = fileURLToPath(new URL("../tokens.json", import.meta.url));
+const publicPath        = fileURLToPath(new URL("../public/", import.meta.url));
+const tokensPath        = fileURLToPath(new URL("../tokens.json", import.meta.url));
+const betaFeaturesPath  = fileURLToPath(new URL("../beta-features.json", import.meta.url));
 const bareAsModule3Path = fileURLToPath(
   new URL("../node_modules/@mercuryworkshop/bare-as-module3/dist/", import.meta.url)
 );
@@ -93,6 +94,32 @@ fastify.get('/api/verify-token', (req, reply) => {
     return reply.send({ valid: false });
   } catch {
     return reply.code(500).send({ valid: false });
+  }
+});
+
+// Beta feature status — computes whether each feature is still in its ambassador-only window
+fastify.get('/api/beta-features', (_req, reply) => {
+  try {
+    const raw = existsSync(betaFeaturesPath)
+      ? JSON.parse(readFileSync(betaFeaturesPath, "utf-8"))
+      : [];
+    const now = Date.now();
+    const result = raw.map((f) => {
+      const betaMs  = (f.betaDays ?? 14) * 86400000;
+      const elapsed = now - new Date(f.releasedAt).getTime();
+      const isBeta  = elapsed < betaMs;
+      return {
+        id:       f.id,
+        type:     f.type,
+        key:      f.key,
+        label:    f.label,
+        isBeta,
+        daysLeft: isBeta ? Math.ceil((betaMs - elapsed) / 86400000) : 0,
+      };
+    });
+    return reply.send(result);
+  } catch {
+    return reply.code(500).send([]);
   }
 });
 

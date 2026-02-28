@@ -412,8 +412,82 @@
     }
   }
 
+  // ── Beta feature system ──────────────────────────────────────────────────
+  // Features in beta-features.json are ambassador-only until their betaDays
+  // window expires, then they unlock for everyone automatically.
+
+  function _betaApplyEl(type, key, label, unlocked, daysLeft) {
+    if (type === "theme") {
+      const el = document.querySelector(`.theme-swatch[data-theme="${key}"]`);
+      if (!el) return;
+      el.disabled    = !unlocked;
+      el.textContent = unlocked ? "" : "🔒";
+      el.title       = unlocked
+        ? `${label} (Early Access — ${daysLeft}d left)`
+        : `${label} (Ambassador only — ${daysLeft} days left in early access)`;
+      el.classList.toggle("theme-swatch--locked", !unlocked);
+    } else if (type === "gradient") {
+      const el = document.querySelector(`.bg-swatch[data-gradient="${key}"]`);
+      if (!el) return;
+      el.disabled    = !unlocked;
+      el.textContent = unlocked ? "" : "🔒";
+      el.title       = unlocked
+        ? `${label} (Early Access — ${daysLeft}d left)`
+        : `${label} (Ambassador only — ${daysLeft} days left in early access)`;
+      el.classList.toggle("bg-swatch--locked", !unlocked);
+    } else if (type === "cloak") {
+      const el = document.getElementById(`cloak-opt-${key}`);
+      if (!el) return;
+      el.disabled    = !unlocked;
+      el.textContent = `${unlocked ? "⭐" : "🔒"} ${label}`;
+    }
+  }
+
+  function _betaUnlockEl(type, key, label) {
+    if (type === "theme") {
+      const el = document.querySelector(`.theme-swatch[data-theme="${key}"]`);
+      if (!el) return;
+      el.disabled    = false;
+      el.textContent = "";
+      el.title       = label;
+      el.classList.remove("theme-swatch--locked");
+    } else if (type === "gradient") {
+      const el = document.querySelector(`.bg-swatch[data-gradient="${key}"]`);
+      if (!el) return;
+      el.disabled    = false;
+      el.textContent = "";
+      el.title       = label;
+      el.classList.remove("bg-swatch--locked");
+    } else if (type === "cloak") {
+      const el = document.getElementById(`cloak-opt-${key}`);
+      if (!el) return;
+      el.disabled    = false;
+      el.textContent = label;
+    }
+  }
+
+  async function applyBetaFeatures() {
+    let features;
+    try {
+      const res = await fetch("/api/beta-features");
+      if (!res.ok) return;
+      features = await res.json();
+    } catch { return; }
+    if (!Array.isArray(features) || !features.length) return;
+
+    const isAmbassador = loadAmbassador() != null;
+    for (const f of features) {
+      if (f.isBeta) {
+        _betaApplyEl(f.type, f.key, f.label, isAmbassador, f.daysLeft);
+      } else {
+        _betaUnlockEl(f.type, f.key, f.label);
+      }
+    }
+  }
+
   // Apply on page load
   applyAmbassador(loadAmbassador());
+  applyBetaFeatures();
 
   // Redeem button
   document.getElementById("ambassador-redeem-btn")?.addEventListener("click", async function () {
@@ -432,6 +506,7 @@
       if (data.valid) {
         saveAmbassador({ token, username: data.username });
         applyAmbassador({ token, username: data.username });
+        applyBetaFeatures();
         if (input) input.value = "";
       } else {
         if (errorEl) { errorEl.textContent = "Invalid token. Ask staff to run /approve-ad for you."; errorEl.style.display = ""; }
@@ -448,5 +523,6 @@
   document.getElementById("ambassador-revoke-btn")?.addEventListener("click", function () {
     clearAmbassador();
     applyAmbassador(null);
+    applyBetaFeatures();
   });
 })();

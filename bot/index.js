@@ -15,9 +15,10 @@ import { dirname, join } from "path";
 import https from "https";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const LINKS_FILE   = join(__dirname, "links.json");
-const CONFIG_FILE  = join(__dirname, "live-config.json");
-const TOKENS_FILE  = join(__dirname, "../tokens.json");
+const LINKS_FILE         = join(__dirname, "links.json");
+const CONFIG_FILE        = join(__dirname, "live-config.json");
+const TOKENS_FILE        = join(__dirname, "../tokens.json");
+const BETA_FEATURES_FILE = join(__dirname, "../beta-features.json");
 
 // ── Persistent config (live message IDs) ──────────────────────────────────
 function loadConfig() {
@@ -37,6 +38,16 @@ function loadTokens() {
 
 function saveTokens(tokens) {
   writeFileSync(TOKENS_FILE, JSON.stringify(tokens, null, 2));
+}
+
+// ── Beta feature storage ────────────────────────────────────────────────────
+function loadBetaFeatures() {
+  if (!existsSync(BETA_FEATURES_FILE)) return [];
+  return JSON.parse(readFileSync(BETA_FEATURES_FILE, "utf-8"));
+}
+
+function saveBetaFeatures(features) {
+  writeFileSync(BETA_FEATURES_FILE, JSON.stringify(features, null, 2));
 }
 
 // ── Link storage ───────────────────────────────────────────────────────────
@@ -476,6 +487,65 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     saveTokens(filtered);
     return interaction.reply({ content: `🗑️ Ambassador token revoked for **${target.username}**.`, ephemeral: true });
+  }
+
+  // /beta-release
+  if (commandName === "beta-release") {
+    const type  = interaction.options.getString("type");
+    const key   = interaction.options.getString("key");
+    const label = interaction.options.getString("label");
+    const days  = interaction.options.getInteger("days") ?? 14;
+
+    const features = loadBetaFeatures();
+    const existing = features.find((f) => f.type === type && f.key === key);
+    if (existing) {
+      return interaction.reply({
+        content: `**${label}** (\`${type}:${key}\`) is already in the beta list (released <t:${Math.floor(new Date(existing.releasedAt).getTime() / 1000)}:R>).`,
+        ephemeral: true,
+      });
+    }
+
+    const releasedAt = new Date().toISOString();
+    features.push({ id: `${type}-${key}`, type, key, label, releasedAt, betaDays: days });
+    saveBetaFeatures(features);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("🚀 Beta Feature Released")
+      .addFields(
+        { name: "Feature", value: `${label} (${type}: \`${key}\`)`, inline: true },
+        { name: "Window",  value: `${days} days`,                   inline: true },
+        { name: "Goes public", value: `<t:${Math.floor((Date.now() + days * 86400000) / 1000)}:R>`, inline: true },
+      )
+      .setDescription(`Ambassadors get early access. Feature unlocks for everyone <t:${Math.floor((Date.now() + days * 86400000) / 1000)}:R>.`)
+      .setTimestamp();
+
+    return interaction.reply({ embeds: [embed] });
+  }
+
+  // /beta-status
+  if (commandName === "beta-status") {
+    const features = loadBetaFeatures();
+    if (!features.length) {
+      return interaction.reply({ content: "No features in the beta system yet.", ephemeral: true });
+    }
+    const now = Date.now();
+    const lines = features.map((f) => {
+      const betaMs   = (f.betaDays ?? 14) * 86400000;
+      const elapsed  = now - new Date(f.releasedAt).getTime();
+      const isBeta   = elapsed < betaMs;
+      const daysLeft = isBeta ? Math.ceil((betaMs - elapsed) / 86400000) : 0;
+      const publicTs = Math.floor((new Date(f.releasedAt).getTime() + betaMs) / 1000);
+      return isBeta
+        ? `🔒 **${f.label}** (${f.type}:\`${f.key}\`) — Ambassador only · ${daysLeft}d left · public <t:${publicTs}:R>`
+        : `✅ **${f.label}** (${f.type}:\`${f.key}\`) — Public since <t:${publicTs}:R>`;
+    });
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("🔬 Beta Feature Status")
+      .setDescription(lines.join("\n"))
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed] });
   }
 
   // /uptime

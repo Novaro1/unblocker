@@ -101,6 +101,33 @@ const commands = [
     .addUserOption((o) =>
       o.setName("user").setDescription("The user to revoke").setRequired(true)
     ),
+
+  new SlashCommandBuilder()
+    .setName("beta-release")
+    .setDescription("Add a new feature to the beta (ambassador-only) window (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addStringOption((o) =>
+      o.setName("type").setDescription("Feature type").setRequired(true)
+        .addChoices(
+          { name: "Theme",    value: "theme"    },
+          { name: "Gradient", value: "gradient" },
+          { name: "Cloak",    value: "cloak"    },
+        )
+    )
+    .addStringOption((o) =>
+      o.setName("key").setDescription("The data key (e.g. hologram, blaze, youtube)").setRequired(true)
+    )
+    .addStringOption((o) =>
+      o.setName("label").setDescription("Display name (e.g. Hologram)").setRequired(true)
+    )
+    .addIntegerOption((o) =>
+      o.setName("days").setDescription("Days in ambassador-only beta window (default 14)").setRequired(false)
+        .setMinValue(1).setMaxValue(365)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("beta-status")
+    .setDescription("Show current beta features and their ambassador-only countdown"),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);
