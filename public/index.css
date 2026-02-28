@@ -1652,10 +1652,26 @@ body.perf-mode .ql-tile:hover {
   --aurora-4:       #334155;
 }
 
+[data-theme="chrome"] {
+  --bg:             #ffffff;
+  --surface:        #f1f3f4;
+  --surface2:       #e8eaed;
+  --border:         #dadce0;
+  --text:           #202124;
+  --muted:          #5f6368;
+  --accent:         #1a73e8;
+  --accent-light:   #4285f4;
+  --accent-lighter: #8ab4f8;
+  --aurora-2:       #ea4335;
+  --aurora-3:       #fbbc04;
+  --aurora-4:       #34a853;
+  --danger:         #ea4335;
+}
+
 /* ── Theme picker ─────────────────────────────────────────────────────────── */
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 8px;
   margin-top: 2px;
   width: 100%;
@@ -1680,6 +1696,7 @@ body.perf-mode .ql-tile:hover {
 .theme-swatch[data-theme="rose"]    { background: linear-gradient(135deg, #0d0608 0%, #f43f5e 100%); }
 .theme-swatch[data-theme="ocean"]   { background: linear-gradient(135deg, #04080d 0%, #06b6d4 100%); }
 .theme-swatch[data-theme="void"]    { background: linear-gradient(135deg, #080808 0%, #94a3b8 100%); }
+.theme-swatch[data-theme="chrome"]  { background: linear-gradient(135deg, #f1f3f4 0%, #ffffff 50%, #1a73e8 100%); border-color: #dadce0; }
 
 /* ── Custom background ───────────────────────────────────────────────────── */
 #custom-bg {
