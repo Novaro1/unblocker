@@ -17,8 +17,33 @@ try {
   _swBC.postMessage({ ok: false, message: e.message, stack: String(e.stack || "") });
 }
 
+// Captcha CDN hostnames that must load directly (not rewritten) so that
+// reCAPTCHA, hCaptcha, and Cloudflare Turnstile work correctly.
+const CAPTCHA_HOSTS = new Set([
+  "www.google.com",
+  "www.gstatic.com",
+  "recaptcha.net",
+  "hcaptcha.com",
+  "js.hcaptcha.com",
+  "newassets.hcaptcha.com",
+  "imgs.hcaptcha.com",
+  "challenges.cloudflare.com",
+  "static.cloudflareinsights.com",
+]);
+
+function isCaptchaRequest(url) {
+  try {
+    const { hostname, pathname } = new URL(url);
+    if (CAPTCHA_HOSTS.has(hostname)) return true;
+    // reCAPTCHA can also be loaded from the site's own domain via a path
+    if (pathname.includes("/recaptcha/") || pathname.includes("/captcha/")) return true;
+  } catch {}
+  return false;
+}
+
 async function handleRequest(event) {
   await _scramjet.loadConfig();
+  if (isCaptchaRequest(event.request.url)) return fetch(event.request);
   if (_scramjet.route(event)) return _scramjet.fetch(event);
   return fetch(event.request);
 }
