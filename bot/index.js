@@ -11,7 +11,18 @@ import { dirname, join } from "path";
 import https from "https";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const LINKS_FILE = join(__dirname, "links.json");
+const LINKS_FILE  = join(__dirname, "links.json");
+const CONFIG_FILE = join(__dirname, "live-config.json");
+
+// ── Persistent config (live message IDs) ──────────────────────────────────
+function loadConfig() {
+  if (!existsSync(CONFIG_FILE)) return {};
+  return JSON.parse(readFileSync(CONFIG_FILE, "utf-8"));
+}
+
+function saveConfig(cfg) {
+  writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+}
 
 // ── Link storage ───────────────────────────────────────────────────────────
 function loadLinks() {
@@ -53,8 +64,64 @@ const {
 
 const BOT_START = Date.now();
 
+// ── Live embed builders ────────────────────────────────────────────────────
+async function buildStatusEmbed(guild) {
+  const result = await checkStatus(SERVER_URL);
+  await guild.members.fetch();
+  const online = guild.members.cache.filter(
+    (m) => m.presence?.status && m.presence.status !== "offline"
+  ).size;
+  return new EmbedBuilder()
+    .setColor(result.online ? 0x22c55e : 0xef4444)
+    .setTitle("🌐 Veil Live Status")
+    .addFields(
+      { name: "Proxy",    value: result.online ? "🟢 Online" : "🔴 Offline", inline: true },
+      { name: "Ping",     value: `${result.ms}ms`,                            inline: true },
+      { name: "Members",  value: `${guild.memberCount}`,                      inline: true },
+      { name: "Online",   value: `${online}`,                                 inline: true },
+      { name: "Links",    value: `${loadLinks().length} active`,               inline: true },
+    )
+    .setFooter({ text: `Last updated` })
+    .setTimestamp();
+}
+
+function buildLinksEmbed() {
+  const links = loadLinks();
+  return new EmbedBuilder()
+    .setColor(0x6366f1)
+    .setTitle("🔗 Working Veil Links")
+    .setDescription(
+      links.length
+        ? links.map((l, i) => `${i + 1}. [${l.name}](${l.url})`).join("\n")
+        : "No links yet. Staff can add one with `/addlink`."
+    )
+    .setFooter({ text: "First load may take a few seconds for the SSL cert" })
+    .setTimestamp();
+}
+
+// ── Update live messages ───────────────────────────────────────────────────
+async function refreshLiveMessages() {
+  const cfg = loadConfig();
+  if (cfg.statusChannelId && cfg.statusMessageId) {
+    try {
+      const ch  = await client.channels.fetch(cfg.statusChannelId);
+      const msg = await ch.messages.fetch(cfg.statusMessageId);
+      await msg.edit({ embeds: [await buildStatusEmbed(ch.guild)] });
+    } catch { /* message deleted or channel gone */ }
+  }
+  if (cfg.linksChannelId && cfg.linksMessageId) {
+    try {
+      const ch  = await client.channels.fetch(cfg.linksChannelId);
+      const msg = await ch.messages.fetch(cfg.linksMessageId);
+      await msg.edit({ embeds: [buildLinksEmbed()] });
+    } catch { /* message deleted or channel gone */ }
+  }
+}
+
 client.once(Events.ClientReady, () => {
   console.log(`Veil Bot ready as ${client.user.tag}`);
+  // Refresh live embeds every 60 seconds
+  setInterval(refreshLiveMessages, 60_000);
 });
 
 // ── Auto-role + welcome on join ────────────────────────────────────────────
@@ -112,6 +179,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     links.push({ url, name });
     saveLinks(links);
+    refreshLiveMessages();
     return interaction.reply({ content: `Added **${name}** to the links list.` });
   }
 
@@ -124,6 +192,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ content: "Link not found.", ephemeral: true });
     }
     saveLinks(filtered);
+    refreshLiveMessages();
     return interaction.reply({ content: `Removed **${url}** from the links list.` });
   }
 
@@ -249,6 +318,29 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setThumbnail(interaction.user.displayAvatarURL());
     await channel.send({ embeds: [embed] });
     return interaction.reply({ content: "Test welcome message sent!", ephemeral: true });
+  }
+
+  // /livestatus
+  if (commandName === "livestatus") {
+    await interaction.deferReply({ ephemeral: true });
+    const embed = await buildStatusEmbed(interaction.guild);
+    const msg = await interaction.channel.send({ embeds: [embed] });
+    const cfg = loadConfig();
+    cfg.statusChannelId = interaction.channel.id;
+    cfg.statusMessageId = msg.id;
+    saveConfig(cfg);
+    return interaction.editReply({ content: "Live status embed posted! It will update every 60 seconds." });
+  }
+
+  // /livelinks
+  if (commandName === "livelinks") {
+    await interaction.deferReply({ ephemeral: true });
+    const msg = await interaction.channel.send({ embeds: [buildLinksEmbed()] });
+    const cfg = loadConfig();
+    cfg.linksChannelId = interaction.channel.id;
+    cfg.linksMessageId = msg.id;
+    saveConfig(cfg);
+    return interaction.editReply({ content: "Live links embed posted! It will update automatically when links are added or removed." });
   }
 
   // /uptime

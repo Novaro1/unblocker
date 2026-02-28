@@ -70,6 +70,16 @@ const commands = [
   new SlashCommandBuilder()
     .setName("uptime")
     .setDescription("Show how long the bot has been running"),
+
+  new SlashCommandBuilder()
+    .setName("livestatus")
+    .setDescription("Post a live auto-updating server status embed in this channel (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+  new SlashCommandBuilder()
+    .setName("livelinks")
+    .setDescription("Post a live auto-updating links embed in this channel (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);
