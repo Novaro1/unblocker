@@ -52,7 +52,7 @@ let _swOk      = null;
 function getProxiedUrlFrom(tab) {
   try {
     const href = tab.frame.frame.contentWindow.location.href;
-    const base = location.origin + "/scramjet/";
+    const base = location.origin + "/sj/";
     if (href.startsWith(base)) return decodeURIComponent(href.slice(base.length));
   } catch {}
   return "";
@@ -261,6 +261,7 @@ form.addEventListener("submit", async (event) => {
     if (!scramjet) {
       const { ScramjetController } = $scramjetLoadController();
       scramjet = new ScramjetController({
+        prefix: "/sj/",
         files: {
           wasm: "/scramjet/scramjet.wasm.wasm",
           all:  "/scramjet/scramjet.all.js",
@@ -280,6 +281,7 @@ form.addEventListener("submit", async (event) => {
       });
       const { ScramjetController } = $scramjetLoadController();
       scramjet = new ScramjetController({
+        prefix: "/sj/",
         files: {
           wasm: "/scramjet/scramjet.wasm.wasm",
           all:  "/scramjet/scramjet.all.js",
