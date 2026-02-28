@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "url";
 import { hostname } from "node:os";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
@@ -8,7 +9,8 @@ import fastifyStatic from "@fastify/static";
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
 import { baremuxPath } from "@mercuryworkshop/bare-mux/node";
 
-const publicPath  = fileURLToPath(new URL("../public/", import.meta.url));
+const publicPath   = fileURLToPath(new URL("../public/", import.meta.url));
+const tokensPath   = fileURLToPath(new URL("../tokens.json", import.meta.url));
 const bareAsModule3Path = fileURLToPath(
   new URL("../node_modules/@mercuryworkshop/bare-as-module3/dist/", import.meta.url)
 );
@@ -76,6 +78,22 @@ fastify.register(fastifyStatic, {
 // Caddy on-demand TLS ask endpoint — always approve
 fastify.get('/caddy-ask', (_req, reply) => {
   reply.code(200).send('ok');
+});
+
+// Ambassador token verification
+fastify.get('/api/verify-token', (req, reply) => {
+  const { token } = req.query;
+  if (!token) return reply.code(400).send({ valid: false });
+  try {
+    const tokens = existsSync(tokensPath)
+      ? JSON.parse(readFileSync(tokensPath, "utf-8"))
+      : [];
+    const entry = tokens.find((t) => t.token === token);
+    if (entry) return reply.send({ valid: true, username: entry.username });
+    return reply.send({ valid: false });
+  } catch {
+    return reply.code(500).send({ valid: false });
+  }
 });
 
 fastify.setNotFoundHandler((_req, reply) => {

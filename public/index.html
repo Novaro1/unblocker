@@ -345,6 +345,7 @@
               <button class="theme-swatch"        data-theme="ocean"   title="Ocean"></button>
               <button class="theme-swatch"        data-theme="void"    title="Void"></button>
               <button class="theme-swatch"        data-theme="chrome"  title="Chrome"></button>
+              <button class="theme-swatch theme-swatch--locked" data-theme="aura" id="aura-swatch" title="Aura (Ambassador only)" disabled>🔒</button>
             </div>
           </div>
 
@@ -412,6 +413,31 @@
               <button class="bg-swatch"        data-gradient="ocean"  title="Ocean"></button>
               <button class="bg-swatch"        data-gradient="dusk"   title="Dusk"></button>
             </div>
+          </div>
+        </section>
+
+        <!-- Ambassador -->
+        <section class="settings-section">
+          <div class="settings-section-title">Ambassador</div>
+          <p class="settings-section-desc">Advertise Veil in Discord and get approved by staff to unlock exclusive features.</p>
+
+          <div id="ambassador-verified" style="display:none;">
+            <div class="ambassador-badge">⭐ Ambassador — <span id="ambassador-name"></span></div>
+          </div>
+
+          <div id="ambassador-form">
+            <div class="settings-row settings-row--col">
+              <span class="settings-label">Token</span>
+              <div class="ambassador-input-row">
+                <input type="text" id="ambassador-token-input" class="settings-input" placeholder="Paste your token here" autocomplete="off" spellcheck="false" />
+                <button class="settings-btn" id="ambassador-redeem-btn">Redeem</button>
+              </div>
+            </div>
+            <p id="ambassador-error" class="ambassador-error" style="display:none;"></p>
+          </div>
+
+          <div class="settings-row settings-row--actions" id="ambassador-revoke-row" style="display:none;">
+            <button class="settings-btn-danger" id="ambassador-revoke-btn">Remove Token</button>
           </div>
         </section>
 

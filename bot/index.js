@@ -9,13 +9,15 @@ import {
   ActionRowBuilder,
 } from "discord.js";
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const LINKS_FILE  = join(__dirname, "links.json");
-const CONFIG_FILE = join(__dirname, "live-config.json");
+const LINKS_FILE   = join(__dirname, "links.json");
+const CONFIG_FILE  = join(__dirname, "live-config.json");
+const TOKENS_FILE  = join(__dirname, "../tokens.json");
 
 // ── Persistent config (live message IDs) ──────────────────────────────────
 function loadConfig() {
@@ -25,6 +27,16 @@ function loadConfig() {
 
 function saveConfig(cfg) {
   writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+}
+
+// ── Ambassador token storage ────────────────────────────────────────────────
+function loadTokens() {
+  if (!existsSync(TOKENS_FILE)) return [];
+  return JSON.parse(readFileSync(TOKENS_FILE, "utf-8"));
+}
+
+function saveTokens(tokens) {
+  writeFileSync(TOKENS_FILE, JSON.stringify(tokens, null, 2));
 }
 
 // ── Link storage ───────────────────────────────────────────────────────────
@@ -408,6 +420,62 @@ client.on(Events.InteractionCreate, async (interaction) => {
       console.error(err);
       return interaction.editReply({ content: `Error: ${err.message}` });
     }
+  }
+
+  // /approve-ad
+  if (commandName === "approve-ad") {
+    const target = interaction.options.getUser("user");
+    if (!target) return interaction.reply({ content: "User not found.", ephemeral: true });
+
+    const tokens = loadTokens();
+    const existing = tokens.find((t) => t.userId === target.id);
+    if (existing) {
+      return interaction.reply({
+        content: `**${target.username}** already has a token: \`${existing.token}\``,
+        ephemeral: true,
+      });
+    }
+
+    const token = randomUUID();
+    tokens.push({ token, userId: target.id, username: target.username, approvedAt: new Date().toISOString() });
+    saveTokens(tokens);
+
+    const embed = new EmbedBuilder()
+      .setColor(0xf59e0b)
+      .setTitle("⭐ Ambassador Token")
+      .setDescription(
+        `Thanks for advertising Veil! Here is your exclusive ambassador token.\n\n` +
+        `**Token:** \`${token}\`\n\n` +
+        `Go to **veilub.mooo.com → Settings → Ambassador** and enter your token to unlock exclusive features.`
+      )
+      .setFooter({ text: "Keep this token private — it's linked to your account." });
+
+    try {
+      await target.send({ embeds: [embed] });
+      return interaction.reply({
+        content: `✅ Ambassador token generated and DMed to **${target.username}**.`,
+        ephemeral: true,
+      });
+    } catch {
+      return interaction.reply({
+        content: `✅ Token generated but couldn't DM **${target.username}** (DMs may be closed). Token: \`${token}\``,
+        ephemeral: true,
+      });
+    }
+  }
+
+  // /revoke-ad
+  if (commandName === "revoke-ad") {
+    const target = interaction.options.getUser("user");
+    if (!target) return interaction.reply({ content: "User not found.", ephemeral: true });
+
+    const tokens = loadTokens();
+    const filtered = tokens.filter((t) => t.userId !== target.id);
+    if (filtered.length === tokens.length) {
+      return interaction.reply({ content: `**${target.username}** has no ambassador token.`, ephemeral: true });
+    }
+    saveTokens(filtered);
+    return interaction.reply({ content: `🗑️ Ambassador token revoked for **${target.username}**.`, ephemeral: true });
   }
 
   // /uptime

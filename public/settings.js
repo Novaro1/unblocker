@@ -296,3 +296,96 @@
   // ── Init ──────────────────────────────────────────────────────────────────
   applySettings(loadSettings());
 })();
+
+// ── Ambassador token system ─────────────────────────────────────────────────
+(function () {
+  const AMBASSADOR_KEY = "veil_ambassador_v1";
+
+  function loadAmbassador() {
+    try { return JSON.parse(localStorage.getItem(AMBASSADOR_KEY) || "null"); }
+    catch { return null; }
+  }
+
+  function saveAmbassador(data) {
+    localStorage.setItem(AMBASSADOR_KEY, JSON.stringify(data));
+  }
+
+  function clearAmbassador() {
+    localStorage.removeItem(AMBASSADOR_KEY);
+  }
+
+  function applyAmbassador(data) {
+    const verifiedEl = document.getElementById("ambassador-verified");
+    const formEl     = document.getElementById("ambassador-form");
+    const revokeRow  = document.getElementById("ambassador-revoke-row");
+    const nameEl     = document.getElementById("ambassador-name");
+    const auraSwatch = document.getElementById("aura-swatch");
+
+    if (data) {
+      if (verifiedEl) verifiedEl.style.display = "";
+      if (formEl)     formEl.style.display     = "none";
+      if (revokeRow)  revokeRow.style.display  = "";
+      if (nameEl)     nameEl.textContent        = data.username;
+      if (auraSwatch) {
+        auraSwatch.disabled    = false;
+        auraSwatch.textContent = "";
+        auraSwatch.title       = "Aura (Ambassador)";
+        auraSwatch.classList.remove("theme-swatch--locked");
+      }
+    } else {
+      if (verifiedEl) verifiedEl.style.display = "none";
+      if (formEl)     formEl.style.display     = "";
+      if (revokeRow)  revokeRow.style.display  = "none";
+      if (auraSwatch) {
+        auraSwatch.disabled    = true;
+        auraSwatch.textContent = "🔒";
+        auraSwatch.title       = "Aura (Ambassador only)";
+        auraSwatch.classList.add("theme-swatch--locked");
+        // Revert to default if the locked theme was active
+        if (document.documentElement.dataset.theme === "aura") {
+          const s = Object.assign({}, JSON.parse(localStorage.getItem("veil_settings_v1") || "{}"), { theme: "veil" });
+          localStorage.setItem("veil_settings_v1", JSON.stringify(s));
+          delete document.documentElement.dataset.theme;
+        }
+      }
+    }
+  }
+
+  // Apply on page load
+  applyAmbassador(loadAmbassador());
+
+  // Redeem button
+  document.getElementById("ambassador-redeem-btn")?.addEventListener("click", async function () {
+    const input   = document.getElementById("ambassador-token-input");
+    const errorEl = document.getElementById("ambassador-error");
+    const token   = input?.value.trim();
+    if (!token) return;
+
+    this.disabled    = true;
+    this.textContent = "Checking…";
+    if (errorEl) errorEl.style.display = "none";
+
+    try {
+      const res  = await fetch(`/api/verify-token?token=${encodeURIComponent(token)}`);
+      const data = await res.json();
+      if (data.valid) {
+        saveAmbassador({ token, username: data.username });
+        applyAmbassador({ token, username: data.username });
+        if (input) input.value = "";
+      } else {
+        if (errorEl) { errorEl.textContent = "Invalid token. Ask staff to run /approve-ad for you."; errorEl.style.display = ""; }
+      }
+    } catch {
+      if (errorEl) { errorEl.textContent = "Could not reach the server. Try again."; errorEl.style.display = ""; }
+    } finally {
+      this.disabled    = false;
+      this.textContent = "Redeem";
+    }
+  });
+
+  // Revoke button
+  document.getElementById("ambassador-revoke-btn")?.addEventListener("click", function () {
+    clearAmbassador();
+    applyAmbassador(null);
+  });
+})();

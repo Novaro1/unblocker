@@ -1846,7 +1846,7 @@ body.perf-mode .ql-tile:hover {
 /* ── Theme picker ─────────────────────────────────────────────────────────── */
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(8, 1fr);
   gap: 8px;
   margin-top: 2px;
   width: 100%;
@@ -1872,6 +1872,64 @@ body.perf-mode .ql-tile:hover {
 .theme-swatch[data-theme="ocean"]   { background: linear-gradient(135deg, #04080d 0%, #06b6d4 100%); }
 .theme-swatch[data-theme="void"]    { background: linear-gradient(135deg, #080808 0%, #94a3b8 100%); }
 .theme-swatch[data-theme="chrome"]  { background: linear-gradient(135deg, #f1f3f4 0%, #ffffff 50%, #1a73e8 100%); border-color: #dadce0; }
+.theme-swatch[data-theme="aura"]    { background: linear-gradient(135deg, #0a0014 0%, #c026d3 50%, #f0abfc 100%); }
+.theme-swatch--locked               { opacity: 0.45; cursor: not-allowed; font-size: 0.65rem; display: flex; align-items: center; justify-content: center; }
+.theme-swatch--locked:hover         { transform: none; }
+
+/* ── Aura theme ──────────────────────────────────────────────────────────── */
+:root[data-theme="aura"] {
+  --accent:        #c026d3;
+  --accent-light:  #f0abfc;
+  --accent-dark:   #86198f;
+  --bg:            #0a0014;
+  --surface:       rgba(30, 0, 50, 0.72);
+  --border:        rgba(192, 38, 211, 0.18);
+  --text:          #fdf4ff;
+  --muted:         #c084fc;
+}
+:root[data-theme="aura"] .aurora div { filter: hue-rotate(60deg); }
+
+/* ── Ambassador section ──────────────────────────────────────────────────── */
+.ambassador-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: linear-gradient(90deg, rgba(245,158,11,0.15), rgba(251,191,36,0.08));
+  border: 1px solid rgba(245,158,11,0.35);
+  border-radius: 8px;
+  color: #fbbf24;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  margin-bottom: 0.5rem;
+  width: 100%;
+}
+
+.ambassador-input-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.ambassador-input-row .settings-input {
+  flex: 1;
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+.ambassador-error {
+  font-size: 0.75rem;
+  color: #f87171;
+  margin-top: 0.25rem;
+  padding-left: 0.1rem;
+}
+
+:root[data-theme="chrome"] .ambassador-badge {
+  background: #fef9c3;
+  border-color: #fde047;
+  color: #92400e;
+}
+:root[data-theme="chrome"] .ambassador-error { color: #dc2626; }
 
 /* ── Custom background ───────────────────────────────────────────────────── */
 #custom-bg {

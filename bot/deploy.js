@@ -85,6 +85,22 @@ const commands = [
     .setName("setupverify")
     .setDescription("Post the verification button in this channel (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+  new SlashCommandBuilder()
+    .setName("approve-ad")
+    .setDescription("Grant a user an ambassador token for advertising Veil (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addUserOption((o) =>
+      o.setName("user").setDescription("The user to reward").setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("revoke-ad")
+    .setDescription("Revoke a user's ambassador token (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addUserOption((o) =>
+      o.setName("user").setDescription("The user to revoke").setRequired(true)
+    ),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);
