@@ -1846,7 +1846,7 @@ body.perf-mode .ql-tile:hover {
 /* ── Theme picker ─────────────────────────────────────────────────────────── */
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
   margin-top: 2px;
   width: 100%;
@@ -1873,6 +1873,8 @@ body.perf-mode .ql-tile:hover {
 .theme-swatch[data-theme="void"]    { background: linear-gradient(135deg, #080808 0%, #94a3b8 100%); }
 .theme-swatch[data-theme="chrome"]  { background: linear-gradient(135deg, #f1f3f4 0%, #ffffff 50%, #1a73e8 100%); border-color: #dadce0; }
 .theme-swatch[data-theme="aura"]    { background: linear-gradient(135deg, #0a0014 0%, #c026d3 50%, #f0abfc 100%); }
+.theme-swatch[data-theme="crimson"] { background: linear-gradient(135deg, #0d0203 0%, #dc2626 50%, #fca5a5 100%); }
+.theme-swatch[data-theme="gold"]    { background: linear-gradient(135deg, #0d0900 0%, #d97706 50%, #fde68a 100%); }
 .theme-swatch--locked               { opacity: 0.45; cursor: not-allowed; font-size: 0.65rem; display: flex; align-items: center; justify-content: center; }
 .theme-swatch--locked:hover         { transform: none; }
 
@@ -1888,6 +1890,51 @@ body.perf-mode .ql-tile:hover {
   --muted:         #c084fc;
 }
 :root[data-theme="aura"] .aurora div { filter: hue-rotate(60deg); }
+
+/* ── Crimson theme ───────────────────────────────────────────────────────── */
+:root[data-theme="crimson"] {
+  --accent:        #dc2626;
+  --accent-light:  #fca5a5;
+  --accent-dark:   #991b1b;
+  --bg:            #0d0203;
+  --surface:       rgba(40, 5, 5, 0.72);
+  --border:        rgba(220, 38, 38, 0.18);
+  --text:          #fff1f2;
+  --muted:         #f87171;
+}
+:root[data-theme="crimson"] .aurora div { filter: hue-rotate(180deg); }
+
+/* ── Gold theme ──────────────────────────────────────────────────────────── */
+:root[data-theme="gold"] {
+  --accent:        #d97706;
+  --accent-light:  #fde68a;
+  --accent-dark:   #92400e;
+  --bg:            #0d0900;
+  --surface:       rgba(40, 28, 0, 0.72);
+  --border:        rgba(217, 119, 6, 0.18);
+  --text:          #fffbeb;
+  --muted:         #fbbf24;
+}
+:root[data-theme="gold"] .aurora div { filter: hue-rotate(220deg); }
+
+/* ── Ambassador locked gradient swatches ─────────────────────────────────── */
+.bg-swatch--locked               { opacity: 0.45; cursor: not-allowed; font-size: 0.6rem; }
+.bg-swatch--locked:hover         { transform: none; border-color: transparent; }
+.bg-swatch[data-gradient="blaze"] { background: linear-gradient(135deg, #0d0200 0%, #c2410c 50%, #fb923c 100%); }
+.bg-swatch[data-gradient="neon"]  { background: linear-gradient(135deg, #001a0d 0%, #059669 40%, #06b6d4 100%); }
+
+/* ── Ambassador home star ────────────────────────────────────────────────── */
+#ambassador-home-star {
+  position: absolute;
+  top: 0.9rem;
+  left: 1.1rem;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: default;
+  user-select: none;
+  filter: drop-shadow(0 0 6px rgba(251,191,36,0.7));
+  z-index: 10;
+}
 
 /* ── Ambassador section ──────────────────────────────────────────────────── */
 .ambassador-badge {

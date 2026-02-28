@@ -56,6 +56,9 @@
         </svg>
       </button>
 
+      <!-- Ambassador star — shown on home screen when verified -->
+      <div id="ambassador-home-star" style="display:none;" title="Ambassador">⭐</div>
+
       <!-- Settings gear — top-right corner of home screen -->
       <button class="settings-gear" id="btn-settings-home" title="Settings" aria-label="Open settings">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -285,6 +288,10 @@
               <option value="desmos">Desmos</option>
               <option value="khan">Khan Academy</option>
               <option value="custom">Custom…</option>
+              <option value="youtube"  disabled id="cloak-opt-youtube">🔒 YouTube</option>
+              <option value="spotify"  disabled id="cloak-opt-spotify">🔒 Spotify</option>
+              <option value="discord"  disabled id="cloak-opt-discord">🔒 Discord</option>
+              <option value="roblox"   disabled id="cloak-opt-roblox" >🔒 Roblox</option>
             </select>
           </div>
 
@@ -345,7 +352,9 @@
               <button class="theme-swatch"        data-theme="ocean"   title="Ocean"></button>
               <button class="theme-swatch"        data-theme="void"    title="Void"></button>
               <button class="theme-swatch"        data-theme="chrome"  title="Chrome"></button>
-              <button class="theme-swatch theme-swatch--locked" data-theme="aura" id="aura-swatch" title="Aura (Ambassador only)" disabled>🔒</button>
+              <button class="theme-swatch theme-swatch--locked" data-theme="aura"    id="aura-swatch"    title="Aura (Ambassador only)"    disabled>🔒</button>
+              <button class="theme-swatch theme-swatch--locked" data-theme="crimson" id="crimson-swatch" title="Crimson (Ambassador only)" disabled>🔒</button>
+              <button class="theme-swatch theme-swatch--locked" data-theme="gold"    id="gold-swatch"    title="Gold (Ambassador only)"    disabled>🔒</button>
             </div>
           </div>
 
@@ -412,6 +421,8 @@
               <button class="bg-swatch"        data-gradient="forest" title="Forest"></button>
               <button class="bg-swatch"        data-gradient="ocean"  title="Ocean"></button>
               <button class="bg-swatch"        data-gradient="dusk"   title="Dusk"></button>
+              <button class="bg-swatch bg-swatch--locked" data-gradient="blaze" id="grad-blaze" title="Blaze (Ambassador only)" disabled>🔒</button>
+              <button class="bg-swatch bg-swatch--locked" data-gradient="neon"  id="grad-neon"  title="Neon (Ambassador only)"  disabled>🔒</button>
             </div>
           </div>
         </section>

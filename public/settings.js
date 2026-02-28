@@ -12,6 +12,11 @@
     gmail:     { title: "Inbox (1) - Gmail",           favicon: "https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico" },
     desmos:    { title: "Desmos | Graphing Calculator",favicon: "https://www.desmos.com/favicon.ico" },
     khan:      { title: "Khan Academy",                favicon: "https://cdn.kastatic.org/images/favicon.ico" },
+    // Ambassador-exclusive cloaks
+    youtube:   { title: "YouTube",                    favicon: "https://www.youtube.com/favicon.ico" },
+    spotify:   { title: "Spotify - Web Player",       favicon: "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png" },
+    discord:   { title: "Discord",                    favicon: "https://discord.com/assets/847541504914fd33810e70a0ea73177e.ico" },
+    roblox:    { title: "Roblox",                     favicon: "https://www.roblox.com/favicon.ico" },
   };
 
   const BG_GRADIENTS = {
@@ -20,6 +25,9 @@
     forest: "linear-gradient(135deg, #030d05 0%, #0a2010 30%, #183818 60%, #0d2810 85%, #030d05 100%)",
     ocean:  "linear-gradient(160deg, #02080d 0%, #051a30 30%, #083050 60%, #051a30 85%, #02080d 100%)",
     dusk:   "linear-gradient(135deg, #0d0820 0%, #2a1848 30%, #522868 60%, #8a3858 80%, #2a1848 100%)",
+    // Ambassador-exclusive gradients
+    blaze:  "linear-gradient(135deg, #0d0200 0%, #7c1d06 30%, #c2410c 60%, #fb923c 100%)",
+    neon:   "linear-gradient(135deg, #001a0d 0%, #065f46 30%, #059669 60%, #06b6d4 100%)",
   };
 
   const DEFAULTS = {
@@ -314,39 +322,92 @@
     localStorage.removeItem(AMBASSADOR_KEY);
   }
 
+  // Ambassador-exclusive theme/gradient/cloak IDs
+  const AMB_THEMES   = ["aura", "crimson", "gold"];
+  const AMB_CLOAKS   = ["youtube", "spotify", "discord", "roblox"];
+  const AMB_GRADS    = ["blaze", "neon"];
+
   function applyAmbassador(data) {
     const verifiedEl = document.getElementById("ambassador-verified");
     const formEl     = document.getElementById("ambassador-form");
     const revokeRow  = document.getElementById("ambassador-revoke-row");
     const nameEl     = document.getElementById("ambassador-name");
-    const auraSwatch = document.getElementById("aura-swatch");
+    const homeStar   = document.getElementById("ambassador-home-star");
 
     if (data) {
       if (verifiedEl) verifiedEl.style.display = "";
       if (formEl)     formEl.style.display     = "none";
       if (revokeRow)  revokeRow.style.display  = "";
       if (nameEl)     nameEl.textContent        = data.username;
-      if (auraSwatch) {
-        auraSwatch.disabled    = false;
-        auraSwatch.textContent = "";
-        auraSwatch.title       = "Aura (Ambassador)";
-        auraSwatch.classList.remove("theme-swatch--locked");
-      }
+      if (homeStar)   homeStar.style.display    = "";
+
+      // Unlock exclusive theme swatches
+      AMB_THEMES.forEach((t) => {
+        const el = document.querySelector(`.theme-swatch[data-theme="${t}"]`);
+        if (!el) return;
+        el.disabled    = false;
+        el.textContent = "";
+        el.title       = `${t.charAt(0).toUpperCase() + t.slice(1)} (Ambassador)`;
+        el.classList.remove("theme-swatch--locked");
+      });
+
+      // Unlock exclusive cloak options
+      AMB_CLOAKS.forEach((c) => {
+        const el = document.getElementById(`cloak-opt-${c}`);
+        if (!el) return;
+        el.disabled     = false;
+        el.textContent  = el.textContent.replace("🔒 ", "⭐ ");
+      });
+
+      // Unlock exclusive gradient swatches
+      AMB_GRADS.forEach((g) => {
+        const el = document.querySelector(`.bg-swatch[data-gradient="${g}"]`);
+        if (!el) return;
+        el.disabled    = false;
+        el.textContent = "";
+        el.title       = `${g.charAt(0).toUpperCase() + g.slice(1)} (Ambassador)`;
+        el.classList.remove("bg-swatch--locked");
+      });
     } else {
       if (verifiedEl) verifiedEl.style.display = "none";
       if (formEl)     formEl.style.display     = "";
       if (revokeRow)  revokeRow.style.display  = "none";
-      if (auraSwatch) {
-        auraSwatch.disabled    = true;
-        auraSwatch.textContent = "🔒";
-        auraSwatch.title       = "Aura (Ambassador only)";
-        auraSwatch.classList.add("theme-swatch--locked");
-        // Revert to default if the locked theme was active
-        if (document.documentElement.dataset.theme === "aura") {
-          const s = Object.assign({}, JSON.parse(localStorage.getItem("veil_settings_v1") || "{}"), { theme: "veil" });
-          localStorage.setItem("veil_settings_v1", JSON.stringify(s));
-          delete document.documentElement.dataset.theme;
-        }
+      if (homeStar)   homeStar.style.display   = "none";
+
+      // Re-lock exclusive theme swatches
+      AMB_THEMES.forEach((t) => {
+        const el = document.querySelector(`.theme-swatch[data-theme="${t}"]`);
+        if (!el) return;
+        el.disabled    = true;
+        el.textContent = "🔒";
+        el.title       = `${t.charAt(0).toUpperCase() + t.slice(1)} (Ambassador only)`;
+        el.classList.add("theme-swatch--locked");
+      });
+
+      // Re-lock exclusive cloak options
+      AMB_CLOAKS.forEach((c) => {
+        const el = document.getElementById(`cloak-opt-${c}`);
+        if (!el) return;
+        el.disabled    = true;
+        el.textContent = el.textContent.replace("⭐ ", "🔒 ");
+      });
+
+      // Re-lock exclusive gradient swatches
+      AMB_GRADS.forEach((g) => {
+        const el = document.querySelector(`.bg-swatch[data-gradient="${g}"]`);
+        if (!el) return;
+        el.disabled    = true;
+        el.textContent = "🔒";
+        el.title       = `${g.charAt(0).toUpperCase() + g.slice(1)} (Ambassador only)`;
+        el.classList.add("bg-swatch--locked");
+      });
+
+      // Revert any locked theme/gradient that was active
+      const activeTheme = document.documentElement.dataset.theme;
+      if (AMB_THEMES.includes(activeTheme)) {
+        const s = Object.assign({}, JSON.parse(localStorage.getItem("veil_settings_v1") || "{}"), { theme: "veil" });
+        localStorage.setItem("veil_settings_v1", JSON.stringify(s));
+        delete document.documentElement.dataset.theme;
       }
     }
   }
