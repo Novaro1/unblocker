@@ -206,7 +206,8 @@ function waitForSWInit() {
   if (_swOk !== null) return Promise.resolve();
   return new Promise((resolve) => {
     const prev = _swBC.onmessage;
-    const t = setTimeout(() => { _swBC.onmessage = prev; resolve(); }, 1500);
+    // 12s — allows time to download scramjet on slow connections
+    const t = setTimeout(() => { _swBC.onmessage = prev; resolve(); }, 12000);
     _swBC.onmessage = (e) => {
       clearTimeout(t);
       _swOk = e.data.ok ? true : (e.data.message + "\n\n" + e.data.stack);
