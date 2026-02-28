@@ -1669,54 +1669,178 @@ body.perf-mode .ql-tile:hover {
 }
 
 /* ── Chrome theme overrides ───────────────────────────────────────────────── */
+
+/* Hide animated background effects */
 :root[data-theme="chrome"] .aurora,
 :root[data-theme="chrome"] #veil-stars,
 :root[data-theme="chrome"] #cursor-glow { display: none !important; }
 
+/* Hide vignette + CRT scanlines */
+:root[data-theme="chrome"] body::before,
+:root[data-theme="chrome"] body::after { display: none !important; }
+
+/* Base */
 :root[data-theme="chrome"] body { background: #ffffff; }
 
+/* Home title — blue gradient */
+:root[data-theme="chrome"] header h1 {
+  background: linear-gradient(110deg, #1a73e8 20%, #4285f4 50%, #1a73e8 80%);
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Logo ring pulse — Chrome blue instead of hardcoded indigo */
+:root[data-theme="chrome"] .logo-wrap::before,
+:root[data-theme="chrome"] .logo-wrap::after { border-color: rgba(26,115,232,0.45); }
+
+/* Search card */
+:root[data-theme="chrome"] main {
+  background: #ffffff;
+  border: 1px solid #dadce0;
+  box-shadow: 0 1px 6px rgba(32,33,36,0.12);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme="chrome"] main:has(.search-bar:focus-within) {
+  border-color: #1a73e8;
+  box-shadow: 0 1px 6px rgba(32,33,36,0.12), 0 0 0 2px rgba(26,115,232,0.15);
+}
+
+/* Search bar — flat, no spinning conic gradient */
+:root[data-theme="chrome"] .search-bar {
+  background: #f1f3f4;
+  border: 1.5px solid #dadce0;
+  animation: none;
+}
+:root[data-theme="chrome"] .search-bar:focus-within {
+  background: #ffffff;
+  border-color: #1a73e8;
+  animation: none;
+  filter: none;
+  box-shadow: none;
+}
+
+/* Autocomplete dropdown */
+:root[data-theme="chrome"] #ac-dropdown {
+  background: #ffffff;
+  border: 1px solid #dadce0;
+  box-shadow: 0 8px 24px rgba(32,33,36,0.18);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme="chrome"] .ac-item:not(:last-child) { border-bottom-color: #e8eaed; }
+:root[data-theme="chrome"] .ac-item:hover,
+:root[data-theme="chrome"] .ac-item.ac-active { background: #f1f3f4; }
+
+/* Quick-link tiles */
+:root[data-theme="chrome"] .ql-tile {
+  background: #f8f9fa;
+  border-color: #dadce0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme="chrome"] .ql-tile:hover { background: #e8f0fe; border-color: #1a73e8; }
+
+/* Settings + History home buttons */
+:root[data-theme="chrome"] .settings-gear,
+:root[data-theme="chrome"] .history-home-btn {
+  background: #ffffff;
+  border-color: #dadce0;
+  color: #5f6368;
+}
+:root[data-theme="chrome"] .settings-gear:hover,
+:root[data-theme="chrome"] .history-home-btn:hover {
+  background: #e8f0fe;
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+
+/* Toolbar */
 :root[data-theme="chrome"] .toolbar {
   background: #f1f3f4;
   border-bottom: 1px solid #dadce0;
   box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
-
 :root[data-theme="chrome"] .toolbar::before { display: none; }
-
 :root[data-theme="chrome"] .toolbar-btn { color: #5f6368; }
 :root[data-theme="chrome"] .toolbar-btn:hover:not(:disabled) { background: #e8eaed; color: #202124; }
+:root[data-theme="chrome"] .toolbar-sep { background: #dadce0; }
 
+/* URL bar */
 :root[data-theme="chrome"] #sj-url-bar {
   background: #ffffff;
   color: #202124;
   border: 1px solid #dadce0;
   box-shadow: none;
 }
-
 :root[data-theme="chrome"] #sj-url-bar:focus {
-  background: #ffffff;
   border-color: #1a73e8;
   box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
 }
 
+/* Tab bar */
 :root[data-theme="chrome"] #tab-bar {
   background: #dee1e6;
   border-bottom: 1px solid #c4c7cc;
 }
-
 :root[data-theme="chrome"] #tab-bar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
 
-:root[data-theme="chrome"] .tab-btn {
-  color: #5f6368;
-  background: transparent;
-}
+/* Tab chips */
+:root[data-theme="chrome"] .tab-chip { background: rgba(0,0,0,0.05); border-color: transparent; }
+:root[data-theme="chrome"] .tab-chip:hover { background: rgba(0,0,0,0.09); border-color: transparent; }
+:root[data-theme="chrome"] .tab-chip.tab-active { background: #ffffff; border-color: #c4c7cc; }
+:root[data-theme="chrome"] .tab-title { color: rgba(32,33,36,0.55); }
+:root[data-theme="chrome"] .tab-chip.tab-active .tab-title { color: #202124; }
+:root[data-theme="chrome"] .tab-close { color: rgba(32,33,36,0.4); }
+:root[data-theme="chrome"] .tab-close:hover { color: #202124; background: rgba(0,0,0,0.08); }
+:root[data-theme="chrome"] #btn-new-tab { color: rgba(32,33,36,0.45); }
+:root[data-theme="chrome"] #btn-new-tab:hover { background: rgba(0,0,0,0.07); color: #202124; }
 
-:root[data-theme="chrome"] .tab-btn.active {
+/* Settings panel */
+:root[data-theme="chrome"] #settings-panel {
   background: #ffffff;
+  box-shadow: -4px 0 24px rgba(32,33,36,0.14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme="chrome"] .settings-header { border-bottom-color: #e8eaed; }
+:root[data-theme="chrome"] .settings-close:hover { background: #f1f3f4; color: #202124; }
+:root[data-theme="chrome"] .settings-section { border-bottom-color: #e8eaed; }
+:root[data-theme="chrome"] .settings-select,
+:root[data-theme="chrome"] .settings-input {
+  background: #ffffff;
+  border-color: #dadce0;
+  color: #202124;
+}
+:root[data-theme="chrome"] .settings-select:focus,
+:root[data-theme="chrome"] .settings-input:focus { border-color: #1a73e8; }
+:root[data-theme="chrome"] .panic-key-display {
+  background: #ffffff;
+  border-color: #dadce0;
   color: #202124;
 }
 
-:root[data-theme="chrome"] .tab-btn:hover:not(.active) { background: rgba(0,0,0,0.06); }
+/* History panel */
+:root[data-theme="chrome"] #history-panel {
+  background: #ffffff;
+  box-shadow: 4px 0 24px rgba(32,33,36,0.14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme="chrome"] .history-search-wrap { border-bottom-color: #e8eaed; }
+:root[data-theme="chrome"] #history-search {
+  background: #f1f3f4;
+  border-color: #dadce0;
+  color: #202124;
+}
+:root[data-theme="chrome"] #history-search:focus { border-color: #1a73e8; }
+:root[data-theme="chrome"] #history-search::placeholder { color: #5f6368; }
+:root[data-theme="chrome"] .history-row:hover { background: #f1f3f4; }
+:root[data-theme="chrome"] .history-footer { border-top-color: #e8eaed; }
 
 /* ── Theme picker ─────────────────────────────────────────────────────────── */
 .theme-grid {
