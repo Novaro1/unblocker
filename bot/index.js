@@ -47,8 +47,11 @@ const {
   DISCORD_TOKEN,
   MEMBER_ROLE_ID,
   WELCOME_CHANNEL_ID,
+  ANNOUNCEMENTS_CHANNEL_ID,
   SERVER_URL = "https://veilub.mooo.com",
 } = process.env;
+
+const BOT_START = Date.now();
 
 client.once(Events.ClientReady, () => {
   console.log(`Veil Bot ready as ${client.user.tag}`);
@@ -178,6 +181,87 @@ client.on(Events.InteractionCreate, async (interaction) => {
       embed.setDescription(Object.values(faqs).join("\n\n"));
     }
 
+    return interaction.reply({ embeds: [embed] });
+  }
+
+  // /serverinfo
+  if (commandName === "serverinfo") {
+    await interaction.deferReply();
+    const guild = interaction.guild;
+    await guild.members.fetch();
+    const totalMembers = guild.memberCount;
+    const onlineMembers = guild.members.cache.filter(
+      (m) => m.presence?.status && m.presence.status !== "offline"
+    ).size;
+    const result = await checkStatus(SERVER_URL);
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("Veil Server Info")
+      .setThumbnail(guild.iconURL())
+      .addFields(
+        { name: "👥 Members",       value: `${totalMembers}`,                              inline: true },
+        { name: "🟢 Online",        value: `${onlineMembers}`,                             inline: true },
+        { name: "📅 Created",       value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:D>`, inline: true },
+        { name: "🌐 Proxy Status",  value: result.online ? "🟢 Online" : "🔴 Offline",    inline: true },
+        { name: "⚡ Ping",          value: `${result.ms}ms`,                               inline: true },
+        { name: "🔗 Links",         value: `${loadLinks().length} active`,                 inline: true }
+      )
+      .setFooter({ text: SERVER_URL });
+    return interaction.editReply({ embeds: [embed] });
+  }
+
+  // /announce
+  if (commandName === "announce") {
+    const message = interaction.options.getString("message");
+    const channelId = ANNOUNCEMENTS_CHANNEL_ID;
+    if (!channelId) {
+      return interaction.reply({ content: "ANNOUNCEMENTS_CHANNEL_ID is not set in the bot .env file.", ephemeral: true });
+    }
+    const channel = interaction.guild.channels.cache.get(channelId);
+    if (!channel) {
+      return interaction.reply({ content: "Announcements channel not found.", ephemeral: true });
+    }
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("📣 Veil Update")
+      .setDescription(message)
+      .setTimestamp()
+      .setFooter({ text: `Posted by ${interaction.user.username}` });
+    await channel.send({ content: "@everyone", embeds: [embed] });
+    return interaction.reply({ content: "Announcement posted!", ephemeral: true });
+  }
+
+  // /testwelcome
+  if (commandName === "testwelcome") {
+    const channel = WELCOME_CHANNEL_ID
+      ? interaction.guild.channels.cache.get(WELCOME_CHANNEL_ID)
+      : null;
+    if (!channel) {
+      return interaction.reply({ content: "WELCOME_CHANNEL_ID is not set or channel not found.", ephemeral: true });
+    }
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("Welcome to Veil!")
+      .setDescription(
+        `Hey ${interaction.user}! Welcome to the server.\n\n` +
+        `Check **#links** for working proxy links and **#faq** if you have questions.`
+      )
+      .setThumbnail(interaction.user.displayAvatarURL());
+    await channel.send({ embeds: [embed] });
+    return interaction.reply({ content: "Test welcome message sent!", ephemeral: true });
+  }
+
+  // /uptime
+  if (commandName === "uptime") {
+    const ms = Date.now() - BOT_START;
+    const hours   = Math.floor(ms / 3600000);
+    const minutes = Math.floor((ms % 3600000) / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("Bot Uptime")
+      .setDescription(`🕐 **${hours}h ${minutes}m ${seconds}s**`)
+      .setFooter({ text: `Started at ${new Date(BOT_START).toUTCString()}` });
     return interaction.reply({ embeds: [embed] });
   }
 });

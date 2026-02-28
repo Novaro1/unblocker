@@ -49,6 +49,27 @@ const commands = [
           { name: "History & privacy",               value: "history" }
         )
     ),
+
+  new SlashCommandBuilder()
+    .setName("serverinfo")
+    .setDescription("Show Veil Discord server stats and proxy status"),
+
+  new SlashCommandBuilder()
+    .setName("announce")
+    .setDescription("Post an update to the announcements channel (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addStringOption((o) =>
+      o.setName("message").setDescription("The announcement text").setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("testwelcome")
+    .setDescription("Send a test welcome message to the welcome channel (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+  new SlashCommandBuilder()
+    .setName("uptime")
+    .setDescription("Show how long the bot has been running"),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);
