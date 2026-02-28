@@ -80,6 +80,11 @@ const commands = [
     .setName("livelinks")
     .setDescription("Post a live auto-updating links embed in this channel (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+  new SlashCommandBuilder()
+    .setName("setupverify")
+    .setDescription("Post the verification button in this channel (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);

@@ -4,6 +4,9 @@ import {
   GatewayIntentBits,
   Events,
   EmbedBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
 } from "discord.js";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
@@ -59,6 +62,7 @@ const {
   MEMBER_ROLE_ID,
   WELCOME_CHANNEL_ID,
   ANNOUNCEMENTS_CHANNEL_ID,
+  VERIFIED_ROLE_ID,
   SERVER_URL = "https://veilub.mooo.com",
 } = process.env;
 
@@ -143,6 +147,34 @@ client.on(Events.GuildMemberAdd, async (member) => {
         )
         .setThumbnail(member.user.displayAvatarURL());
       channel.send({ embeds: [embed] });
+    }
+  }
+});
+
+// ── Button interactions ────────────────────────────────────────────────────
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isButton()) return;
+
+  if (interaction.customId === "verify_user") {
+    if (!VERIFIED_ROLE_ID) {
+      return interaction.reply({ content: "VERIFIED_ROLE_ID is not set in the bot .env file.", ephemeral: true });
+    }
+    const role = interaction.guild.roles.cache.get(VERIFIED_ROLE_ID);
+    if (!role) {
+      return interaction.reply({ content: "Verified role not found. Check VERIFIED_ROLE_ID in .env.", ephemeral: true });
+    }
+    if (interaction.member.roles.cache.has(VERIFIED_ROLE_ID)) {
+      return interaction.reply({ content: "You are already verified!", ephemeral: true });
+    }
+    try {
+      await interaction.member.roles.add(role);
+      return interaction.reply({
+        content: "✅ You have been verified! Welcome to Veil.",
+        ephemeral: true,
+      });
+    } catch (err) {
+      console.error(err);
+      return interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
     }
   }
 });
@@ -347,6 +379,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
       cfg.linksMessageId = msg.id;
       saveConfig(cfg);
       return interaction.editReply({ content: "Live links embed posted! It will update automatically when links are added or removed." });
+    } catch (err) {
+      console.error(err);
+      return interaction.editReply({ content: `Error: ${err.message}` });
+    }
+  }
+
+  // /setupverify
+  if (commandName === "setupverify") {
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      const embed = new EmbedBuilder()
+        .setColor(0x6366f1)
+        .setTitle("✅ Verify to access Veil")
+        .setDescription(
+          "Click the button below to verify and gain access to the server.\n\n" +
+          "By verifying you agree to follow the rules in **#rules**."
+        );
+      const button = new ButtonBuilder()
+        .setCustomId("verify_user")
+        .setLabel("Verify Me")
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji("✅");
+      const row = new ActionRowBuilder().addComponents(button);
+      await interaction.channel.send({ embeds: [embed], components: [row] });
+      return interaction.editReply({ content: "Verification message posted!" });
     } catch (err) {
       console.error(err);
       return interaction.editReply({ content: `Error: ${err.message}` });
