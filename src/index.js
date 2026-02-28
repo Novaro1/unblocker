@@ -57,7 +57,7 @@ fastify.register(fastifyStatic, {
 
 fastify.register(fastifyStatic, {
   root: scramjetPath,
-  prefix: "/scram/",
+  prefix: "/scramjet/",
   decorateReply: false,
 });
 

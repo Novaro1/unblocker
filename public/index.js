@@ -261,9 +261,9 @@ form.addEventListener("submit", async (event) => {
       const { ScramjetController } = $scramjetLoadController();
       scramjet = new ScramjetController({
         files: {
-          wasm: "/scram/scramjet.wasm.wasm",
-          all:  "/scram/scramjet.all.js",
-          sync: "/scram/scramjet.sync.js",
+          wasm: "/scramjet/scramjet.wasm.wasm",
+          all:  "/scramjet/scramjet.all.js",
+          sync: "/scramjet/scramjet.sync.js",
         },
       });
     }
@@ -280,9 +280,9 @@ form.addEventListener("submit", async (event) => {
       const { ScramjetController } = $scramjetLoadController();
       scramjet = new ScramjetController({
         files: {
-          wasm: "/scram/scramjet.wasm.wasm",
-          all:  "/scram/scramjet.all.js",
-          sync: "/scram/scramjet.sync.js",
+          wasm: "/scramjet/scramjet.wasm.wasm",
+          all:  "/scramjet/scramjet.all.js",
+          sync: "/scramjet/scramjet.sync.js",
         },
       });
       await scramjet.init();

@@ -1,5 +1,5 @@
 // Scramjet configuration — loaded by the service worker
 const _CONFIG = {
-  prefix: "/scram/",
+  prefix: "/scramjet/",
   codec: "xor",
 };

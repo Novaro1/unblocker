@@ -2,7 +2,7 @@ const _swBC = new BroadcastChannel("_sw_init");
 let _scramjet = null;
 
 try {
-  importScripts("/scram/scramjet.all.js");
+  importScripts("/scramjet/scramjet.all.js");
   const { ScramjetServiceWorker } = $scramjetLoadWorker();
   _scramjet = new ScramjetServiceWorker();
   _swBC.postMessage({ ok: true });
