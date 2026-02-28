@@ -317,6 +317,13 @@ form.addEventListener("submit", async (event) => {
       setLoading(false);
       return;
     }
+    // Wait for the SW to actually control this page (clients.claim completes)
+    // before navigating — otherwise the first iframe fetch hits the server raw.
+    if (!navigator.serviceWorker.controller) {
+      await new Promise((r) =>
+        navigator.serviceWorker.addEventListener("controllerchange", r, { once: true })
+      );
+    }
   }
 
   try {

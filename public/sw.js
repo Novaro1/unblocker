@@ -1,6 +1,11 @@
 const _swBC = new BroadcastChannel("_sw_init");
 let _scramjet = null;
 
+// Skip waiting phase and immediately claim all clients so the SW controls
+// the page right away on first install — prevents 404 on first navigation.
+self.addEventListener("install",  ()  => self.skipWaiting());
+self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+
 try {
   importScripts("/scramjet/scramjet.all.js");
   const { ScramjetServiceWorker } = $scramjetLoadWorker();
