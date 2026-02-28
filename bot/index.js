@@ -323,24 +323,34 @@ client.on(Events.InteractionCreate, async (interaction) => {
   // /livestatus
   if (commandName === "livestatus") {
     await interaction.deferReply({ ephemeral: true });
-    const embed = await buildStatusEmbed(interaction.guild);
-    const msg = await interaction.channel.send({ embeds: [embed] });
-    const cfg = loadConfig();
-    cfg.statusChannelId = interaction.channel.id;
-    cfg.statusMessageId = msg.id;
-    saveConfig(cfg);
-    return interaction.editReply({ content: "Live status embed posted! It will update every 60 seconds." });
+    try {
+      const embed = await buildStatusEmbed(interaction.guild);
+      const msg = await interaction.channel.send({ embeds: [embed] });
+      const cfg = loadConfig();
+      cfg.statusChannelId = interaction.channel.id;
+      cfg.statusMessageId = msg.id;
+      saveConfig(cfg);
+      return interaction.editReply({ content: "Live status embed posted! It will update every 60 seconds." });
+    } catch (err) {
+      console.error(err);
+      return interaction.editReply({ content: `Error: ${err.message}` });
+    }
   }
 
   // /livelinks
   if (commandName === "livelinks") {
     await interaction.deferReply({ ephemeral: true });
-    const msg = await interaction.channel.send({ embeds: [buildLinksEmbed()] });
-    const cfg = loadConfig();
-    cfg.linksChannelId = interaction.channel.id;
-    cfg.linksMessageId = msg.id;
-    saveConfig(cfg);
-    return interaction.editReply({ content: "Live links embed posted! It will update automatically when links are added or removed." });
+    try {
+      const msg = await interaction.channel.send({ embeds: [buildLinksEmbed()] });
+      const cfg = loadConfig();
+      cfg.linksChannelId = interaction.channel.id;
+      cfg.linksMessageId = msg.id;
+      saveConfig(cfg);
+      return interaction.editReply({ content: "Live links embed posted! It will update automatically when links are added or removed." });
+    } catch (err) {
+      console.error(err);
+      return interaction.editReply({ content: `Error: ${err.message}` });
+    }
   }
 
   // /uptime
