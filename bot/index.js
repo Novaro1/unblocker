@@ -489,6 +489,72 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return interaction.reply({ content: `🗑️ Ambassador token revoked for **${target.username}**.`, ephemeral: true });
   }
 
+  // /award-points
+  if (commandName === "award-points") {
+    const target = interaction.options.getUser("user");
+    const pts    = interaction.options.getInteger("points");
+    const reason = interaction.options.getString("reason") || null;
+
+    const tokens = loadTokens();
+    const entry  = tokens.find((t) => t.userId === target.id);
+    if (!entry) {
+      return interaction.reply({ content: `**${target.username}** is not an ambassador.`, ephemeral: true });
+    }
+
+    const before = entry.points ?? 0;
+    entry.points = Math.max(0, before + pts);
+    saveTokens(tokens);
+
+    const sign = pts >= 0 ? "+" : "";
+    const embed = new EmbedBuilder()
+      .setColor(pts >= 0 ? 0x22c55e : 0xf87171)
+      .setTitle(pts >= 0 ? "⭐ Points Awarded" : "📉 Points Deducted")
+      .addFields(
+        { name: "Ambassador", value: target.username,           inline: true },
+        { name: "Change",     value: `${sign}${pts}`,           inline: true },
+        { name: "New total",  value: `${entry.points} pts`,     inline: true },
+      );
+    if (reason) embed.setDescription(`**Reason:** ${reason}`);
+
+    // Notify the ambassador via DM
+    try {
+      const dmEmbed = new EmbedBuilder()
+        .setColor(pts >= 0 ? 0xf59e0b : 0xf87171)
+        .setTitle(pts >= 0 ? "⭐ You earned leaderboard points!" : "📉 Leaderboard points adjusted")
+        .setDescription(
+          `${sign}${pts} points${reason ? ` — *${reason}*` : ""}.\n` +
+          `Your new total: **${entry.points} pts**\n\n` +
+          `Check the leaderboard at **Settings → Ambassador** on veilub.mooo.com.`
+        );
+      await target.send({ embeds: [dmEmbed] });
+    } catch { /* DMs closed */ }
+
+    return interaction.reply({ embeds: [embed], ephemeral: true });
+  }
+
+  // /leaderboard
+  if (commandName === "leaderboard") {
+    const tokens = loadTokens();
+    const board = tokens
+      .map((t) => ({ username: t.username, points: t.points ?? 0 }))
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 10);
+
+    const RANK_ICONS = ["🥇", "🥈", "🥉"];
+    const lines = board.map((t, i) =>
+      `${RANK_ICONS[i] ?? `**${i + 1}.**`} ${t.username} — ${t.points} pts`
+    );
+
+    const embed = new EmbedBuilder()
+      .setColor(0xf59e0b)
+      .setTitle("⭐ Ambassador Leaderboard")
+      .setDescription(lines.length ? lines.join("\n") : "No ambassadors yet.")
+      .setFooter({ text: "Earn points by advertising Veil. Staff award points via /award-points." })
+      .setTimestamp();
+
+    return interaction.reply({ embeds: [embed] });
+  }
+
   // /beta-release
   if (commandName === "beta-release") {
     const type  = interaction.options.getString("type");

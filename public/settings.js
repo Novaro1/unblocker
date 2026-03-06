@@ -137,6 +137,7 @@
     panel.setAttribute("aria-hidden", "false");
     populateForm(loadSettings());
     window._veilPanicRefreshUi?.();
+    window._veilLoadLeaderboard?.();
     panel.querySelector(".settings-close")?.focus();
   }
 
@@ -412,6 +413,57 @@
     }
   }
 
+  // ── Leaderboard ──────────────────────────────────────────────────────────
+  const RANK_ICONS = ["🥇", "🥈", "🥉"];
+
+  async function renderLeaderboard() {
+    const el = document.getElementById("leaderboard-list");
+    if (!el) return;
+
+    let board;
+    try {
+      const res = await fetch("/api/leaderboard");
+      if (!res.ok) throw new Error();
+      board = await res.json();
+    } catch {
+      el.innerHTML = `<div class="lb-empty">Could not load leaderboard.</div>`;
+      return;
+    }
+
+    if (!board.length) {
+      el.innerHTML = `<div class="lb-empty">No ambassadors yet — be the first!</div>`;
+      return;
+    }
+
+    const myUsername = loadAmbassador()?.username ?? null;
+    el.innerHTML = "";
+    for (const entry of board) {
+      const row = document.createElement("div");
+      const isMe = myUsername && entry.username === myUsername;
+      row.className = "lb-entry" + (isMe ? " lb-entry--me" : "");
+
+      const rankEl = document.createElement("span");
+      rankEl.className = "lb-rank";
+      rankEl.textContent = RANK_ICONS[entry.rank - 1] ?? `${entry.rank}.`;
+
+      const nameEl = document.createElement("span");
+      nameEl.className = "lb-name";
+      nameEl.textContent = entry.username + (isMe ? " (you)" : "");
+
+      const ptsEl = document.createElement("span");
+      ptsEl.className = "lb-pts";
+      ptsEl.textContent = `${entry.points} pts`;
+
+      row.appendChild(rankEl);
+      row.appendChild(nameEl);
+      row.appendChild(ptsEl);
+      el.appendChild(row);
+    }
+  }
+
+  // Expose so the settings open handler can refresh it
+  window._veilLoadLeaderboard = renderLeaderboard;
+
   // ── Beta feature system ──────────────────────────────────────────────────
   // Features in beta-features.json are ambassador-only until their betaDays
   // window expires, then they unlock for everyone automatically.
@@ -488,6 +540,7 @@
   // Apply on page load
   applyAmbassador(loadAmbassador());
   applyBetaFeatures();
+  renderLeaderboard();
 
   // Redeem button
   document.getElementById("ambassador-redeem-btn")?.addEventListener("click", async function () {
@@ -507,6 +560,7 @@
         saveAmbassador({ token, username: data.username });
         applyAmbassador({ token, username: data.username });
         applyBetaFeatures();
+        renderLeaderboard();
         if (input) input.value = "";
       } else {
         if (errorEl) { errorEl.textContent = "Invalid token. Ask staff to run /approve-ad for you."; errorEl.style.display = ""; }
@@ -524,5 +578,6 @@
     clearAmbassador();
     applyAmbassador(null);
     applyBetaFeatures();
+    renderLeaderboard();
   });
 })();

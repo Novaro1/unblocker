@@ -1978,6 +1978,64 @@ body.perf-mode .ql-tile:hover {
 }
 :root[data-theme="chrome"] .ambassador-error { color: #dc2626; }
 
+/* ── Leaderboard ─────────────────────────────────────────────────────────── */
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.lb-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+  transition: background 0.15s;
+}
+
+.lb-entry--me {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface2));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.lb-rank {
+  font-size: 1rem;
+  width: 1.6rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.lb-name {
+  flex: 1;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-entry--me .lb-name { color: var(--accent-light); font-weight: 600; }
+
+.lb-pts {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.lb-entry--me .lb-pts { color: var(--accent-lighter); }
+
+.lb-empty {
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 0.5rem 0.2rem;
+}
+
 /* ── Custom background ───────────────────────────────────────────────────── */
 #custom-bg {
   position: fixed;

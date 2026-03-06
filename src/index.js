@@ -97,6 +97,23 @@ fastify.get('/api/verify-token', (req, reply) => {
   }
 });
 
+// Ambassador leaderboard — returns top ambassadors sorted by points (no tokens exposed)
+fastify.get('/api/leaderboard', (_req, reply) => {
+  try {
+    const tokens = existsSync(tokensPath)
+      ? JSON.parse(readFileSync(tokensPath, "utf-8"))
+      : [];
+    const board = tokens
+      .map((t) => ({ username: t.username, points: t.points ?? 0 }))
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 20)
+      .map((t, i) => ({ rank: i + 1, username: t.username, points: t.points }));
+    return reply.send(board);
+  } catch {
+    return reply.code(500).send([]);
+  }
+});
+
 // Beta feature status — computes whether each feature is still in its ambassador-only window
 fastify.get('/api/beta-features', (_req, reply) => {
   try {

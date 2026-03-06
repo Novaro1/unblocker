@@ -128,6 +128,24 @@ const commands = [
   new SlashCommandBuilder()
     .setName("beta-status")
     .setDescription("Show current beta features and their ambassador-only countdown"),
+
+  new SlashCommandBuilder()
+    .setName("award-points")
+    .setDescription("Award leaderboard points to an ambassador (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addUserOption((o) =>
+      o.setName("user").setDescription("The ambassador to award").setRequired(true)
+    )
+    .addIntegerOption((o) =>
+      o.setName("points").setDescription("Points to award (use negative to deduct)").setRequired(true)
+    )
+    .addStringOption((o) =>
+      o.setName("reason").setDescription("Why are you awarding these points?").setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("leaderboard")
+    .setDescription("Show the top Veil ambassadors"),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);
