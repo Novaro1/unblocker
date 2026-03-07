@@ -249,10 +249,10 @@ HuggingFace is an AI/ML research platform. Nobody blocks `hf.space` because doin
    # When prompted for a password, paste your access token
    ```
 
-6. Copy the Veil repo files into it:
+6. Copy the Veil repo files into it (using `git archive` to skip the `.git` folder):
    ```bash
    git clone https://github.com/Novaro1/unblocker /tmp/unblocker
-   cp -r /tmp/unblocker/. .
+   git -C /tmp/unblocker archive HEAD | tar -x -C .
    ```
 
 7. Push to HuggingFace:
