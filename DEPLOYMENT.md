@@ -4,7 +4,7 @@ Each option below acts as a **full reverse proxy** — all traffic is forwarded 
 
 > **Two repos:**
 > - **`Novaro1/veil-edge`** — Cloudflare Pages, Netlify Edge Functions (minimal, no Node.js files)
-> - **`Novaro1/unblocker`** — Railway, Render, Koyeb, HuggingFace, Google Cloud Run, GitHub Codespaces, Azure Container Apps, IBM Code Engine (full server)
+> - **`Novaro1/unblocker`** — Railway, Render, Koyeb, HuggingFace, Google Cloud Run, GitHub Codespaces, GitPod, Azure Container Apps, IBM Code Engine, Replit, Fly.io (full server)
 
 ---
 
@@ -489,7 +489,147 @@ The free tier is low (50 vCPU-seconds/month) but Code Engine scales to zero when
 
 ---
 
+## Replit
+
+**Domain format:** `https://veil.yourusername.repl.co` or `https://veilname.replit.app`
+**WebSocket support:** Yes
+**Free tier:** Free with limits (reserved VM keeps it always on)
+**Requires:** Replit account (no credit card)
+
+Replit is a browser-based coding platform used in thousands of classrooms. Many school network filters explicitly whitelist `replit.com` and `replit.app` because teachers assign coding projects there. A proxy running on `replit.app` looks indistinguishable from a student's coding assignment.
+
+### Setup
+
+1. Go to [replit.com](https://replit.com) and create a free account
+2. Click **+ Create Repl**
+3. In the template search, type **Node.js** and select it
+4. Name it anything (e.g. `veil`)
+5. In the Shell tab at the bottom, run:
+   ```bash
+   git clone https://github.com/Novaro1/unblocker .
+   npm install
+   ```
+6. Open the `.replit` file (create it if it doesn't exist) and set:
+   ```
+   run = "node src/index.js"
+   ```
+   Or just click the **Run** button and when prompted for a run command enter `node src/index.js`
+7. Click **Run** — Replit starts the server and shows a preview URL at the top
+
+Your URL looks like `https://veil.yourusername.repl.co`. Click **Open in new tab** to get the full link.
+
+### Keeping it alive
+
+Free Repls sleep after inactivity. To keep it always on, enable **Reserved VM** in the Repl's settings (requires Replit Core subscription ~$7/month), or use a free uptime monitor like UptimeRobot to ping it every 5 minutes.
+
+### Why this works at schools
+
+Teachers assign Replit projects. School filters have `replit.app` and `repl.co` on their allowlist in many districts. A URL like `https://veil.yourusername.repl.co` is completely indistinguishable from a student's coding homework.
+
+---
+
+## Fly.io
+
+**Domain format:** `https://veil.fly.dev`
+**WebSocket support:** Yes (full)
+**Free tier:** 3 shared-CPU VMs + 160GB outbound/month (credit card required)
+**Requires:** Fly.io account + flyctl CLI
+
+`fly.dev` is Fly.io's domain — an infrastructure platform used by developers and startups. Fly deploys Docker containers to edge locations around the world. The `fly.dev` domain sounds like a developer resource and has no association with proxies in any blocklist.
+
+### Step 1 — Install flyctl
+
+**Mac:**
+```bash
+brew install flyctl
+```
+
+**Windows (PowerShell):**
+```powershell
+iwr https://fly.io/install.ps1 -useb | iex
+```
+
+### Step 2 — Sign up and log in
+
+```bash
+fly auth signup
+```
+This opens a browser to create an account. A credit card is required but you won't be charged on the free tier.
+
+### Step 3 — Deploy Veil
+
+```bash
+git clone https://github.com/Novaro1/unblocker
+cd unblocker
+fly launch
+```
+
+`fly launch` detects the `Dockerfile` automatically. When it asks:
+- **App name:** type `veil` (or anything)
+- **Region:** pick the closest one to you
+- **Would you like to set up a PostgreSQL database?** → `N`
+- **Would you like to deploy now?** → `Y`
+
+After ~2 minutes it prints:
+```
+Visit your newly deployed app at https://veil.fly.dev
+```
+
+### Spinning up more links
+
+```bash
+fly launch --name veil2
+```
+Each app name gets its own `*.fly.dev` subdomain.
+
+### Why this is hard to block
+
+`fly.dev` is a developer tool domain. Blocking it would break access to developer documentation and tools hosted on Fly. The subdomain is your chosen app name — you can pick anything innocuous.
+
+---
+
+## GitPod
+
+**Domain format:** `https://8080-USERNAME-REPO-HASH.ws-us00.gitpod.io`
+**WebSocket support:** Yes
+**Free tier:** 50 hours/month (no credit card required)
+**Requires:** GitHub account
+
+GitPod is an online development environment used in open source projects and coding education. The `gitpod.io` domain is trusted in any developer-friendly environment. Like GitHub Codespaces, you run Veil inside a workspace and forward the port publicly.
+
+### Setup
+
+1. Go to [gitpod.io](https://gitpod.io) and sign in with GitHub
+2. Click **New Workspace**
+3. Paste this URL and press Enter:
+   ```
+   https://github.com/Novaro1/unblocker
+   ```
+4. Wait ~1 minute for the workspace to load
+5. In the terminal that opens, run:
+   ```bash
+   npm install
+   node src/index.js
+   ```
+6. GitPod detects port 8080 and shows a notification — click **Make Public**
+7. Click the **Open Browser** button or go to the **Ports** panel → copy the URL next to port 8080
+
+Your URL looks like `https://8080-yourusername-unblocker-abc123.ws-us00.gitpod.io`.
+
+### Keeping it alive
+
+GitPod workspaces stop after 30 minutes of inactivity. Go to [gitpod.io/workspaces](https://gitpod.io/workspaces) and click your workspace to resume it — the port URL stays the same.
+
+---
+
 ## Notes
+
+- **Independent deployments** (Railway, Render, Koyeb, HuggingFace, Cloud Run, Azure Container Apps, IBM Code Engine, Fly.io, Replit) are the most resilient — they're entirely separate Veil instances with their own servers and IPs, not just proxies in front of your EC2.
+- **Edge proxies** (Cloudflare Workers, Cloudflare Pages, Deno Deploy, Netlify Edge Functions, val.town) are the fastest to spin up — new URL in under a minute.
+- **GitHub Codespaces and GitPod** are the best no-credit-card options — `github.dev` and `gitpod.io` are both trusted in any school that uses GitHub.
+- **Replit** is uniquely powerful because many school filters explicitly allow it for coding class.
+- **Azure Container Apps and Google Cloud Run** have the most filter-resistant enterprise domains.
+- Do **not** use the raw server IP (`16.59.60.231`) in edge proxy options — it's in a Cloudflare-owned range. Use `veilub.mooo.com` as the upstream hostname instead.
 
 - **Independent deployments** (Railway, Render, Koyeb, HuggingFace, Cloud Run, Azure Container Apps, IBM Code Engine) are the most resilient — they're entirely separate Veil instances with their own servers and IPs, not just proxies in front of your EC2.
 - **Edge proxies** (Cloudflare Workers, Cloudflare Pages, Deno Deploy, Netlify Edge Functions, val.town) are the fastest to spin up — new URL in under a minute.
@@ -514,11 +654,15 @@ The free tier is low (50 vCPU-seconds/month) but Code Engine scales to zero when
 | HuggingFace | `*.hf.space` | Full server | ✅ | Free |
 | Google Cloud Run | `*-hash-*.run.app` | Full server | ✅ | 2M req/month |
 | GitHub Codespaces | `*-8080.app.github.dev` | Full server | ✅ | 60 core-hr/mo |
+| GitPod | `8080-*-*.gitpod.io` | Full server | ✅ | 50 hr/month |
 | Azure Container Apps | `*.azurecontainerapps.io` | Full server | ✅ | Free allowance |
 | IBM Code Engine | `*.codeengine.appdomain.cloud` | Full server | ✅ | Free allowance |
+| Replit | `*.replit.app` | Full server | ✅ | Free (sleeps) |
+| Fly.io | `*.fly.dev` | Full server | ✅ | Free allowance |
 
 - **Cloudflare Workers** is the fastest to spin up. New URL in under a minute, no card needed.
-- **GitHub Codespaces** is the best no-card full-server option. `github.dev` domain cannot be blocked at schools.
+- **Replit** is uniquely powerful — many school filters explicitly whitelist it for coding class.
+- **GitHub Codespaces / GitPod** are the best no-card options. Both domains are trusted at schools that use GitHub.
 - **Azure Container Apps** has the best enterprise domain — Microsoft's domain is trusted everywhere.
 - **val.town** WebSocket support is limited so the proxy transport may be unreliable.
 - Do **not** use the raw server IP (`16.59.60.231`) in any edge proxy — use `veilub.mooo.com` instead.
