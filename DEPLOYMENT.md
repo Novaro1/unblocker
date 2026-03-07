@@ -225,35 +225,12 @@ Your URL: `yourapp-yourorg.koyeb.app`
 
 ---
 
-## Glitch (full server — own hosting)
-
-**Domain format:** `yourproject.glitch.me`
-**WebSocket support:** Yes
-**Free tier:** Free with sleep after 5 min inactivity (wakes in ~10 seconds)
-**Requires:** Cloning the Veil GitHub repo
-
-Glitch is a code collaboration platform. `glitch.me` is associated with programming projects and is not in any proxy blocklist. You can import directly from GitHub.
-
-### Setup
-
-1. Go to [glitch.com](https://glitch.com) → **New Project → Import from GitHub**
-2. Enter `Novaro1/unblocker`
-3. Once imported, open the `.env` file in the file tree and add:
-   ```
-   PORT=3000
-   ```
-4. Click **Share** at the top → copy the **Live site** URL
-
-Your URL: `yourproject.glitch.me`
-
----
-
 ## HuggingFace Spaces (Docker)
 
 **Domain format:** `https://username-spacename.hf.space`
 **WebSocket support:** Yes
 **Free tier:** Free CPU instances
-**Requires:** A GitHub repo with a Dockerfile
+**Requires:** A HuggingFace account and git
 
 HuggingFace is an AI/ML research platform. Nobody blocks `hf.space` because doing so would break AI tools used in education. You can run any Docker container there including Veil.
 
@@ -261,10 +238,34 @@ HuggingFace is an AI/ML research platform. Nobody blocks `hf.space` because doin
 
 1. Go to [huggingface.co](https://huggingface.co) → **New Space**
 2. Set **Space SDK** to **Docker**
-3. Under **Repository**, link **`Novaro1/unblocker`** from GitHub (or clone it and upload manually)
-4. HuggingFace detects the `Dockerfile` in the repo and builds automatically
+3. Give it a name (e.g. `veil`) and click **Create Space** — do NOT link GitHub here
 
-Your URL: `https://yourusername-spacename.hf.space`
+4. Generate an access token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) with **write** permissions
+
+5. Clone the empty Space locally:
+   ```bash
+   git clone https://huggingface.co/spaces/YOURUSERNAME/veil
+   cd veil
+   # When prompted for a password, paste your access token
+   ```
+
+6. Copy the Veil repo files into it:
+   ```bash
+   git clone https://github.com/Novaro1/unblocker /tmp/unblocker
+   cp -r /tmp/unblocker/. .
+   ```
+
+7. Push to HuggingFace:
+   ```bash
+   git add .
+   git commit -m "Deploy Veil"
+   git push
+   # Use your access token as the password again
+   ```
+
+HuggingFace detects the `Dockerfile` and builds automatically. Your URL is ready in ~2 minutes.
+
+Your URL: `https://yourusername-veil.hf.space`
 
 The URL reads like an AI demo (`https://john-veil.hf.space`) which raises zero suspicion.
 
@@ -313,7 +314,7 @@ The hash in the URL is unique to your deployment and unpredictable. Even if a fi
 
 ## Notes
 
-- **Independent deployments** (Railway, Render, Koyeb, Glitch, HuggingFace, Cloud Run) are the most resilient — they're entirely separate Veil instances with their own servers and IPs, not just proxies in front of your EC2.
+- **Independent deployments** (Railway, Render, Koyeb, HuggingFace, Cloud Run) are the most resilient — they're entirely separate Veil instances with their own servers and IPs, not just proxies in front of your EC2.
 - **Edge proxies** (Cloudflare Workers, Cloudflare Pages, Deno Deploy, Netlify Edge Functions, val.town) are the fastest to spin up — new URL in under a minute.
 - **HuggingFace Spaces and Google Cloud Run** are the most filter-resistant domains. Blocking them would break legitimate AI tools and Google developer services respectively.
 - Do **not** use the raw server IP (`16.59.60.231`) in edge proxy options — it's in a Cloudflare-owned range. Use `veilub.mooo.com` as the upstream hostname instead.
@@ -332,7 +333,6 @@ The hash in the URL is unique to your deployment and unpredictable. Even if a fi
 | Railway | `*.railway.app` | Full server | ✅ | $5 credit |
 | Render | `*.onrender.com` | Full server | ✅ | Free (sleeps) |
 | Koyeb | `*.koyeb.app` | Full server | ✅ | Always on |
-| Glitch | `*.glitch.me` | Full server | ✅ | Free (sleeps) |
 | HuggingFace | `*.hf.space` | Full server | ✅ | Free |
 | Google Cloud Run | `*-hash-*.run.app` | Full server | ✅ | 2M req/month |
 
