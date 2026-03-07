@@ -4,7 +4,7 @@ Each option below acts as a **full reverse proxy** — all traffic is forwarded 
 
 > **Two repos:**
 > - **`Novaro1/veil-edge`** — Cloudflare Pages, Netlify Edge Functions (minimal, no Node.js files)
-> - **`Novaro1/unblocker`** — Railway, Render, Koyeb, HuggingFace, Google Cloud Run, GitHub Codespaces, Azure Container Apps, Oracle Cloud, IBM Code Engine (full server)
+> - **`Novaro1/unblocker`** — Railway, Render, Koyeb, HuggingFace, Google Cloud Run, GitHub Codespaces, Azure Container Apps, IBM Code Engine (full server)
 
 ---
 
@@ -456,64 +456,6 @@ Microsoft's `azurecontainerapps.io` is the same domain used by Microsoft's own e
 
 ---
 
-## Oracle Cloud Free Tier (permanent free VM)
-
-**Domain format:** Your own IP or a FreeDNS subdomain
-**WebSocket support:** Yes (full)
-**Free tier:** 4 ARM cores + 24GB RAM — **free forever, no expiry, no spin-down**
-**Requires:** Oracle account + credit card (never charged on always-free resources)
-
-Oracle's always-free tier includes two AMD micro VMs or one ARM VM with 4 cores and 24GB RAM. It never sleeps, never expires, and never costs anything as long as you stay on free-tier resources. This is a completely independent Veil server with its own IP.
-
-### Step 1 — Create an Oracle Cloud account
-
-1. Go to [cloud.oracle.com](https://cloud.oracle.com) → **Start for free**
-2. Sign up — they ask for a credit card but will not charge it for always-free resources
-3. Choose your home region (pick one close to you — you can't change it later)
-
-### Step 2 — Launch a free VM
-
-1. Go to **Compute → Instances → Create Instance**
-2. Click **Change Shape** → **Ampere** → select **VM.Standard.A1.Flex**
-   - Set: **1 OCPU, 6 GB RAM** (you can go up to 4 OCPU / 24 GB still free)
-3. Under **Image**, leave it as Oracle Linux or switch to **Ubuntu 22.04**
-4. Under **Add SSH Keys**, paste your public SSH key (from `~/.ssh/id_rsa.pub`) or download the generated key
-5. Click **Create**
-
-### Step 3 — Set up Veil on the VM
-
-Once the instance shows **Running**, SSH in:
-```bash
-ssh ubuntu@YOUR_INSTANCE_IP
-```
-
-Install Node.js and clone Veil:
-```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs git
-git clone https://github.com/Novaro1/unblocker
-cd unblocker
-npm install
-```
-
-Open port 8080 in Oracle's firewall (their cloud has an extra firewall layer):
-```bash
-sudo iptables -I INPUT -p tcp --dport 8080 -j ACCEPT
-```
-Also go to **Networking → Virtual Cloud Networks → your VCN → Security Lists** and add an ingress rule for port 8080.
-
-Run with PM2 so it stays up:
-```bash
-sudo npm install -g pm2
-pm2 start src/index.js --name veil
-pm2 save
-pm2 startup
-```
-
-Your server is now running permanently at `http://YOUR_INSTANCE_IP:8080`. Use FreeDNS to point a subdomain at that IP to get an HTTPS URL.
-
----
-
 ## IBM Code Engine
 
 **Domain format:** `https://veil.RANDOMHASH.us-south.codeengine.appdomain.cloud`
@@ -549,10 +491,9 @@ The free tier is low (50 vCPU-seconds/month) but Code Engine scales to zero when
 
 ## Notes
 
-- **Independent deployments** (Railway, Render, Koyeb, HuggingFace, Cloud Run, Oracle, Azure Container Apps) are the most resilient — they're entirely separate Veil instances with their own servers and IPs, not just proxies in front of your EC2.
+- **Independent deployments** (Railway, Render, Koyeb, HuggingFace, Cloud Run, Azure Container Apps, IBM Code Engine) are the most resilient — they're entirely separate Veil instances with their own servers and IPs, not just proxies in front of your EC2.
 - **Edge proxies** (Cloudflare Workers, Cloudflare Pages, Deno Deploy, Netlify Edge Functions, val.town) are the fastest to spin up — new URL in under a minute.
-- **Oracle Cloud** is the only option with a truly permanent, always-on free server that never sleeps. It takes the most setup but costs nothing forever.
-- **GitHub Codespaces** is the best no-credit-card option for a real server URL — `github.dev` is unbockable at any school that uses GitHub.
+- **GitHub Codespaces** is the best no-credit-card option for a real server URL — `github.dev` cannot be blocked at any school that uses GitHub.
 - **Azure Container Apps and Google Cloud Run** have the most filter-resistant domains. Blocking Microsoft or Google domains at a school would break core services.
 - Do **not** use the raw server IP (`16.59.60.231`) in edge proxy options — it's in a Cloudflare-owned range. Use `veilub.mooo.com` as the upstream hostname instead.
 
@@ -574,12 +515,10 @@ The free tier is low (50 vCPU-seconds/month) but Code Engine scales to zero when
 | Google Cloud Run | `*-hash-*.run.app` | Full server | ✅ | 2M req/month |
 | GitHub Codespaces | `*-8080.app.github.dev` | Full server | ✅ | 60 core-hr/mo |
 | Azure Container Apps | `*.azurecontainerapps.io` | Full server | ✅ | Free allowance |
-| Oracle Cloud | your IP / FreeDNS | Full server | ✅ | Forever free |
 | IBM Code Engine | `*.codeengine.appdomain.cloud` | Full server | ✅ | Free allowance |
 
 - **Cloudflare Workers** is the fastest to spin up. New URL in under a minute, no card needed.
 - **GitHub Codespaces** is the best no-card full-server option. `github.dev` domain cannot be blocked at schools.
-- **Oracle Cloud** is the only option with a permanent, always-on, truly free server.
 - **Azure Container Apps** has the best enterprise domain — Microsoft's domain is trusted everywhere.
 - **val.town** WebSocket support is limited so the proxy transport may be unreliable.
 - Do **not** use the raw server IP (`16.59.60.231`) in any edge proxy — use `veilub.mooo.com` instead.
