@@ -169,6 +169,14 @@ const commands = [
   new SlashCommandBuilder()
     .setName("leaderboard")
     .setDescription("Show the top Veil ambassadors"),
+
+  new SlashCommandBuilder()
+    .setName("freedns")
+    .setDescription("Pick random public FreeDNS domains to use for a Veil link")
+    .addIntegerOption((o) =>
+      o.setName("count").setDescription("How many to show (default 5, max 20)").setRequired(false)
+        .setMinValue(1).setMaxValue(20)
+    ),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);

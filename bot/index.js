@@ -19,6 +19,7 @@ const LINKS_FILE         = join(__dirname, "links.json");
 const CONFIG_FILE        = join(__dirname, "live-config.json");
 const TOKENS_FILE        = join(__dirname, "../tokens.json");
 const BETA_FEATURES_FILE = join(__dirname, "../beta-features.json");
+const FREEDNS_FILE       = join(__dirname, "../freedns-domains.txt");
 
 // ── Persistent config (live message IDs) ──────────────────────────────────
 function loadConfig() {
@@ -640,6 +641,38 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setColor(0x6366f1)
       .setTitle("🔬 Beta Feature Status")
       .setDescription(lines.join("\n"))
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed] });
+  }
+
+  // /freedns
+  if (commandName === "freedns") {
+    if (!existsSync(FREEDNS_FILE)) {
+      return interaction.reply({
+        content: "The FreeDNS domain list hasn't been generated yet. Run `node scripts/freedns-list.js > freedns-domains.txt` on the server first.",
+        ephemeral: true,
+      });
+    }
+    const count = interaction.options.getInteger("count") ?? 5;
+    const allDomains = readFileSync(FREEDNS_FILE, "utf-8")
+      .split("\n")
+      .map((d) => d.trim())
+      .filter(Boolean);
+
+    // Pick `count` random unique domains
+    const picked = [];
+    const pool = [...allDomains];
+    for (let i = 0; i < count && pool.length > 0; i++) {
+      const idx = Math.floor(Math.random() * pool.length);
+      picked.push(pool.splice(idx, 1)[0]);
+    }
+
+    const lines = picked.map((d) => `• \`yourname.${d}\` — [add on FreeDNS](https://freedns.afraid.org/subdomain/edit.php)`);
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("🎲 Random FreeDNS Domains")
+      .setDescription(lines.join("\n"))
+      .setFooter({ text: `${allDomains.length} public domains available · /freedns to roll again` })
       .setTimestamp();
     return interaction.reply({ embeds: [embed] });
   }
