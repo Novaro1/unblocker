@@ -276,35 +276,83 @@ The URL reads like an AI demo (`https://john-veil.hf.space`) which raises zero s
 **Domain format:** `https://veil-RANDOMHASH-uc.a.run.app`
 **WebSocket support:** Yes
 **Free tier:** 2,000,000 requests/month + compute free tier
-**Requires:** Docker, Google Cloud account, gcloud CLI
+**Requires:** A Google account (free). No credit card needed for the free tier.
 
 The `run.app` domain is owned by Google. No school running Google Workspace is going to block it. The random hash in the URL makes it impossible to pattern-block even if they wanted to.
 
-### Setup
+### Step 1 — Create a Google Cloud project
 
-1. Install the [gcloud CLI](https://cloud.google.com/sdk/docs/install) and log in:
-   ```bash
-   gcloud auth login
-   gcloud config set project YOUR_PROJECT_ID
-   ```
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) and sign in with any Google account
+2. Click the project dropdown at the top → **New Project**
+3. Name it anything (e.g. `veil`) and click **Create**
+4. Copy your **Project ID** — it's shown under the project name and looks like `veil-123456`. You'll need it in a moment.
 
-2. Clone the repo locally:
-   ```bash
-   git clone https://github.com/Novaro1/unblocker
-   cd unblocker
-   ```
+### Step 2 — Install the gcloud CLI
 
-3. Deploy from the repo directory:
-   ```bash
-   gcloud run deploy veil \
-     --source . \
-     --platform managed \
-     --region us-central1 \
-     --allow-unauthenticated \
-     --port 8080
-   ```
+**Mac:**
+```bash
+brew install google-cloud-sdk
+```
+If you don't have Homebrew: go to [brew.sh](https://brew.sh) and run the one-liner at the top first, then run the command above.
 
-4. The CLI prints your URL when done — something like `https://veil-abc123xy-uc.a.run.app`
+**Windows:**
+Download and run the installer from [cloud.google.com/sdk/docs/install](https://cloud.google.com/sdk/docs/install) → Windows section. It's a normal `.exe` installer. After it finishes, open a new terminal (Command Prompt or PowerShell).
+
+**Linux:**
+```bash
+curl https://sdk.cloud.google.com | bash
+exec -l $SHELL
+```
+
+### Step 3 — Log in and set your project
+
+Run these one at a time:
+```bash
+gcloud auth login
+```
+A browser window will open — sign in with your Google account and click Allow.
+
+```bash
+gcloud config set project YOUR_PROJECT_ID
+```
+Replace `YOUR_PROJECT_ID` with the ID you copied in Step 1 (e.g. `veil-123456`).
+
+```bash
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com
+```
+This enables Cloud Run and the build service. Takes about 30 seconds.
+
+### Step 4 — Clone Veil and deploy
+
+```bash
+git clone https://github.com/Novaro1/unblocker
+```
+```bash
+cd unblocker
+```
+```bash
+gcloud run deploy veil --source . --platform managed --region us-central1 --allow-unauthenticated --port 8080
+```
+
+When it asks **"Do you want to enable the Artifact Registry API?"** — type `y` and press Enter.
+
+When it asks **"Allow unauthenticated invocations?"** — type `y` and press Enter.
+
+The deploy takes about 2–3 minutes. When it finishes the CLI prints your URL:
+```
+Service URL: https://veil-abc123xy-uc.a.run.app
+```
+
+That's your link. It works immediately.
+
+### Spinning up more links
+
+To get a second URL with a completely different hash, just change the service name:
+```bash
+gcloud run deploy veil2 --source . --platform managed --region us-central1 --allow-unauthenticated --port 8080
+```
+
+Each service name gets its own unique URL.
 
 ### Why this is the hardest to block
 
