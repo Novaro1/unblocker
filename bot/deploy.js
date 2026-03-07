@@ -19,6 +19,29 @@ const commands = [
     )
     .addStringOption((o) =>
       o.setName("name").setDescription("Display name e.g. veilub.mooo.com").setRequired(false)
+    )
+    .addUserOption((o) =>
+      o.setName("submitter").setDescription("Who found or submitted this link?").setRequired(false)
+    )
+    .addStringOption((o) =>
+      o.setName("unblocked").setDescription("Filters it works on, comma-separated (e.g. GoGuardian, Securly, Lightspeed)").setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("updatelink")
+    .setDescription("Update filter info or submitter on an existing link (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addStringOption((o) =>
+      o.setName("url").setDescription("The exact URL of the link to update").setRequired(true)
+    )
+    .addStringOption((o) =>
+      o.setName("unblocked").setDescription("Filters it works on, comma-separated (replaces existing)").setRequired(false)
+    )
+    .addUserOption((o) =>
+      o.setName("submitter").setDescription("Update who submitted this link").setRequired(false)
+    )
+    .addStringOption((o) =>
+      o.setName("name").setDescription("Update the display name").setRequired(false)
     ),
 
   new SlashCommandBuilder()

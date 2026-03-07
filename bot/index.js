@@ -114,14 +114,25 @@ async function buildStatusEmbed(guild) {
 
 function buildLinksEmbed() {
   const links = loadLinks();
+  let description;
+  if (!links.length) {
+    description = "No links yet. Staff can add one with `/addlink`.";
+  } else {
+    description = links.map((l, i) => {
+      let line = `**${i + 1}. [${l.name || l.url}](${l.url})**`;
+      if (l.unblocked && l.unblocked.length) {
+        line += `\n✅ Works on: ${l.unblocked.join(" · ")}`;
+      }
+      if (l.submittedBy) {
+        line += `\n👤 Submitted by ${l.submittedBy}`;
+      }
+      return line;
+    }).join("\n\n");
+  }
   return new EmbedBuilder()
     .setColor(0x6366f1)
     .setTitle("🔗 Working Veil Links")
-    .setDescription(
-      links.length
-        ? links.map((l, i) => `${i + 1}. [${l.name}](${l.url})`).join("\n")
-        : "No links yet. Staff can add one with `/addlink`."
-    )
+    .setDescription(description)
     .setFooter({ text: "First load may take a few seconds for the SSL cert" })
     .setTimestamp();
 }
@@ -209,33 +220,52 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /links
   if (commandName === "links") {
-    const links = loadLinks();
-    if (links.length === 0) {
-      return interaction.reply({
-        content: "No links added yet. Staff can add one with `/addlink`.",
-        ephemeral: true,
-      });
-    }
-    const embed = new EmbedBuilder()
-      .setColor(0x6366f1)
-      .setTitle("Working Veil Links")
-      .setDescription(links.map((l, i) => `${i + 1}. [${l.name}](${l.url})`).join("\n"))
-      .setFooter({ text: "First load may take a few seconds while the SSL cert is issued." });
-    return interaction.reply({ embeds: [embed] });
+    return interaction.reply({ embeds: [buildLinksEmbed()] });
   }
 
   // /addlink
   if (commandName === "addlink") {
-    const url  = interaction.options.getString("url");
-    const name = interaction.options.getString("name") || url;
+    const url       = interaction.options.getString("url");
+    const name      = interaction.options.getString("name") || new URL(url).hostname;
+    const submitter = interaction.options.getUser("submitter");
+    const unblocked = interaction.options.getString("unblocked");
     const links = loadLinks();
     if (links.find((l) => l.url === url)) {
       return interaction.reply({ content: "That link is already in the list.", ephemeral: true });
     }
-    links.push({ url, name });
+    const entry = { url, name, addedAt: new Date().toISOString() };
+    if (submitter) {
+      entry.submittedBy   = submitter.username;
+      entry.submittedById = submitter.id;
+    }
+    if (unblocked) {
+      entry.unblocked = unblocked.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    links.push(entry);
     saveLinks(links);
     refreshLiveMessages();
     return interaction.reply({ content: `Added **${name}** to the links list.` });
+  }
+
+  // /updatelink
+  if (commandName === "updatelink") {
+    const url       = interaction.options.getString("url");
+    const name      = interaction.options.getString("name");
+    const submitter = interaction.options.getUser("submitter");
+    const unblocked = interaction.options.getString("unblocked");
+    const links = loadLinks();
+    const entry = links.find((l) => l.url === url);
+    if (!entry) {
+      return interaction.reply({ content: "Link not found.", ephemeral: true });
+    }
+    if (name)      entry.name = name;
+    if (submitter) { entry.submittedBy = submitter.username; entry.submittedById = submitter.id; }
+    if (unblocked !== null) {
+      entry.unblocked = unblocked.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    saveLinks(links);
+    refreshLiveMessages();
+    return interaction.reply({ content: `Updated **${entry.name}**.`, ephemeral: true });
   }
 
   // /removelink
