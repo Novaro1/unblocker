@@ -4,7 +4,7 @@ Each option below acts as a **full reverse proxy** — all traffic is forwarded 
 
 > **Two repos:**
 > - **`Novaro1/veil-edge`** — Cloudflare Pages, Netlify Edge Functions (minimal, no Node.js files)
-> - **`Novaro1/unblocker`** — Railway, Render, Koyeb, Glitch, HuggingFace, Google Cloud Run (full server)
+> - **`Novaro1/unblocker`** — Railway, Render, Koyeb, HuggingFace, Google Cloud Run, GitHub Codespaces, Azure Container Apps, Oracle Cloud, IBM Code Engine (full server)
 
 ---
 
@@ -360,11 +360,200 @@ The hash in the URL is unique to your deployment and unpredictable. Even if a fi
 
 ---
 
+## GitHub Codespaces (port forwarding)
+
+**Domain format:** `https://CODESPACE-8080.app.github.dev`
+**WebSocket support:** Yes
+**Free tier:** 60 core-hours/month (no credit card required)
+**Requires:** GitHub account
+
+`github.dev` is GitHub's own domain. Any school that uses GitHub for class projects cannot block it. The URL contains a random Codespace name making it impossible to pattern-block. This is the best no-card option after Cloudflare Workers.
+
+### Setup
+
+1. Go to [github.com/Novaro1/unblocker](https://github.com/Novaro1/unblocker)
+2. Click the green **Code** button → **Codespaces** tab → **Create codespace on main**
+3. Wait ~1 minute for the Codespace to load (it opens in a browser VS Code editor)
+4. In the terminal at the bottom, run:
+   ```bash
+   npm install
+   node src/index.js
+   ```
+5. A notification will pop up saying "Your application running on port 8080 is available". Click **Make Public**
+6. Go to the **Ports** tab (next to Terminal) — right-click port 8080 → **Port Visibility → Public**
+7. Copy the **Forwarded Address** — it looks like `https://fuzzy-rotary-phone-8080.app.github.dev`
+
+That's your link. It works as long as the Codespace is running.
+
+### Keeping it alive
+
+The Codespace sleeps after 30 minutes of no browser activity. To wake it back up, just go to [github.com/codespaces](https://github.com/codespaces) and click **Resume**. The URL stays the same after resuming.
+
+### Why this is hard to block
+
+Blocking `*.app.github.dev` would break GitHub Codespaces for every developer and student using GitHub. No school IT department is going to do that.
+
+---
+
+## Azure Container Apps
+
+**Domain format:** `https://veil.RANDOMHASH.eastus.azurecontainerapps.io`
+**WebSocket support:** Yes
+**Free tier:** 180,000 vCPU-seconds/month (enough for ~2 requests/second 24/7)
+**Requires:** Azure account + credit card (not charged under free tier)
+
+`azurecontainerapps.io` is a Microsoft domain. Any school running Microsoft 365, Teams, or Azure AD — which is the majority of US schools — will **never** block a Microsoft domain. The random hash in the URL makes it unblockable by pattern even if they tried.
+
+### Step 1 — Create an Azure account
+
+Go to [azure.microsoft.com](https://azure.microsoft.com) → **Start free**. Sign in with any Microsoft account. They require a credit card but give $200 in free credits for 30 days plus always-free services after that.
+
+### Step 2 — Install the Azure CLI
+
+**Mac:**
+```bash
+brew install azure-cli
+```
+
+**Windows:** Download the installer from [aka.ms/installazurecliwindows](https://aka.ms/installazurecliwindows)
+
+### Step 3 — Log in and deploy
+
+Run these one at a time in Terminal:
+
+```bash
+az login
+```
+A browser window opens — sign in with your Microsoft account.
+
+```bash
+az group create --name veil-rg --location eastus
+```
+
+```bash
+az containerapp up \
+  --name veil \
+  --resource-group veil-rg \
+  --location eastus \
+  --source https://github.com/Novaro1/unblocker \
+  --ingress external \
+  --target-port 8080
+```
+
+This pulls the repo, builds it, and deploys it. Takes 3–5 minutes. When done it prints:
+
+```
+Your container app veil is available at: https://veil.RANDOMHASH.eastus.azurecontainerapps.io
+```
+
+### Spinning up more links
+
+Change `--name veil` to `--name veil2`, `--name veil3`, etc. Each gets a new random hash in the URL.
+
+### Why this is nearly impossible to block
+
+Microsoft's `azurecontainerapps.io` is the same domain used by Microsoft's own enterprise services. Blocking it would break Azure DevOps, Microsoft's developer tools, and potentially Teams integrations at schools that use Microsoft 365.
+
+---
+
+## Oracle Cloud Free Tier (permanent free VM)
+
+**Domain format:** Your own IP or a FreeDNS subdomain
+**WebSocket support:** Yes (full)
+**Free tier:** 4 ARM cores + 24GB RAM — **free forever, no expiry, no spin-down**
+**Requires:** Oracle account + credit card (never charged on always-free resources)
+
+Oracle's always-free tier includes two AMD micro VMs or one ARM VM with 4 cores and 24GB RAM. It never sleeps, never expires, and never costs anything as long as you stay on free-tier resources. This is a completely independent Veil server with its own IP.
+
+### Step 1 — Create an Oracle Cloud account
+
+1. Go to [cloud.oracle.com](https://cloud.oracle.com) → **Start for free**
+2. Sign up — they ask for a credit card but will not charge it for always-free resources
+3. Choose your home region (pick one close to you — you can't change it later)
+
+### Step 2 — Launch a free VM
+
+1. Go to **Compute → Instances → Create Instance**
+2. Click **Change Shape** → **Ampere** → select **VM.Standard.A1.Flex**
+   - Set: **1 OCPU, 6 GB RAM** (you can go up to 4 OCPU / 24 GB still free)
+3. Under **Image**, leave it as Oracle Linux or switch to **Ubuntu 22.04**
+4. Under **Add SSH Keys**, paste your public SSH key (from `~/.ssh/id_rsa.pub`) or download the generated key
+5. Click **Create**
+
+### Step 3 — Set up Veil on the VM
+
+Once the instance shows **Running**, SSH in:
+```bash
+ssh ubuntu@YOUR_INSTANCE_IP
+```
+
+Install Node.js and clone Veil:
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs git
+git clone https://github.com/Novaro1/unblocker
+cd unblocker
+npm install
+```
+
+Open port 8080 in Oracle's firewall (their cloud has an extra firewall layer):
+```bash
+sudo iptables -I INPUT -p tcp --dport 8080 -j ACCEPT
+```
+Also go to **Networking → Virtual Cloud Networks → your VCN → Security Lists** and add an ingress rule for port 8080.
+
+Run with PM2 so it stays up:
+```bash
+sudo npm install -g pm2
+pm2 start src/index.js --name veil
+pm2 save
+pm2 startup
+```
+
+Your server is now running permanently at `http://YOUR_INSTANCE_IP:8080`. Use FreeDNS to point a subdomain at that IP to get an HTTPS URL.
+
+---
+
+## IBM Code Engine
+
+**Domain format:** `https://veil.RANDOMHASH.us-south.codeengine.appdomain.cloud`
+**WebSocket support:** Yes
+**Free tier:** 50 vCPU-seconds + 100 GB-seconds per month
+**Requires:** IBM Cloud account (credit card required but has a free tier)
+
+`codeengine.appdomain.cloud` is IBM's serverless container domain. It's extremely obscure — no school filter has ever thought to block it. IBM is known as an enterprise company so their domains are universally trusted.
+
+### Setup
+
+1. Go to [cloud.ibm.com](https://cloud.ibm.com) → create a free account
+2. Search for **Code Engine** in the catalog and open it
+3. Click **Create project** → name it `veil` → **Create**
+4. Inside the project, click **Applications → Create**
+5. Under **Code**, select **Source code** and enter:
+   ```
+   https://github.com/Novaro1/unblocker
+   ```
+6. Set **Listen port** to `8080`
+7. Click **Create** — IBM builds and deploys automatically (~3 minutes)
+
+Your URL is shown on the application page once it deploys. It looks like:
+```
+https://veil.abc123def.us-south.codeengine.appdomain.cloud
+```
+
+### Note on free tier limits
+
+The free tier is low (50 vCPU-seconds/month) but Code Engine scales to zero when not in use and only consumes credits when actively handling requests. Light usage (a few dozen users) should stay within free limits.
+
+---
+
 ## Notes
 
-- **Independent deployments** (Railway, Render, Koyeb, HuggingFace, Cloud Run) are the most resilient — they're entirely separate Veil instances with their own servers and IPs, not just proxies in front of your EC2.
+- **Independent deployments** (Railway, Render, Koyeb, HuggingFace, Cloud Run, Oracle, Azure Container Apps) are the most resilient — they're entirely separate Veil instances with their own servers and IPs, not just proxies in front of your EC2.
 - **Edge proxies** (Cloudflare Workers, Cloudflare Pages, Deno Deploy, Netlify Edge Functions, val.town) are the fastest to spin up — new URL in under a minute.
-- **HuggingFace Spaces and Google Cloud Run** are the most filter-resistant domains. Blocking them would break legitimate AI tools and Google developer services respectively.
+- **Oracle Cloud** is the only option with a truly permanent, always-on free server that never sleeps. It takes the most setup but costs nothing forever.
+- **GitHub Codespaces** is the best no-credit-card option for a real server URL — `github.dev` is unbockable at any school that uses GitHub.
+- **Azure Container Apps and Google Cloud Run** have the most filter-resistant domains. Blocking Microsoft or Google domains at a school would break core services.
 - Do **not** use the raw server IP (`16.59.60.231`) in edge proxy options — it's in a Cloudflare-owned range. Use `veilub.mooo.com` as the upstream hostname instead.
 
 ---
@@ -383,8 +572,14 @@ The hash in the URL is unique to your deployment and unpredictable. Even if a fi
 | Koyeb | `*.koyeb.app` | Full server | ✅ | Always on |
 | HuggingFace | `*.hf.space` | Full server | ✅ | Free |
 | Google Cloud Run | `*-hash-*.run.app` | Full server | ✅ | 2M req/month |
+| GitHub Codespaces | `*-8080.app.github.dev` | Full server | ✅ | 60 core-hr/mo |
+| Azure Container Apps | `*.azurecontainerapps.io` | Full server | ✅ | Free allowance |
+| Oracle Cloud | your IP / FreeDNS | Full server | ✅ | Forever free |
+| IBM Code Engine | `*.codeengine.appdomain.cloud` | Full server | ✅ | Free allowance |
 
-- **Cloudflare Workers** is the most reliable option. The `workers.dev` domain is extremely unlikely to be blocked by school filters, and you can generate new Worker names instantly.
-- **Deno Deploy** is a strong backup with a higher free request limit.
-- **val.town** is a lesser-known domain which makes it harder to block by pattern, but WebSocket support is limited so the proxy transport may be unreliable.
-- Do **not** use the raw server IP (`16.59.60.231`) in any of these — that IP is in a Cloudflare-owned range and will be rejected by Cloudflare Workers. Use `veilub.mooo.com` as the hostname in all cases.
+- **Cloudflare Workers** is the fastest to spin up. New URL in under a minute, no card needed.
+- **GitHub Codespaces** is the best no-card full-server option. `github.dev` domain cannot be blocked at schools.
+- **Oracle Cloud** is the only option with a permanent, always-on, truly free server.
+- **Azure Container Apps** has the best enterprise domain — Microsoft's domain is trusted everywhere.
+- **val.town** WebSocket support is limited so the proxy transport may be unreliable.
+- Do **not** use the raw server IP (`16.59.60.231`) in any edge proxy — use `veilub.mooo.com` instead.
