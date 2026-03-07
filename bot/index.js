@@ -677,6 +677,78 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return interaction.reply({ embeds: [embed] });
   }
 
+  // /findlink
+  if (commandName === "findlink") {
+    if (!existsSync(FREEDNS_FILE)) {
+      return interaction.reply({
+        content: "The FreeDNS domain list hasn't been generated yet. Run `node scripts/freedns-list.js > freedns-domains.txt` on the server first.",
+        ephemeral: true,
+      });
+    }
+
+    const filterKey = interaction.options.getString("filter");
+    await interaction.deferReply();
+
+    const allDomains = readFileSync(FREEDNS_FILE, "utf-8")
+      .split("\n").map((d) => d.trim()).filter(Boolean);
+
+    // Shuffle
+    const pool = [...allDomains].sort(() => Math.random() - 0.5);
+
+    const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
+    const MAX_TRIES = 30;
+    let found = null;
+    let checked = 0;
+    let filterName = filterKey;
+
+    for (const domain of pool.slice(0, MAX_TRIES)) {
+      checked++;
+      try {
+        const res = await fetch(
+          `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
+        );
+        const data = await res.json();
+        if (!data.success) continue;
+        const result = data.results.find((r) => r.filter === filterKey);
+        if (result) filterName = result.name;
+        if (result && !result.blocked && !result.error) {
+          found = { domain, name: result.name, category: result.category };
+          break;
+        }
+      } catch {
+        // skip failed check
+      }
+    }
+
+    if (!found) {
+      const embed = new EmbedBuilder()
+        .setColor(0xef4444)
+        .setTitle("No Unblocked Domain Found")
+        .setDescription(
+          `Checked **${checked}** random FreeDNS domains against **${filterName}** — none passed.\nTry running the command again for a new random batch.`
+        )
+        .setTimestamp();
+      return interaction.editReply({ embeds: [embed] });
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0x22c55e)
+      .setTitle("Unblocked Domain Found!")
+      .setDescription(`\`${found.domain}\` is **not blocked** by **${found.name}**`)
+      .addFields(
+        { name: "Category",     value: found.category || "Unknown", inline: true },
+        { name: "Filter",       value: found.name,                  inline: true },
+        { name: "Domains checked", value: `${checked}`,             inline: true },
+        {
+          name: "Register it on FreeDNS",
+          value: `Go to [FreeDNS](https://freedns.afraid.org/subdomain/edit.php) and register a subdomain like \`yourname.${found.domain}\``,
+        }
+      )
+      .setFooter({ text: "Powered by live.glseries.net · Results may vary" })
+      .setTimestamp();
+    return interaction.editReply({ embeds: [embed] });
+  }
+
   // /uptime
   if (commandName === "uptime") {
     const ms = Date.now() - BOT_START;

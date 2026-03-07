@@ -177,6 +177,34 @@ const commands = [
       o.setName("count").setDescription("How many to show (default 5, max 20)").setRequired(false)
         .setMinValue(1).setMaxValue(20)
     ),
+
+  new SlashCommandBuilder()
+    .setName("findlink")
+    .setDescription("Find a FreeDNS domain that is unblocked by a specific school content filter")
+    .addStringOption((o) =>
+      o.setName("filter").setDescription("Which filter to check against").setRequired(true)
+        .addChoices(
+          { name: "GoGuardian",     value: "goguardian"    },
+          { name: "Securly",        value: "securly"       },
+          { name: "Lightspeed",     value: "lightspeed"    },
+          { name: "Cisco Umbrella", value: "cisco"         },
+          { name: "iBoss",          value: "iboss"         },
+          { name: "Barracuda",      value: "barracuda"     },
+          { name: "DNSFilter",      value: "dnsfilter"     },
+          { name: "FortiGuard",     value: "fortiguard"    },
+          { name: "Linewize",       value: "linewize"      },
+          { name: "Blocksi Web",    value: "blocksiweb"    },
+          { name: "Blocksi AI",     value: "blocksiai"     },
+          { name: "Deledao",        value: "deledao"       },
+          { name: "AristotleK12",   value: "aristotle"     },
+          { name: "Senso Cloud",    value: "senso"         },
+          { name: "Palo Alto",      value: "paloalto"      },
+          { name: "LanSchool",      value: "lanschool"     },
+          { name: "Qustodio",       value: "qustodio"      },
+          { name: "Sophos",         value: "sophos"        },
+          { name: "ContentKeeper",  value: "contentkeeper" },
+        )
+    ),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);
