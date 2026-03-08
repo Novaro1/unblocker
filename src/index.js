@@ -17,6 +17,24 @@ const bareAsModule3Path = fileURLToPath(
 );
 
 logging.set_level(logging.NONE);
+
+// ── Simple in-memory rate limiter ──────────────────────────────────────────
+const rateLimitStore = new Map(); // ip -> { count, resetAt }
+function rateLimit(req, reply, { max, windowMs }) {
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
+  const now = Date.now();
+  const entry = rateLimitStore.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(ip, { count: 1, resetAt: now + windowMs });
+    return false; // not limited
+  }
+  entry.count++;
+  if (entry.count > max) {
+    reply.code(429).send({ error: "Too many requests. Try again later." });
+    return true; // limited
+  }
+  return false;
+}
 Object.assign(wisp.options, {
   allow_udp_streams: false,
   dns_servers: ["1.1.1.3", "1.0.0.3"],
@@ -39,6 +57,11 @@ const fastify = Fastify({
       .on("request", (req, res) => {
         res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
         res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader("X-Frame-Options", "SAMEORIGIN");
+        res.setHeader("Referrer-Policy", "no-referrer");
+        res.setHeader("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
+        res.setHeader("X-XSS-Protection", "1; mode=block");
         if (bareServer.shouldRoute(req)) {
           bareServer.routeRequest(req, res);
         } else {
@@ -83,6 +106,7 @@ fastify.get('/caddy-ask', (_req, reply) => {
 
 // Ambassador token verification
 fastify.get('/api/verify-token', (req, reply) => {
+  if (rateLimit(req, reply, { max: 10, windowMs: 60_000 })) return;
   const { token } = req.query;
   if (!token) return reply.code(400).send({ valid: false });
   try {
@@ -163,4 +187,4 @@ function shutdown() {
 let port = parseInt(process.env.PORT || "");
 if (isNaN(port)) port = 8080;
 
-fastify.listen({ port, host: "0.0.0.0" });
+fastify.listen({ port, host: "127.0.0.1" });
