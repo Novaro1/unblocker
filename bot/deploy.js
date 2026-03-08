@@ -69,7 +69,8 @@ const commands = [
           { name: "Site is slow",                    value: "slow"    },
           { name: "Site won't load",                 value: "blocked" },
           { name: "Make your own link",              value: "link"    },
-          { name: "History & privacy",               value: "history" }
+          { name: "History & privacy",               value: "history" },
+          { name: "Ambassador program",              value: "ambassador" }
         )
     ),
 

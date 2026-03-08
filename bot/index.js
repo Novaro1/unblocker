@@ -359,29 +359,46 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const faqs = {
       error:
         "**Scramjet / Service Worker Error**\n" +
-        "You're on `http://` instead of `https://`. The proxy requires a secure connection. " +
-        "Make sure your link starts with `https://`.",
+        "This usually means one of two things:\n" +
+        "• You're on `http://` instead of `https://` — make sure your link starts with `https://`\n" +
+        "• The service worker failed to install — try opening the link in a new tab, or clear your browser cache and reload\n" +
+        "If it keeps happening, the link may have been blocked. Check #links for a working one.",
       slow:
         "**Site is Slow**\n" +
-        "The server is shared by everyone. Try enabling **Lag Reduction** in Settings. " +
-        "Peak hours will be slower.",
+        "A few things that help:\n" +
+        "• Try a different link from #links — some routes are faster than others\n" +
+        "• Avoid peak hours (typically 7am–4pm on school days)\n" +
+        "• Close other tabs — the proxy uses your browser's resources\n" +
+        "• If a game is lagging, it may just be the game's own servers",
       blocked:
-        "**Site Won't Load**\n" +
-        "Some sites actively block proxies. Google, YouTube, Discord, and most social media work fine. " +
-        "Streaming sites like Netflix are blocked by design.",
+        "**Site Won't Load / Keeps Getting Blocked**\n" +
+        "• If the link itself is blocked at school, get a new one from #links or use `/findlink` to find one that passes your filter\n" +
+        "• Some sites (Netflix, Spotify, etc.) actively detect and block proxies — this is a limitation we can't fix\n" +
+        "• If you get a school block page, your filter caught the domain — try a different link\n" +
+        "• Tab cloak (Settings → Appearance) can help avoid teacher attention",
       link:
-        "**Make Your Own Link**\n" +
-        "1. Go to freedns.afraid.org → create a free account\n" +
-        "2. Subdomains → Add\n" +
-        "3. Type: `A` | Subdomain: anything | pick a domain | Destination: (see #links)\n" +
-        "4. Save and wait ~2 minutes\n" +
-        "5. Visit `https://yourname.domain.com`\n" +
-        "Post it in #submit-a-link so others can use it!",
+        "**Make Your Own Veil Link**\n" +
+        "1. Go to [freedns.afraid.org](https://freedns.afraid.org) → create a free account\n" +
+        "2. Click **Subdomains** → **Add**\n" +
+        "3. Set Type: `A` | Enter any subdomain name | Pick a domain | Destination: your server IP (see #links for the current IP)\n" +
+        "4. Save — wait ~2 minutes for it to go live\n" +
+        "5. Visit `https://yoursubdomain.domain.com`\n\n" +
+        "Tip: Use `/freedns` to get random domain suggestions, or `/findlink` to find one already unblocked by your school filter.",
       history:
         "**History & Privacy**\n" +
-        "History is stored only on your own device in local storage. " +
-        "Nothing is sent to or stored on the server. " +
-        "You can turn it off or clear it in Settings → Privacy.",
+        "• Your browsing history is stored **only on your own device** in local storage — nothing is sent to our servers\n" +
+        "• We do not log what sites you visit through the proxy\n" +
+        "• You can clear or disable history in **Settings → Privacy**\n" +
+        "• Tab cloak titles are also stored locally only",
+      ambassador:
+        "**Ambassador Program**\n" +
+        "Advertise Veil in a Discord server with 50+ members, screenshot it, and DM proof to staff.\n" +
+        "You'll get an **ambassador token** that unlocks:\n" +
+        "• Exclusive themes (Aura, Crimson, Gold)\n" +
+        "• Premium tab cloaks (YouTube, Spotify, Roblox, Discord)\n" +
+        "• Early access to new features before public release\n" +
+        "• Ambassador leaderboard rank\n" +
+        "• Access to `/findlink` — finds unblocked domains for your school filter",
     };
 
     const embed = new EmbedBuilder().setColor(0x6366f1).setTitle("FAQ");
