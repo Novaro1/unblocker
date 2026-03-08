@@ -711,8 +711,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (!data.success) continue;
         const result = data.results.find((r) => r.filter === filterKey);
         if (result) filterName = result.name;
-        if (result && !result.blocked && !result.error) {
-          found = { domain, name: result.name, category: result.category };
+        const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
+        const category = result?.category || "";
+        if (result && !result.blocked && !result.error && !UNCATEGORIZED.test(category)) {
+          found = { domain, name: result.name, category };
           break;
         }
       } catch {
