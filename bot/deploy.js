@@ -199,6 +199,13 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
+    .setName("ticket")
+    .setDescription("Open a support ticket with staff")
+    .addStringOption((o) =>
+      o.setName("issue").setDescription("Briefly describe your issue").setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
     .setName("findlink")
     .setDescription("Find a FreeDNS domain that is unblocked by a specific school content filter")
     .addStringOption((o) =>

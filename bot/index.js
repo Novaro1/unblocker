@@ -10,6 +10,7 @@ import {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
+  ChannelType,
 } from "discord.js";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { randomUUID } from "crypto";
@@ -148,6 +149,8 @@ const {
   VERIFIED_ROLE_ID,
   BOT_COMMANDS_CHANNEL_ID,
   MOD_LOG_CHANNEL_ID,
+  TICKETS_CHANNEL_ID,
+  STAFF_ROLE_ID,
   SERVER_URL = "https://veilub.mooo.com",
 } = process.env;
 
@@ -274,6 +277,28 @@ const pendingVerify = new Map();
 // ── Button interactions ────────────────────────────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isButton()) return;
+
+  if (interaction.customId === "close_ticket") {
+    if (!interaction.channel.isThread()) {
+      return interaction.reply({ content: "This can only be used inside a ticket thread.", ephemeral: true });
+    }
+    try {
+      await interaction.reply({ content: "🔒 Closing ticket..." });
+      await modLog(interaction.guild, new EmbedBuilder()
+        .setColor(0xef4444)
+        .setTitle("Ticket Closed")
+        .addFields(
+          { name: "Thread", value: interaction.channel.name, inline: true },
+          { name: "Closed by", value: `${interaction.user.tag}`, inline: true },
+        )
+        .setTimestamp());
+      await interaction.channel.setLocked(true);
+      await interaction.channel.setArchived(true);
+    } catch (err) {
+      return interaction.followUp({ content: `Error closing ticket: ${err.message}`, ephemeral: true });
+    }
+    return;
+  }
 
   if (interaction.customId === "verify_user") {
     if (!VERIFIED_ROLE_ID) {
@@ -1035,6 +1060,71 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setFooter({ text: `Powered by live.glseries.net · ${MONTHLY_LIMIT - uses - 1} uses remaining this month` })
       .setTimestamp();
     return interaction.editReply({ embeds: [embed] });
+  }
+
+  // /ticket
+  if (commandName === "ticket") {
+    const issue = interaction.options.getString("issue");
+    const ticketsChannel = TICKETS_CHANNEL_ID
+      ? interaction.guild.channels.cache.get(TICKETS_CHANNEL_ID)
+      : null;
+
+    if (!ticketsChannel) {
+      return interaction.reply({
+        content: "Tickets are not configured yet. Please ask staff to set up the TICKETS_CHANNEL_ID.",
+        ephemeral: true,
+      });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      const thread = await ticketsChannel.threads.create({
+        name: `ticket-${interaction.user.username}`,
+        autoArchiveDuration: 1440,
+        type: ChannelType.PublicThread,
+        reason: `Support ticket from ${interaction.user.tag}`,
+      });
+
+      await thread.members.add(interaction.user.id);
+
+      const embed = new EmbedBuilder()
+        .setColor(0x6366f1)
+        .setTitle("Support Ticket")
+        .addFields(
+          { name: "User",  value: `${interaction.user} (${interaction.user.tag})`, inline: true },
+          { name: "Issue", value: issue },
+        )
+        .setFooter({ text: `Thread ID: ${thread.id}` })
+        .setTimestamp();
+
+      const closeButton = new ButtonBuilder()
+        .setCustomId("close_ticket")
+        .setLabel("Close Ticket")
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji("🔒");
+
+      await thread.send({
+        content: `${interaction.user}${STAFF_ROLE_ID ? ` | <@&${STAFF_ROLE_ID}>` : " | @Staff"}`,
+        embeds: [embed],
+        components: [new ActionRowBuilder().addComponents(closeButton)],
+      });
+
+      await modLog(interaction.guild, new EmbedBuilder()
+        .setColor(0x6366f1)
+        .setTitle("Ticket Opened")
+        .addFields(
+          { name: "User",   value: `${interaction.user.tag}`, inline: true },
+          { name: "Thread", value: `<#${thread.id}>`,         inline: true },
+          { name: "Issue",  value: issue },
+        )
+        .setTimestamp());
+
+      return interaction.editReply({
+        content: `Your ticket has been created: <#${thread.id}>. Staff will be with you shortly.`,
+      });
+    } catch (err) {
+      return interaction.editReply({ content: `Error creating ticket: ${err.message}` });
+    }
   }
 
   // /uptime
