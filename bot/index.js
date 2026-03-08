@@ -248,12 +248,18 @@ client.on(Events.GuildMemberAdd, async (member) => {
     if (channel) {
       const embed = new EmbedBuilder()
         .setColor(0x6366f1)
-        .setTitle("Welcome to Veil!")
+        .setTitle(`Welcome to Veil, ${member.user.username}!`)
         .setDescription(
-          `Hey ${member}! Welcome to the server.\n\n` +
-          `Check **#links** for working proxy links and **#faq** if you have questions.`
+          `You're in. Here's how to get started:\n\n` +
+          `**1.** Head to <#${process.env.VERIFY_CHANNEL_ID || "verify"}> and click **Verify Me** to unlock the server\n` +
+          `**2.** Grab a working proxy link from **#links**\n` +
+          `**3.** Check **#faq** if something isn't working\n` +
+          `**4.** Use **#bot-commands** for bot features like \`/findlink\` and \`/freedns\`\n\n` +
+          `Want exclusive themes and early access? Check out the **Ambassador Program** — use \`/faq\` and pick *Ambassador program* for details.`
         )
-        .setThumbnail(member.user.displayAvatarURL());
+        .setThumbnail(member.user.displayAvatarURL())
+        .setFooter({ text: `Member #${member.guild.memberCount}` })
+        .setTimestamp();
       channel.send({ embeds: [embed] });
     }
   }
@@ -494,12 +500,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     const embed = new EmbedBuilder()
       .setColor(0x6366f1)
-      .setTitle("Welcome to Veil!")
+      .setTitle(`Welcome to Veil, ${interaction.user.username}!`)
       .setDescription(
-        `Hey ${interaction.user}! Welcome to the server.\n\n` +
-        `Check **#links** for working proxy links and **#faq** if you have questions.`
+        `You're in. Here's how to get started:\n\n` +
+        `**1.** Head to <#${process.env.VERIFY_CHANNEL_ID || "verify"}> and click **Verify Me** to unlock the server\n` +
+        `**2.** Grab a working proxy link from **#links**\n` +
+        `**3.** Check **#faq** if something isn't working\n` +
+        `**4.** Use **#bot-commands** for bot features like \`/findlink\` and \`/freedns\`\n\n` +
+        `Want exclusive themes and early access? Check out the **Ambassador Program** — use \`/faq\` and pick *Ambassador program* for details.`
       )
-      .setThumbnail(interaction.user.displayAvatarURL());
+      .setThumbnail(interaction.user.displayAvatarURL())
+      .setFooter({ text: `Member #${interaction.guild.memberCount} · Test message` })
+      .setTimestamp();
     await channel.send({ embeds: [embed] });
     return interaction.reply({ content: "Test welcome message sent!", ephemeral: true });
   }
