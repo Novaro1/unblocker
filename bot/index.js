@@ -21,6 +21,36 @@ const TOKENS_FILE        = join(__dirname, "../tokens.json");
 const BETA_FEATURES_FILE = join(__dirname, "../beta-features.json");
 const FREEDNS_FILE       = join(__dirname, "../freedns-domains.txt");
 const FINDLINK_USAGE_FILE = join(__dirname, "../findlink-usage.json");
+const FINDLINK_CACHE_FILE = join(__dirname, "../findlink-cache.json");
+
+// ── /findlink domain result cache ───────────────────────────────────────────
+function loadFindlinkCache() {
+  if (!existsSync(FINDLINK_CACHE_FILE)) return {};
+  return JSON.parse(readFileSync(FINDLINK_CACHE_FILE, "utf-8"));
+}
+
+function saveFindlinkCache(cache) {
+  writeFileSync(FINDLINK_CACHE_FILE, JSON.stringify(cache));
+}
+
+// Returns cached results array for a domain this month, or null if not cached
+function getCachedResults(domain) {
+  const cache = loadFindlinkCache();
+  const month = new Date().toISOString().slice(0, 7);
+  return cache[`${month}:${domain}`] ?? null;
+}
+
+// Stores all filter results for a domain this month
+function setCachedResults(domain, results) {
+  const cache = loadFindlinkCache();
+  const month = new Date().toISOString().slice(0, 7);
+  // Evict entries from previous months to keep the file small
+  for (const key of Object.keys(cache)) {
+    if (!key.startsWith(month + ":")) delete cache[key];
+  }
+  cache[`${month}:${domain}`] = results;
+  saveFindlinkCache(cache);
+}
 
 // ── /findlink usage tracking ────────────────────────────────────────────────
 function loadFindlinkUsage() {
@@ -744,12 +774,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
     for (const domain of pool.slice(0, MAX_TRIES)) {
       checked++;
       try {
-        const res = await fetch(
-          `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
-        );
-        const data = await res.json();
-        if (!data.success) continue;
-        const result = data.results.find((r) => r.filter === filterKey);
+        let results = getCachedResults(domain);
+        if (!results) {
+          const res = await fetch(
+            `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
+          );
+          const data = await res.json();
+          if (!data.success) continue;
+          results = data.results;
+          setCachedResults(domain, results);
+        }
+        const result = results.find((r) => r.filter === filterKey);
         if (result) filterName = result.name;
         const category = result?.category || "";
         const categoryOk = !skipUncategorized || !UNCATEGORIZED.test(category);
