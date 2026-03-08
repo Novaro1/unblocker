@@ -480,14 +480,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (!channel) {
       return interaction.reply({ content: "Announcements channel not found.", ephemeral: true });
     }
+    const ping = interaction.options.getBoolean("ping") ?? true;
     const embed = new EmbedBuilder()
       .setColor(0x6366f1)
       .setTitle("📣 Veil Update")
       .setDescription(message)
       .setTimestamp()
       .setFooter({ text: `Posted by ${interaction.user.username}` });
-    await channel.send({ content: "@everyone", embeds: [embed] });
-    return interaction.reply({ content: "Announcement posted!", ephemeral: true });
+    await channel.send({ content: ping ? "@everyone" : undefined, embeds: [embed] });
+    return interaction.reply({ content: `Announcement posted!${ping ? " (@everyone pinged)" : " (no ping)"}`, ephemeral: true });
   }
 
   // /testwelcome

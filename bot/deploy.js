@@ -84,6 +84,9 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addStringOption((o) =>
       o.setName("message").setDescription("The announcement text").setRequired(true)
+    )
+    .addBooleanOption((o) =>
+      o.setName("ping").setDescription("Ping @everyone? (default: true)").setRequired(false)
     ),
 
   new SlashCommandBuilder()
