@@ -300,6 +300,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
+  if (interaction.customId === "open_ticket") {
+    const modal = new ModalBuilder()
+      .setCustomId("ticket_modal")
+      .setTitle("Open a Support Ticket");
+
+    const issueInput = new TextInputBuilder()
+      .setCustomId("ticket_issue")
+      .setLabel("Describe your issue")
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(true)
+      .setMinLength(10)
+      .setMaxLength(1000)
+      .setPlaceholder("e.g. The proxy isn't loading YouTube, I get a service worker error...");
+
+    modal.addComponents(new ActionRowBuilder().addComponents(issueInput));
+    return interaction.showModal(modal);
+  }
+
   if (interaction.customId === "verify_user") {
     if (!VERIFIED_ROLE_ID) {
       return interaction.reply({ content: "VERIFIED_ROLE_ID is not set in the bot .env file.", ephemeral: true });
@@ -348,6 +366,67 @@ client.on(Events.InteractionCreate, async (interaction) => {
 // ── Modal submissions ──────────────────────────────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isModalSubmit()) return;
+
+  if (interaction.customId === "ticket_modal") {
+    const issue = interaction.fields.getTextInputValue("ticket_issue");
+    const ticketsChannel = TICKETS_CHANNEL_ID
+      ? interaction.guild.channels.cache.get(TICKETS_CHANNEL_ID)
+      : null;
+
+    if (!ticketsChannel) {
+      return interaction.reply({ content: "Tickets are not configured. Please contact staff.", ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      const thread = await ticketsChannel.threads.create({
+        name: `ticket-${interaction.user.username}`,
+        autoArchiveDuration: 1440,
+        type: ChannelType.PublicThread,
+        reason: `Support ticket from ${interaction.user.tag}`,
+      });
+
+      await thread.members.add(interaction.user.id);
+
+      const embed = new EmbedBuilder()
+        .setColor(0x6366f1)
+        .setTitle("Support Ticket")
+        .addFields(
+          { name: "User",  value: `${interaction.user} (${interaction.user.tag})`, inline: true },
+          { name: "Issue", value: issue },
+        )
+        .setFooter({ text: `Thread ID: ${thread.id}` })
+        .setTimestamp();
+
+      const closeButton = new ButtonBuilder()
+        .setCustomId("close_ticket")
+        .setLabel("Close Ticket")
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji("🔒");
+
+      await thread.send({
+        content: `${interaction.user}${STAFF_ROLE_ID ? ` | <@&${STAFF_ROLE_ID}>` : " | @Staff"}`,
+        embeds: [embed],
+        components: [new ActionRowBuilder().addComponents(closeButton)],
+      });
+
+      await modLog(interaction.guild, new EmbedBuilder()
+        .setColor(0x6366f1)
+        .setTitle("Ticket Opened")
+        .addFields(
+          { name: "User",   value: `${interaction.user.tag}`, inline: true },
+          { name: "Thread", value: `<#${thread.id}>`,         inline: true },
+          { name: "Issue",  value: issue },
+        )
+        .setTimestamp());
+
+      return interaction.editReply({
+        content: `Your ticket has been created: <#${thread.id}>. Staff will be with you shortly.`,
+      });
+    } catch (err) {
+      return interaction.editReply({ content: `Error creating ticket: ${err.message}` });
+    }
+  }
 
   if (interaction.customId === "verify_modal") {
     const captchaAnswer = interaction.fields.getTextInputValue("captcha_answer").trim();
@@ -1062,68 +1141,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return interaction.editReply({ embeds: [embed] });
   }
 
-  // /ticket
-  if (commandName === "ticket") {
-    const issue = interaction.options.getString("issue");
-    const ticketsChannel = TICKETS_CHANNEL_ID
-      ? interaction.guild.channels.cache.get(TICKETS_CHANNEL_ID)
-      : null;
-
-    if (!ticketsChannel) {
-      return interaction.reply({
-        content: "Tickets are not configured yet. Please ask staff to set up the TICKETS_CHANNEL_ID.",
-        ephemeral: true,
-      });
-    }
-
+  // /setuptickets
+  if (commandName === "setuptickets") {
     await interaction.deferReply({ ephemeral: true });
     try {
-      const thread = await ticketsChannel.threads.create({
-        name: `ticket-${interaction.user.username}`,
-        autoArchiveDuration: 1440,
-        type: ChannelType.PublicThread,
-        reason: `Support ticket from ${interaction.user.tag}`,
-      });
-
-      await thread.members.add(interaction.user.id);
-
       const embed = new EmbedBuilder()
         .setColor(0x6366f1)
-        .setTitle("Support Ticket")
-        .addFields(
-          { name: "User",  value: `${interaction.user} (${interaction.user.tag})`, inline: true },
-          { name: "Issue", value: issue },
-        )
-        .setFooter({ text: `Thread ID: ${thread.id}` })
-        .setTimestamp();
+        .setTitle("🎫 Support Tickets")
+        .setDescription(
+          "Need help? Click the button below to open a private support ticket.\n\n" +
+          "Describe your issue and a staff member will assist you as soon as possible."
+        );
 
-      const closeButton = new ButtonBuilder()
-        .setCustomId("close_ticket")
-        .setLabel("Close Ticket")
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji("🔒");
+      const button = new ButtonBuilder()
+        .setCustomId("open_ticket")
+        .setLabel("Open a Ticket")
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji("🎫");
 
-      await thread.send({
-        content: `${interaction.user}${STAFF_ROLE_ID ? ` | <@&${STAFF_ROLE_ID}>` : " | @Staff"}`,
+      await interaction.channel.send({
         embeds: [embed],
-        components: [new ActionRowBuilder().addComponents(closeButton)],
+        components: [new ActionRowBuilder().addComponents(button)],
       });
 
-      await modLog(interaction.guild, new EmbedBuilder()
-        .setColor(0x6366f1)
-        .setTitle("Ticket Opened")
-        .addFields(
-          { name: "User",   value: `${interaction.user.tag}`, inline: true },
-          { name: "Thread", value: `<#${thread.id}>`,         inline: true },
-          { name: "Issue",  value: issue },
-        )
-        .setTimestamp());
-
-      return interaction.editReply({
-        content: `Your ticket has been created: <#${thread.id}>. Staff will be with you shortly.`,
-      });
+      return interaction.editReply({ content: "Ticket panel posted!" });
     } catch (err) {
-      return interaction.editReply({ content: `Error creating ticket: ${err.message}` });
+      return interaction.editReply({ content: `Error: ${err.message}` });
     }
   }
 

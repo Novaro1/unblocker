@@ -199,11 +199,9 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
-    .setName("ticket")
-    .setDescription("Open a support ticket with staff")
-    .addStringOption((o) =>
-      o.setName("issue").setDescription("Briefly describe your issue").setRequired(true)
-    ),
+    .setName("setuptickets")
+    .setDescription("Post the ticket panel with an Open a Ticket button in this channel (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   new SlashCommandBuilder()
     .setName("findlink")
