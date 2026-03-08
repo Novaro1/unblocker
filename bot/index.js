@@ -143,8 +143,25 @@ const {
   WELCOME_CHANNEL_ID,
   ANNOUNCEMENTS_CHANNEL_ID,
   VERIFIED_ROLE_ID,
+  BOT_COMMANDS_CHANNEL_ID,
+  MOD_LOG_CHANNEL_ID,
   SERVER_URL = "https://veilub.mooo.com",
 } = process.env;
+
+// Public commands that must be used in #bot-commands
+const PUBLIC_COMMANDS = new Set([
+  "links", "status", "faq", "serverinfo", "uptime",
+  "leaderboard", "beta-status", "freedns", "findlink",
+]);
+
+// Send a log embed to #mod-log
+async function modLog(guild, embed) {
+  if (!MOD_LOG_CHANNEL_ID) return;
+  try {
+    const ch = guild.channels.cache.get(MOD_LOG_CHANNEL_ID);
+    if (ch) await ch.send({ embeds: [embed] });
+  } catch { /* ignore */ }
+}
 
 const BOT_START = Date.now();
 
@@ -274,6 +291,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   const { commandName } = interaction;
+
+  // Restrict public commands to #bot-commands
+  if (PUBLIC_COMMANDS.has(commandName) && BOT_COMMANDS_CHANNEL_ID && interaction.channel.id !== BOT_COMMANDS_CHANNEL_ID) {
+    return interaction.reply({
+      content: `Please use bot commands in <#${BOT_COMMANDS_CHANNEL_ID}>.`,
+      ephemeral: true,
+    });
+  }
 
   // /links
   if (commandName === "links") {
@@ -549,6 +574,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     try {
       await target.roles.add(VERIFIED_ROLE_ID);
+      await modLog(interaction.guild, new EmbedBuilder()
+        .setColor(0x22c55e)
+        .setTitle("Manual Verify")
+        .addFields(
+          { name: "User",   value: `${target} (${target.user.tag})`, inline: true },
+          { name: "Staff",  value: `${interaction.user.tag}`,         inline: true },
+        )
+        .setTimestamp());
       return interaction.reply({ content: `✅ ${target} has been manually verified.`, ephemeral: true });
     } catch (err) {
       return interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
@@ -567,6 +600,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     try {
       await target.roles.remove(VERIFIED_ROLE_ID);
+      await modLog(interaction.guild, new EmbedBuilder()
+        .setColor(0xef4444)
+        .setTitle("Verification Revoked")
+        .addFields(
+          { name: "User",   value: `${target} (${target.user.tag})`, inline: true },
+          { name: "Staff",  value: `${interaction.user.tag}`,         inline: true },
+        )
+        .setTimestamp());
       return interaction.reply({ content: `🚫 ${target}'s verification has been revoked.`, ephemeral: true });
     } catch (err) {
       return interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
@@ -603,11 +644,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     try {
       await target.send({ embeds: [embed] });
+      await modLog(interaction.guild, new EmbedBuilder()
+        .setColor(0xf59e0b)
+        .setTitle("Ambassador Approved")
+        .addFields(
+          { name: "User",  value: `${target.tag}`, inline: true },
+          { name: "Staff", value: `${interaction.user.tag}`, inline: true },
+        )
+        .setTimestamp());
       return interaction.reply({
         content: `✅ Ambassador token generated and DMed to **${target.username}**.`,
         ephemeral: true,
       });
     } catch {
+      await modLog(interaction.guild, new EmbedBuilder()
+        .setColor(0xf59e0b)
+        .setTitle("Ambassador Approved (DM failed)")
+        .addFields(
+          { name: "User",  value: `${target.tag}`, inline: true },
+          { name: "Staff", value: `${interaction.user.tag}`, inline: true },
+          { name: "Token", value: `\`${token}\`` },
+        )
+        .setTimestamp());
       return interaction.reply({
         content: `✅ Token generated but couldn't DM **${target.username}** (DMs may be closed). Token: \`${token}\``,
         ephemeral: true,
@@ -626,6 +684,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ content: `**${target.username}** has no ambassador token.`, ephemeral: true });
     }
     saveTokens(filtered);
+    await modLog(interaction.guild, new EmbedBuilder()
+      .setColor(0xef4444)
+      .setTitle("Ambassador Revoked")
+      .addFields(
+        { name: "User",  value: `${target.tag}`, inline: true },
+        { name: "Staff", value: `${interaction.user.tag}`, inline: true },
+      )
+      .setTimestamp());
     return interaction.reply({ content: `🗑️ Ambassador token revoked for **${target.username}**.`, ephemeral: true });
   }
 
@@ -668,6 +734,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
         );
       await target.send({ embeds: [dmEmbed] });
     } catch { /* DMs closed */ }
+
+    await modLog(interaction.guild, new EmbedBuilder()
+      .setColor(pts >= 0 ? 0x22c55e : 0xf87171)
+      .setTitle(pts >= 0 ? "Points Awarded" : "Points Deducted")
+      .addFields(
+        { name: "Ambassador", value: target.tag,           inline: true },
+        { name: "Change",     value: `${sign}${pts}`,      inline: true },
+        { name: "New total",  value: `${entry.points} pts`,inline: true },
+        { name: "Staff",      value: interaction.user.tag, inline: true },
+        ...(reason ? [{ name: "Reason", value: reason }] : []),
+      )
+      .setTimestamp());
 
     return interaction.reply({ embeds: [embed], ephemeral: true });
   }
