@@ -7,6 +7,9 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ActionRowBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } from "discord.js";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { randomUUID } from "crypto";
@@ -265,6 +268,9 @@ client.on(Events.GuildMemberAdd, async (member) => {
   }
 });
 
+// ── Verification captcha store (in-memory, userId -> { answer, expiresAt }) ─
+const pendingVerify = new Map();
+
 // ── Button interactions ────────────────────────────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isButton()) return;
@@ -273,21 +279,82 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (!VERIFIED_ROLE_ID) {
       return interaction.reply({ content: "VERIFIED_ROLE_ID is not set in the bot .env file.", ephemeral: true });
     }
-    const role = interaction.guild.roles.cache.get(VERIFIED_ROLE_ID);
-    if (!role) {
-      return interaction.reply({ content: "Verified role not found. Check VERIFIED_ROLE_ID in .env.", ephemeral: true });
-    }
     if (interaction.member.roles.cache.has(VERIFIED_ROLE_ID)) {
       return interaction.reply({ content: "You are already verified!", ephemeral: true });
     }
+
+    // Generate a simple random math question
+    const a = Math.floor(Math.random() * 20) + 1;
+    const b = Math.floor(Math.random() * 20) + 1;
+    const answer = String(a + b);
+    pendingVerify.set(interaction.user.id, { answer, expiresAt: Date.now() + 5 * 60 * 1000 });
+
+    const modal = new ModalBuilder()
+      .setCustomId("verify_modal")
+      .setTitle("Veil Verification");
+
+    const captchaInput = new TextInputBuilder()
+      .setCustomId("captcha_answer")
+      .setLabel(`What is ${a} + ${b}? (type the number)`)
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(1)
+      .setMaxLength(4)
+      .setPlaceholder("Type your answer here");
+
+    const agreeInput = new TextInputBuilder()
+      .setCustomId("rules_agree")
+      .setLabel('Type "I agree" to accept the rules')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(7)
+      .setMaxLength(7)
+      .setPlaceholder("I agree");
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(captchaInput),
+      new ActionRowBuilder().addComponents(agreeInput),
+    );
+
+    return interaction.showModal(modal);
+  }
+});
+
+// ── Modal submissions ──────────────────────────────────────────────────────
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isModalSubmit()) return;
+
+  if (interaction.customId === "verify_modal") {
+    const captchaAnswer = interaction.fields.getTextInputValue("captcha_answer").trim();
+    const rulesAgree   = interaction.fields.getTextInputValue("rules_agree").trim().toLowerCase();
+
+    const pending = pendingVerify.get(interaction.user.id);
+
+    if (!pending || Date.now() > pending.expiresAt) {
+      pendingVerify.delete(interaction.user.id);
+      return interaction.reply({ content: "Your verification session expired. Click the button again to restart.", ephemeral: true });
+    }
+
+    if (rulesAgree !== "i agree") {
+      return interaction.reply({ content: 'You must type exactly **"I agree"** to accept the rules.', ephemeral: true });
+    }
+
+    if (captchaAnswer !== pending.answer) {
+      pendingVerify.delete(interaction.user.id);
+      return interaction.reply({ content: "Incorrect answer. Click the Verify button again to try a new question.", ephemeral: true });
+    }
+
+    pendingVerify.delete(interaction.user.id);
+
     try {
-      await interaction.member.roles.add(role);
-      return interaction.reply({
-        content: "✅ You have been verified! Welcome to Veil.",
-        ephemeral: true,
-      });
+      await interaction.member.roles.add(VERIFIED_ROLE_ID);
+      await modLog(interaction.guild, new EmbedBuilder()
+        .setColor(0x22c55e)
+        .setTitle("User Verified (captcha)")
+        .addFields({ name: "User", value: `${interaction.user.tag} (${interaction.user.id})` })
+        .setTimestamp());
+      return interaction.reply({ content: "✅ You're verified! Welcome to Veil.", ephemeral: true });
     } catch (err) {
-      console.error(err);
       return interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
     }
   }
