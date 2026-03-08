@@ -204,6 +204,9 @@ const commands = [
           { name: "Sophos",         value: "sophos"        },
           { name: "ContentKeeper",  value: "contentkeeper" },
         )
+    )
+    .addBooleanOption((o) =>
+      o.setName("skip_uncategorized").setDescription("Skip domains with no known category (default: true)").setRequired(false)
     ),
 ].map((c) => c.toJSON());
 

@@ -20,6 +20,32 @@ const CONFIG_FILE        = join(__dirname, "live-config.json");
 const TOKENS_FILE        = join(__dirname, "../tokens.json");
 const BETA_FEATURES_FILE = join(__dirname, "../beta-features.json");
 const FREEDNS_FILE       = join(__dirname, "../freedns-domains.txt");
+const FINDLINK_USAGE_FILE = join(__dirname, "../findlink-usage.json");
+
+// ── /findlink usage tracking ────────────────────────────────────────────────
+function loadFindlinkUsage() {
+  if (!existsSync(FINDLINK_USAGE_FILE)) return {};
+  return JSON.parse(readFileSync(FINDLINK_USAGE_FILE, "utf-8"));
+}
+
+function saveFindlinkUsage(data) {
+  writeFileSync(FINDLINK_USAGE_FILE, JSON.stringify(data, null, 2));
+}
+
+function getFindlinkUses(userId) {
+  const data = loadFindlinkUsage();
+  const month = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  return data[userId]?.[month] ?? 0;
+}
+
+function incrementFindlinkUses(userId) {
+  const data = loadFindlinkUsage();
+  const month = new Date().toISOString().slice(0, 7);
+  if (!data[userId]) data[userId] = {};
+  data[userId][month] = (data[userId][month] ?? 0) + 1;
+  saveFindlinkUsage(data);
+  return data[userId][month];
+}
 
 // ── Persistent config (live message IDs) ──────────────────────────────────
 function loadConfig() {
@@ -687,7 +713,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     const filterKey = interaction.options.getString("filter");
+    const skipUncategorized = interaction.options.getBoolean("skip_uncategorized") ?? true;
+    const MONTHLY_LIMIT = 5;
+
+    const uses = getFindlinkUses(interaction.user.id);
+    if (uses >= MONTHLY_LIMIT) {
+      const month = new Date().toLocaleString("en-US", { month: "long" });
+      return interaction.reply({
+        content: `You've used \`/findlink\` **${uses}/${MONTHLY_LIMIT}** times this month (${month}). Your limit resets on the 1st.`,
+        ephemeral: true,
+      });
+    }
+
     await interaction.deferReply();
+    incrementFindlinkUses(interaction.user.id);
 
     const allDomains = readFileSync(FREEDNS_FILE, "utf-8")
       .split("\n").map((d) => d.trim()).filter(Boolean);
@@ -697,6 +736,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
     const MAX_TRIES = 30;
+    const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
     let found = null;
     let checked = 0;
     let filterName = filterKey;
@@ -711,9 +751,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (!data.success) continue;
         const result = data.results.find((r) => r.filter === filterKey);
         if (result) filterName = result.name;
-        const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
         const category = result?.category || "";
-        if (result && !result.blocked && !result.error && !UNCATEGORIZED.test(category)) {
+        const categoryOk = !skipUncategorized || !UNCATEGORIZED.test(category);
+        if (result && !result.blocked && !result.error && categoryOk) {
           found = { domain, name: result.name, category };
           break;
         }
@@ -746,7 +786,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           value: `Go to [FreeDNS](https://freedns.afraid.org/subdomain/edit.php) and register a subdomain like \`yourname.${found.domain}\``,
         }
       )
-      .setFooter({ text: "Powered by live.glseries.net · Results may vary" })
+      .setFooter({ text: `Powered by live.glseries.net · ${MONTHLY_LIMIT - uses - 1} uses remaining this month` })
       .setTimestamp();
     return interaction.editReply({ embeds: [embed] });
   }
