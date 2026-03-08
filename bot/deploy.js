@@ -110,6 +110,22 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   new SlashCommandBuilder()
+    .setName("verify-user")
+    .setDescription("Manually verify a user (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addUserOption((o) =>
+      o.setName("user").setDescription("The user to verify").setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("unverify-user")
+    .setDescription("Revoke a user's verification (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addUserOption((o) =>
+      o.setName("user").setDescription("The user to unverify").setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
     .setName("approve-ad")
     .setDescription("Grant a user an ambassador token for advertising Veil (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)

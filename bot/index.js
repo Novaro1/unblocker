@@ -520,6 +520,42 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
+  // /verify-user
+  if (commandName === "verify-user") {
+    if (!VERIFIED_ROLE_ID) {
+      return interaction.reply({ content: "VERIFIED_ROLE_ID is not set in the bot .env file.", ephemeral: true });
+    }
+    const target = interaction.options.getMember("user");
+    if (!target) return interaction.reply({ content: "User not found in this server.", ephemeral: true });
+    if (target.roles.cache.has(VERIFIED_ROLE_ID)) {
+      return interaction.reply({ content: `${target} is already verified.`, ephemeral: true });
+    }
+    try {
+      await target.roles.add(VERIFIED_ROLE_ID);
+      return interaction.reply({ content: `✅ ${target} has been manually verified.`, ephemeral: true });
+    } catch (err) {
+      return interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
+    }
+  }
+
+  // /unverify-user
+  if (commandName === "unverify-user") {
+    if (!VERIFIED_ROLE_ID) {
+      return interaction.reply({ content: "VERIFIED_ROLE_ID is not set in the bot .env file.", ephemeral: true });
+    }
+    const target = interaction.options.getMember("user");
+    if (!target) return interaction.reply({ content: "User not found in this server.", ephemeral: true });
+    if (!target.roles.cache.has(VERIFIED_ROLE_ID)) {
+      return interaction.reply({ content: `${target} is not verified.`, ephemeral: true });
+    }
+    try {
+      await target.roles.remove(VERIFIED_ROLE_ID);
+      return interaction.reply({ content: `🚫 ${target}'s verification has been revoked.`, ephemeral: true });
+    } catch (err) {
+      return interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
+    }
+  }
+
   // /approve-ad
   if (commandName === "approve-ad") {
     const target = interaction.options.getUser("user");
