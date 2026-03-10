@@ -622,6 +622,120 @@ GitPod workspaces stop after 30 minutes of inactivity. Go to [gitpod.io/workspac
 
 ---
 
+---
+
+## Static Game Hub (veil-static)
+
+These options host the **Veil static game hub** — the games-only site that works without any server. No Node.js, no Docker, no edge functions needed. Just HTML, CSS, and JS files.
+
+> **Repo:** `Novaro1/veil-static` — `https://github.com/Novaro1/veil-static`
+
+---
+
+### GitHub Pages
+
+**Domain format:** `username.github.io/veil-static`
+**Free tier:** Unlimited
+**Deploy time:** ~1 minute after push
+
+Already in use at `https://novaro1.github.io/veil-static/`. Automatic — just push to the `main` branch.
+
+```bash
+cd /Users/everest/veil-static && git add -A && git commit -m "update" && git push
+```
+
+---
+
+### Vercel
+
+**Domain format:** `yourproject.vercel.app`
+**Free tier:** Unlimited bandwidth
+**Deploy time:** ~30 seconds after push
+**Requires:** GitHub account
+
+`vercel.app` is a mainstream developer domain — used by millions of sites. It's extremely uncommon for school filters to block it.
+
+**Setup (one time):**
+1. Go to [vercel.com](https://vercel.com) → sign in with GitHub
+2. Click **Add New → Project**
+3. Import **`Novaro1/veil-static`**
+4. Leave all settings default (no build command needed — it's pure static)
+5. Click **Deploy**
+
+Vercel auto-deploys on every push to `main` after that.
+
+**Spinning up more links:** Fork the repo, connect it as a new Vercel project. New `vercel.app` subdomain instantly.
+
+---
+
+### Netlify Drop
+
+**Domain format:** `random-words.netlify.app`
+**Free tier:** 100GB bandwidth/month
+**Deploy time:** Instant (drag and drop)
+**Requires:** Netlify account (no GitHub needed)
+
+The fastest way to get a new URL — no CLI, no git, no setup.
+
+1. Go to [app.netlify.com/drop](https://app.netlify.com/drop)
+2. Drag the entire `veil-static` folder onto the page
+3. Done — you get a URL like `clever-fox-abc123.netlify.app` immediately
+
+To connect GitHub for auto-deploy: **Import from Git** → select `Novaro1/veil-static` → deploy.
+
+---
+
+### Surge.sh
+
+**Domain format:** `anything-you-want.surge.sh`
+**Free tier:** Unlimited
+**Deploy time:** ~10 seconds
+**Requires:** Node.js (npm)
+
+You pick the subdomain. `surge.sh` is a developer tool domain — widely trusted and almost never blocked.
+
+```bash
+npm install --global surge
+cd /Users/everest/veil-static
+surge . veil-games.surge.sh
+```
+
+Replace `veil-games` with any name you want. If that name is taken, pick another.
+
+To update: run the same command again from the same folder.
+
+**Spinning up more links:** Just use a different subdomain name. You can have unlimited sites on the free plan.
+
+---
+
+### Cloudflare Pages (static)
+
+**Domain format:** `yourproject.pages.dev`
+**Free tier:** Unlimited requests
+**Deploy time:** ~1 minute after push
+
+`pages.dev` is different from `workers.dev` and is less commonly blocked. This is the same setup described in the Cloudflare Pages section above — but pointing at `Novaro1/veil-static` instead of `veil-edge`. No `_worker.js` needed; Cloudflare Pages serves the static files directly.
+
+1. **Pages → Create a project → Connect to Git**
+2. Select **`Novaro1/veil-static`**
+3. Leave build settings blank → **Save and Deploy**
+
+Auto-deploys on every push to `main`.
+
+---
+
+### Quick Reference — Static Options
+
+| Platform | Domain | Free | Auto-deploy | No card |
+|---|---|---|---|---|
+| GitHub Pages | `*.github.io` | ✅ | On push | ✅ |
+| Vercel | `*.vercel.app` | ✅ | On push | ✅ |
+| Netlify Drop | `*.netlify.app` | ✅ | Manual drag | ✅ |
+| Surge.sh | `*.surge.sh` | ✅ | CLI push | ✅ |
+| Cloudflare Pages | `*.pages.dev` | ✅ | On push | ✅ |
+
+---
+
 ## Notes
 
 - **Independent deployments** (Railway, Render, Koyeb, HuggingFace, Cloud Run, Azure Container Apps, IBM Code Engine, Fly.io, Replit) are the most resilient — they're entirely separate Veil instances with their own servers and IPs, not just proxies in front of your EC2.
