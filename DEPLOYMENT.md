@@ -327,13 +327,15 @@ This enables Cloud Run and the build service. Takes about 30 seconds.
 
 ### Step 4 — Clone Veil and deploy
 
+If you already have an `unblocker` folder from a previous attempt, delete it first:
+```bash
+rm -rf unblocker
+```
+
+Then clone and deploy:
 ```bash
 git clone https://github.com/Novaro1/unblocker
-```
-```bash
 cd unblocker
-```
-```bash
 gcloud run deploy veil --source . --platform managed --region us-central1 --allow-unauthenticated --port 8080
 ```
 
