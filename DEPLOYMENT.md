@@ -86,7 +86,7 @@ Same as Workers — create a new Playground, paste the same code, deploy. New UR
 1. Go to [val.town](https://val.town) and create a free account
 2. Click the **+** button in the top right of the editor → select **HTTP**
 3. Name the val something like `veil`
-4. Replace all the code with:
+4. Val Town pre-fills the editor with some boilerplate — replace it all with:
 
 ```ts
 export default async function(req: Request): Promise<Response> {
