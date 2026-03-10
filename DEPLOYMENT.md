@@ -343,6 +343,14 @@ When it asks **"Do you want to enable the Artifact Registry API?"** — type `y`
 
 When it asks **"Allow unauthenticated invocations?"** — type `y` and press Enter.
 
+> **If you get a 403 storage permissions error** like `does not have storage.objects.get access`, the Compute Engine service account needs Storage access. Run this (replace the service account email with the one from your error):
+> ```bash
+> gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
+>   --member="serviceAccount:YOURNUM-compute@developer.gserviceaccount.com" \
+>   --role="roles/storage.objectViewer"
+> ```
+> Then re-run the deploy command.
+
 The deploy takes about 2–3 minutes. When it finishes the CLI prints your URL:
 ```
 Service URL: https://veil-abc123xy-uc.a.run.app
