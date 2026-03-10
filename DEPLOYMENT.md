@@ -724,6 +724,267 @@ Auto-deploys on every push to `main`.
 
 ---
 
+---
+
+## Unconventional Static Hosting
+
+These platforms aren't designed as static site hosts but can serve the game hub anyway. Most use Google, Microsoft, or platform-specific domains that are far outside what any blocklist would target.
+
+---
+
+### Google Cloud Storage (storage.googleapis.com)
+
+**Domain format:** `https://storage.googleapis.com/BUCKETNAME/index.html`
+**Free tier:** 5GB storage, 1GB egress/day
+**No card:** No (Google Cloud requires a card, but has a free tier)
+
+`storage.googleapis.com` is Google's object storage CDN domain. No school filter is ever going to block anything on `googleapis.com` — that would break Google Docs, Classroom, Maps, YouTube thumbnails, and half the internet.
+
+The catch: by default Google Cloud Storage adds no custom domain, so you get the raw `storage.googleapis.com/BUCKETNAME/index.html` URL with the bucket name in it.
+
+**Setup:**
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) → **Cloud Storage → Buckets → Create**
+2. Name the bucket (e.g. `veil-games`) → Leave defaults → **Create**
+3. Go to **Permissions** → **Grant Access** → add principal `allUsers` with role `Storage Object Viewer`
+4. Click **Allow public access** on the warning
+5. Upload everything from `/Users/everest/veil-static/` into the bucket (drag and drop in the console, or use `gsutil`)
+6. Go to **Bucket Settings → Website configuration** → set **Index page** to `index.html`
+
+Your URL: `https://storage.googleapis.com/veil-games/index.html`
+
+**To update:** re-upload changed files, or use the CLI:
+```bash
+gsutil -m rsync -r /Users/everest/veil-static/ gs://veil-games/
+```
+
+---
+
+### Firebase Hosting (web.app / firebaseapp.com)
+
+**Domain format:** `yourproject.web.app` and `yourproject.firebaseapp.com`
+**Free tier:** 10GB hosting, 360MB/day transfer
+**No card:** No (Firebase uses Google Cloud billing, card required but never charged on free tier)
+
+Firebase is Google's app development platform. Every Firebase project gets **two** Google-owned domains: `web.app` and `firebaseapp.com`. Both are clean, short, and completely trusted at any school running Google Workspace.
+
+**Setup:**
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) → **Add project**
+2. Name it anything → skip Analytics → **Create project**
+3. In the left sidebar click **Hosting → Get started**
+4. Install the Firebase CLI:
+   ```bash
+   npm install -g firebase-tools
+   ```
+5. Log in and initialize:
+   ```bash
+   firebase login
+   cd /Users/everest/veil-static
+   firebase init hosting
+   ```
+   When asked:
+   - **Use an existing project** → select the one you just created
+   - **Public directory:** `.` (just a dot — the files are already in this folder)
+   - **Single-page app:** `N`
+   - **Overwrite index.html:** `N`
+6. Deploy:
+   ```bash
+   firebase deploy
+   ```
+
+Your URLs: `https://yourproject.web.app` and `https://yourproject.firebaseapp.com`
+
+**To update:** run `firebase deploy` again from the same folder.
+
+---
+
+### Google Apps Script (script.google.com)
+
+**Domain format:** `https://script.google.com/macros/s/HASH/exec`
+**Free tier:** Unlimited
+**No card:** No card, just a Google account
+
+Google Apps Script is a JavaScript automation tool built into Google Workspace. It can serve a web page via `doGet()`. The URL lives on `script.google.com` — a domain that is completely inseparable from Google Classroom and Docs since teachers use it for grading scripts and form automations.
+
+The limitation: Apps Script serves a single response from `doGet()`, so you can't serve separate CSS/JS files at different paths. Everything must be inlined into one HTML string returned by the script. This works because the veil-static site is small enough to inline.
+
+**Setup:**
+
+1. Go to [script.google.com](https://script.google.com) → **New project**
+2. Name it something boring like `Math Helper`
+3. Delete the default code and paste:
+   ```js
+   function doGet() {
+     return HtmlService
+       .createHtmlOutput(getHtml())
+       .setTitle("Math Helper")
+       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+   }
+
+   function getHtml() {
+     // Paste the full contents of index.html here as a template string
+     return `
+       <!DOCTYPE html>
+       ... (full inlined index.html with <style> and <script> blocks) ...
+     `;
+   }
+   ```
+4. You need to inline all CSS from `style.css` into a `<style>` tag and all JS from `app.js` / `stars.js` into `<script>` tags inside the HTML string. The games iframes still load from `novaro1.github.io/veil-static/games/` via absolute URLs.
+5. Click **Deploy → New deployment**
+   - Type: **Web app**
+   - Execute as: **Me**
+   - Who has access: **Anyone**
+6. Click **Deploy** → copy the `/exec` URL
+
+Your URL: `https://script.google.com/macros/s/LONGHASHABCDEF/exec`
+
+**To update:** Make changes → **Deploy → Manage deployments → Edit → New version → Deploy**
+
+> The URL looks like a teacher's grading script. It's on `script.google.com`. It is not going anywhere.
+
+---
+
+### GitLab Pages (gitlab.io)
+
+**Domain format:** `username.gitlab.io` or `username.gitlab.io/reponame`
+**Free tier:** Unlimited
+**No card:** No card required
+**Auto-deploy:** Yes, on push (via CI/CD pipeline)
+
+`gitlab.io` is GitLab's domain — used by developers and open source projects worldwide. It's essentially never blocked because GitLab is used by the same kinds of people who use GitHub.
+
+**Setup:**
+
+1. Go to [gitlab.com](https://gitlab.com) → sign in → **New project → Import project → GitHub**
+2. Import `Novaro1/veil-static`
+3. In the repo, create `.gitlab-ci.yml`:
+   ```yaml
+   pages:
+     stage: deploy
+     script:
+       - mkdir -p public
+       - cp -r . public/
+       - mv public/public public2 2>/dev/null; true
+     artifacts:
+       paths:
+         - public
+     only:
+       - main
+   ```
+4. Commit and push — GitLab runs the pipeline and deploys Pages automatically
+
+Your URL: `https://yourusername.gitlab.io/veil-static/`
+
+GitLab Pages also supports custom domains for free.
+
+---
+
+### itch.io (HTML5 game hosting)
+
+**Domain format:** `username.itch.io/gamename` (served via itch.io's CDN)
+**Free tier:** Unlimited
+**No card:** No card required
+
+itch.io is a game distribution platform. It's designed exactly for hosting HTML5 games — you upload a ZIP, set it to play in browser, and it renders in an iframe. Schools that allow gaming almost certainly don't block itch.io specifically.
+
+The site doesn't render as a full page like the other options — each game runs in itch.io's game player. This makes it better as a way to host **individual games** from the library rather than the full hub.
+
+**Setup:**
+
+1. Go to [itch.io](https://itch.io) → **Upload new project**
+2. Set **Kind of project** to `HTML`
+3. Zip the contents of `/Users/everest/veil-static/` (select all files, right-click → Compress)
+4. Upload the ZIP → check **This file will be played in the browser**
+5. Set **Viewport dimensions** to `1280 x 720` (or fullscreen)
+6. Set **Visibility** to `Public` → **Save & view page**
+
+Your URL: `https://yourusername.itch.io/your-game-name`
+
+The page looks like a game project page. Completely normal on itch.io.
+
+---
+
+### Internet Archive (archive.org)
+
+**Domain format:** `https://archive.org/download/IDENTIFIER/index.html`
+**Free tier:** Unlimited storage and bandwidth
+**No card:** No card, just a free account
+
+The Internet Archive is a nonprofit digital library. It hosts millions of software items, games, and web pages. Nobody blocks `archive.org` — it's one of the most trusted domains on the internet, used by researchers, historians, and teachers.
+
+You upload a collection of files as an "item" and they're served directly via `archive.org/download/IDENTIFIER/`. HTML files are rendered as web pages when accessed directly.
+
+**Setup:**
+
+1. Go to [archive.org](https://archive.org) → create a free account → verify your email
+2. Click **Upload** (top right) → drag all files from `/Users/everest/veil-static/` (including the `games/` folder)
+3. Fill in:
+   - **Title:** anything (e.g. `Educational Games`)
+   - **Subject:** `games`
+   - **Description:** optional
+4. Click **Upload and Create your Item**
+
+After processing (~1–2 minutes), your URL is:
+`https://archive.org/download/IDENTIFIER/index.html`
+
+Where `IDENTIFIER` is the slug you chose (or auto-generated from the title). You can find it in the URL of the item page.
+
+**To update:** Go to the item page → **Edit** → upload replacement files.
+
+> `archive.org` is literally The Internet Archive. It is incapable of looking suspicious.
+
+---
+
+### Codeberg Pages (codeberg.page)
+
+**Domain format:** `username.codeberg.page`
+**Free tier:** Unlimited
+**No card:** No card required
+
+Codeberg is an open-source alternative to GitHub run by a German nonprofit. It's completely obscure to school IT departments — nobody has thought to block `codeberg.page` because almost nobody outside the open-source community has heard of Codeberg. Setup is identical to GitHub Pages.
+
+**Setup:**
+
+1. Go to [codeberg.org](https://codeberg.org) → create a free account
+2. Create a new repo named exactly **`pages`** (this is required — Codeberg serves `username.codeberg.page` from a repo named `pages`)
+3. Push the veil-static files:
+   ```bash
+   git remote add codeberg https://codeberg.org/YOURUSERNAME/pages.git
+   cd /Users/everest/veil-static
+   git push codeberg main
+   ```
+
+Your URL: `https://YOURUSERNAME.codeberg.page`
+
+**To update:** push to the `codeberg` remote like any other git push.
+
+---
+
+### IPFS via Fleek (on.fleek.co)
+
+**Domain format:** `random-name.on.fleek.co` (also accessible via any IPFS gateway)
+**Free tier:** 50GB storage, 100GB bandwidth/month
+**No card:** No card required
+
+IPFS (InterPlanetary File System) is a decentralized peer-to-peer protocol for hosting content. Once your site is on IPFS, it exists across thousands of nodes worldwide — there is no server to block. Fleek is a service that deploys to IPFS and gives you a clean URL.
+
+The `on.fleek.co` domain is completely unknown to school filters. More importantly, the content is also accessible via any public IPFS gateway (`ipfs.io`, `cloudflare-ipfs.com`, `dweb.link`) — each of those is a different domain serving the exact same content.
+
+**Setup:**
+
+1. Go to [app.fleek.co](https://app.fleek.co) → sign in with GitHub
+2. Click **Add new site → Connect with GitHub**
+3. Select **`Novaro1/veil-static`**
+4. Framework: `Other` — Build command: *(leave blank)* — Publish directory: `.`
+5. Click **Deploy site**
+
+Fleek deploys to IPFS and gives you a URL like `purple-water-1234.on.fleek.co`.
+
+Every file also gets a permanent CID (content ID). Even if Fleek disappears, the content stays accessible via IPFS gateways as long as at least one node is pinning it.
+
+---
+
 ### Quick Reference — Static Options
 
 | Platform | Domain | Free | Auto-deploy | No card |
@@ -733,6 +994,14 @@ Auto-deploys on every push to `main`.
 | Netlify Drop | `*.netlify.app` | ✅ | Manual drag | ✅ |
 | Surge.sh | `*.surge.sh` | ✅ | CLI push | ✅ |
 | Cloudflare Pages | `*.pages.dev` | ✅ | On push | ✅ |
+| Google Cloud Storage | `storage.googleapis.com` | ✅ | CLI sync | ❌ card |
+| Firebase Hosting | `*.web.app` | ✅ | CLI deploy | ❌ card |
+| Google Apps Script | `script.google.com` | ✅ | Manual | ✅ |
+| GitLab Pages | `*.gitlab.io` | ✅ | On push | ✅ |
+| itch.io | `*.itch.io` | ✅ | Manual upload | ✅ |
+| Internet Archive | `archive.org` | ✅ | Manual upload | ✅ |
+| Codeberg Pages | `*.codeberg.page` | ✅ | On push | ✅ |
+| IPFS / Fleek | `*.on.fleek.co` | ✅ | On push | ✅ |
 
 ---
 
