@@ -77,17 +77,16 @@ Same as Workers — create a new Playground, paste the same code, deploy. New UR
 
 ## val.town
 
-**Domain format:** `https://username-valname.val.run`
+**Domain format:** `https://username-valname.web.val.run`
 **WebSocket support:** Partial
 **Free tier:** Generous
 
 ### Setup
 
 1. Go to [val.town](https://val.town) and create a free account
-2. Click **New Val** (top right)
-3. In the editor that opens, click the **type selector** — it's the small icon or label to the left of the val name at the top. Change it to **HTTP**
-4. Name it something like `veil`
-5. Replace all the code with:
+2. Click the **+** button in the top right of the editor → select **HTTP**
+3. Name the val something like `veil`
+4. Replace all the code with:
 
 ```ts
 export default async function(req: Request): Promise<Response> {
@@ -99,8 +98,12 @@ export default async function(req: Request): Promise<Response> {
 }
 ```
 
-6. Click **Run** (or Save)
-7. Your URL is shown in the **Endpoints** tab at the bottom of the editor, or at the top of the val page. It will look like `https://yourusername-veil.val.run`
+5. Click **Save** — the val deploys immediately
+6. Your URL is shown at the top of the val page. It looks like `https://yourusername-veil.web.val.run`
+
+### Spinning up more links
+
+Create a new val (click **+** → **HTTP**), paste the same code, save. New URL in under a minute.
 
 ---
 
@@ -1029,7 +1032,7 @@ Every file also gets a permanent CID (content ID). Even if Fleek disappears, the
 | Cloudflare Workers | `*.workers.dev` | Edge proxy | ✅ | 100k req/day |
 | Cloudflare Pages | `*.pages.dev` | Edge proxy | ✅ | Unlimited |
 | Deno Deploy | `*.deno.dev` | Edge proxy | ✅ | 1M req/month |
-| val.town | `username-name.val.run` | Edge proxy | ⚠️ | Yes |
+| val.town | `username-name.web.val.run` | Edge proxy | ⚠️ | Yes |
 | Netlify Edge | `*.netlify.app` | Edge proxy | ⚠️ | 3M req/month |
 | Railway | `*.railway.app` | Full server | ✅ | $5 credit |
 | Render | `*.onrender.com` | Full server | ✅ | Free (sleeps) |
