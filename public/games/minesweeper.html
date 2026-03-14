@@ -1,0 +1,23 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Minesweeper</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#09090f;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:Inter,sans-serif;color:#e2e2f0;padding:20px;user-select:none}h1{font-size:1.8rem;font-weight:800;color:#a78bfa;margin-bottom:14px}#hud{display:flex;gap:20px;margin-bottom:16px;align-items:center}.hud-box{background:#13131f;border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:8px 16px;text-align:center;min-width:70px}.hud-box span{display:block;font-size:.65rem;color:#7b7b9d;text-transform:uppercase;letter-spacing:.05em}.hud-box b{font-size:1.1rem;font-weight:800}button{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:8px;padding:9px 20px;color:#fff;font-weight:700;cursor:pointer;font-size:.85rem}#board{display:inline-grid;border:1px solid rgba(99,102,241,.2);border-radius:10px;overflow:hidden;gap:1px;background:rgba(99,102,241,.1);padding:1px}.cell{width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;cursor:pointer;border-radius:4px;transition:background .1s}.cell.hidden{background:#13131f}.cell.hidden:hover{background:#1a1a2e}.cell.flag{background:#13131f}.cell.open{background:#0d0d1a;cursor:default}.cell.mine{background:#7f1d1d}#msg{margin-top:14px;font-size:.9rem;color:#a78bfa;font-weight:600;min-height:1.4em}
+</style></head><body>
+<h1>Minesweeper</h1>
+<div id="hud">
+  <div class="hud-box"><span>Mines</span><b id="mineCount">40</b></div>
+  <button onclick="init()">New Game</button>
+  <div class="hud-box"><span>Time</span><b id="timer">0</b></div>
+</div>
+<div id="board"></div>
+<div id="msg">Left click to reveal · Right click to flag</div>
+<script>
+const ROWS=16,COLS=16,MINES=40;
+const COLORS=['','#3b82f6','#22c55e','#ef4444','#7c3aed','#dc2626','#0891b2','#1f2937','#6b7280'];
+let board,revealed,flags,gameOver,started,timerInt,t;
+function init(){board=Array(ROWS).fill(0).map(()=>Array(COLS).fill(0));revealed=Array(ROWS).fill(0).map(()=>Array(COLS).fill(false));flags=Array(ROWS).fill(0).map(()=>Array(COLS).fill(false));gameOver=false;started=false;t=0;clearInterval(timerInt);document.getElementById('timer').textContent='0';document.getElementById('mineCount').textContent=MINES;document.getElementById('msg').textContent='Left click to reveal · Right click to flag';render();}
+function placeMines(sr,sc){let placed=0;while(placed<MINES){const r=Math.floor(Math.random()*ROWS),c=Math.floor(Math.random()*COLS);if(board[r][c]!==-1&&!(Math.abs(r-sr)<=1&&Math.abs(c-sc)<=1)){board[r][c]=-1;placed++;}}for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(board[r][c]!==-1){let n=0;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&board[nr][nc]===-1)n++;}board[r][c]=n;}}
+function reveal(r,c){if(r<0||r>=ROWS||c<0||c>=COLS||revealed[r][c]||flags[r][c])return;revealed[r][c]=true;if(board[r][c]===0)for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)reveal(r+dr,c+dc);}
+function click(r,c){if(gameOver||revealed[r][c]||flags[r][c])return;if(!started){started=true;placeMines(r,c);timerInt=setInterval(()=>{t++;document.getElementById('timer').textContent=t;},1000);}reveal(r,c);if(board[r][c]===-1){gameOver=true;clearInterval(timerInt);for(let i=0;i<ROWS;i++)for(let j=0;j<COLS;j++)if(board[i][j]===-1)revealed[i][j]=true;document.getElementById('msg').textContent='💥 Game over! Click New Game';render();return;}if(revealed.flat().filter((v,i)=>v&&board[Math.floor(i/COLS)][i%COLS]!==-1).length===(ROWS*COLS-MINES)){gameOver=true;clearInterval(timerInt);document.getElementById('msg').textContent='🎉 You win in '+t+'s!';}render();}
+function rightClick(e,r,c){e.preventDefault();if(gameOver||revealed[r][c])return;flags[r][c]=!flags[r][c];const flagged=flags.flat().filter(Boolean).length;document.getElementById('mineCount').textContent=MINES-flagged;render();}
+function render(){const b=document.getElementById('board');b.style.gridTemplateColumns=`repeat(${COLS},36px)`;b.innerHTML='';for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const d=document.createElement('div');d.className='cell'+(revealed[r][c]?' open':'')+(flags[r][c]?' flag':'')+(revealed[r][c]&&board[r][c]===-1?' mine':'');const v=board[r][c];if(flags[r][c]&&!revealed[r][c])d.textContent='🚩';else if(revealed[r][c])d.textContent=v===-1?'💣':v||'';else d.textContent='';if(revealed[r][c]&&v>0)d.style.color=COLORS[v];d.addEventListener('click',()=>click(r,c));d.addEventListener('contextmenu',e=>rightClick(e,r,c));b.appendChild(d);}}
+init();
+</script></body></html>

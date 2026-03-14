@@ -1,0 +1,17 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Snake</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#09090f;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:Inter,sans-serif;color:#e2e2f0;user-select:none}#score{font-size:1.4rem;font-weight:800;color:#a78bfa;margin-bottom:16px;letter-spacing:.05em}canvas{border:1px solid rgba(99,102,241,.25);border-radius:10px;display:block}#msg{margin-top:14px;color:#7b7b9d;font-size:.88rem}
+</style></head><body>
+<div id="score">Score: 0</div>
+<canvas id="c" width="420" height="420"></canvas>
+<div id="msg">Arrow keys or WASD to move · Space to restart</div>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+const SZ=20,COLS=21,ROWS=21;
+let snake,dir,nextDir,food,score,running,loop;
+function init(){snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];dir={x:1,y:0};nextDir={x:1,y:0};food=rndFood();score=0;running=true;document.getElementById('score').textContent='Score: 0';document.getElementById('msg').textContent='Arrow keys or WASD · Space to restart';clearInterval(loop);loop=setInterval(tick,110);}
+function rndFood(){let f;do{f={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS)}}while(snake.some(s=>s.x===f.x&&s.y===f.y));return f;}
+function tick(){dir=nextDir;const h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};if(h.x<0||h.x>=COLS||h.y<0||h.y>=ROWS||snake.some(s=>s.x===h.x&&s.y===h.y)){clearInterval(loop);running=false;document.getElementById('msg').textContent='Game over! Press Space to restart';draw();return;}snake.unshift(h);if(h.x===food.x&&h.y===food.y){food=rndFood();score++;document.getElementById('score').textContent='Score: '+score;}else snake.pop();draw();}
+function draw(){ctx.fillStyle='#09090f';ctx.fillRect(0,0,c.width,c.height);for(let x=0;x<COLS;x++)for(let y=0;y<ROWS;y++){ctx.fillStyle='rgba(99,102,241,.04)';ctx.fillRect(x*SZ,y*SZ,SZ-1,SZ-1);}snake.forEach((s,i)=>{const t=i/snake.length;ctx.fillStyle=`hsl(${245-t*30},70%,${60-t*20}%)`;ctx.beginPath();ctx.roundRect(s.x*SZ+1,s.y*SZ+1,SZ-2,SZ-2,4);ctx.fill();});ctx.fillStyle='#f59e0b';ctx.beginPath();ctx.arc(food.x*SZ+SZ/2,food.y*SZ+SZ/2,SZ/2-2,0,Math.PI*2);ctx.fill();}
+document.addEventListener('keydown',e=>{if(!running&&e.key===' '){init();return;}const m={ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},a:{x:-1,y:0},d:{x:1,y:0},w:{x:0,y:-1},s:{x:0,y:1}};const nd=m[e.key];if(nd&&(nd.x!==0&&nd.x!==-dir.x||nd.y!==0&&nd.y!==-dir.y)){nextDir=nd;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))e.preventDefault();}});
+init();
+</script></body></html>

@@ -1,0 +1,22 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>2048</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#09090f;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:Inter,sans-serif;color:#e2e2f0;padding:20px;user-select:none}h1{font-size:2.5rem;font-weight:800;color:#a78bfa;margin-bottom:6px}#meta{display:flex;gap:16px;margin-bottom:20px}.box{background:#13131f;border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:10px 20px;text-align:center}.box span{display:block;font-size:.7rem;color:#7b7b9d;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}.box b{font-size:1.2rem;font-weight:800}#grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;background:#13131f;border:1px solid rgba(99,102,241,.2);border-radius:14px;padding:14px;width:340px}.cell{width:70px;height:70px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;transition:all .1s}#msg{margin-top:16px;color:#7b7b9d;font-size:.85rem}button{margin-top:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:8px;padding:10px 24px;color:#fff;font-size:.9rem;font-weight:700;cursor:pointer}
+</style></head><body>
+<h1>2048</h1>
+<div id="meta"><div class="box"><span>Score</span><b id="sc">0</b></div><div class="box"><span>Best</span><b id="best">0</b></div></div>
+<div id="grid"></div>
+<div id="msg">Arrow keys or swipe to merge tiles · Get to 2048!</div>
+<button onclick="init()">New Game</button>
+<script>
+const COLORS={2:'#1e1e3a',4:'#232050',8:'#4c1d95',16:'#5b21b6',32:'#6d28d9',64:'#7c3aed',128:'#8b5cf6',256:'#a78bfa',512:'#c084fc',1024:'#e879f9',2048:'#f0abfc',4096:'#f5d0fe'};
+let board,score,best=0,won=false;
+function init(){board=Array(4).fill(0).map(()=>Array(4).fill(0));score=0;won=false;addTile();addTile();render();}
+function addTile(){const e=[];for(let r=0;r<4;r++)for(let c=0;c<4;c++)if(!board[r][c])e.push([r,c]);if(!e.length)return;const[r,c]=e[Math.floor(Math.random()*e.length)];board[r][c]=Math.random()<.9?2:4;}
+function render(){const g=document.getElementById('grid');g.innerHTML='';board.forEach(row=>row.forEach(v=>{const d=document.createElement('div');d.className='cell';d.style.background=COLORS[v]||'#1a1a2e';d.style.color=v>=8?'#fff':'#a78bfa';d.textContent=v||'';g.appendChild(d);}));document.getElementById('sc').textContent=score;if(score>best){best=score;document.getElementById('best').textContent=best;}if(!won&&board.flat().includes(2048)){document.getElementById('msg').textContent='You win! 🎉 Keep going or new game';won=true;}else if(!canMove()){document.getElementById('msg').textContent='Game over! New Game to retry';}}
+function canMove(){for(let r=0;r<4;r++)for(let c=0;c<4;c++){if(!board[r][c])return true;if(c<3&&board[r][c]===board[r][c+1])return true;if(r<3&&board[r][c]===board[r+1][c])return true;}return false;}
+function slide(row){let r=row.filter(x=>x);for(let i=0;i<r.length-1;i++)if(r[i]===r[i+1]){score+=r[i]*2;r[i]*=2;r.splice(i+1,1);}while(r.length<4)r.push(0);return r;}
+function move(dir){let moved=false;const nb=board.map(r=>[...r]);if(dir==='l')board=board.map(r=>{const s=slide(r);if(s.join()!==r.join())moved=true;return s;});else if(dir==='r')board=board.map(r=>{const s=slide([...r].reverse()).reverse();if(s.join()!==r.join())moved=true;return s;});else{const t=board[0].map((_,c)=>board.map(r=>r[c]));const slid=t.map(r=>dir==='u'?slide(r):slide([...r].reverse()).reverse());board=slid[0].map((_,c)=>slid.map(r=>r[c]));if(slid.flat().join()!==nb.flat().join())moved=true;}if(moved){addTile();render();}}
+document.addEventListener('keydown',e=>{const m={ArrowLeft:'l',ArrowRight:'r',ArrowUp:'u',ArrowDown:'d'};if(m[e.key]){e.preventDefault();move(m[e.key]);}});
+let tx=0,ty=0;document.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+document.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;if(Math.abs(dx)>Math.abs(dy)?Math.abs(dx)>30:Math.abs(dy)>30)move(Math.abs(dx)>Math.abs(dy)?(dx>0?'r':'l'):(dy>0?'d':'u'));},{passive:true});
+init();
+</script></body></html>

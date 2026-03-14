@@ -1,0 +1,34 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tetris</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#09090f;display:flex;align-items:center;justify-content:center;height:100vh;font-family:Inter,sans-serif;color:#e2e2f0;gap:24px;user-select:none}canvas{border:1px solid rgba(99,102,241,.25);border-radius:8px}#panel{display:flex;flex-direction:column;gap:14px;width:120px}.label{font-size:.7rem;color:#7b7b9d;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}.val{font-size:1.5rem;font-weight:800;color:#a78bfa}.card{background:#13131f;border:1px solid rgba(99,102,241,.15);border-radius:10px;padding:14px}button{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:8px;padding:10px;color:#fff;font-weight:700;cursor:pointer;font-size:.85rem}#info{color:#7b7b9d;font-size:.75rem;line-height:1.6}
+</style></head><body>
+<canvas id="c" width="240" height="480"></canvas>
+<div id="panel">
+  <div class="card"><div class="label">Score</div><div class="val" id="sc">0</div></div>
+  <div class="card"><div class="label">Lines</div><div class="val" id="ln">0</div></div>
+  <div class="card"><div class="label">Level</div><div class="val" id="lv">1</div></div>
+  <div class="card"><div class="label">Next</div><canvas id="next" width="80" height="80"></canvas></div>
+  <button onclick="init()">New Game</button>
+  <div id="info">← → Move<br>↑ Rotate<br>↓ Soft drop<br>Space Hard drop</div>
+</div>
+<script>
+const PIECES=[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],[[1,1,0],[0,1,1]]];
+const COLORS=['#06b6d4','#eab308','#a855f7','#f97316','#3b82f6','#22c55e','#ef4444'];
+const W=12,H=20,SZ=24;
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+const nc=document.getElementById('next'),nctx=nc.getContext('2d');
+let board,piece,px,py,score,lines,level,drop,running,nextPiece,nextColor;
+function init(){board=Array(H).fill(0).map(()=>Array(W).fill(null));score=0;lines=0;level=1;running=true;[piece,px,py]=spawn();[nextPiece,nextColor]=rndPiece();drop=0;clearInterval(window._loop);window._loop=setInterval(tick,500);render();}
+function rndPiece(){const i=Math.floor(Math.random()*PIECES.length);return[PIECES[i].map(r=>[...r]),COLORS[i]];}
+function spawn(){const[p,col]=nextPiece||rndPiece();[nextPiece,nextColor]=rndPiece();const x=Math.floor((W-p[0].length)/2),y=0;if(collide(p,x,y)){running=false;clearInterval(window._loop);document.getElementById('info').textContent='Game Over! Click New Game';}return[p,x,y,col];}
+let pieceColor='#06b6d4';
+function _spawn(){const[p,col]=rndPiece();pieceColor=col;return p;}
+function tick(){py++;if(collide(piece,px,py)){py--;place();clearLines();[piece,px,py]=spawn();[,pieceColor]=[nextPiece,nextColor]||[null,null];}render();}
+function collide(p,x,y){return p.some((row,r)=>row.some((v,c)=>v&&(y+r>=H||x+c<0||x+c>=W||board[y+r]?.[x+c])));}
+function place(){piece.forEach((row,r)=>row.forEach((v,c)=>{if(v)board[py+r][px+c]=pieceColor;}));}
+function clearLines(){let cleared=0;for(let r=H-1;r>=0;){if(board[r].every(v=>v)){board.splice(r,1);board.unshift(Array(W).fill(null));cleared++;}else r--;}if(cleared){lines+=cleared;score+=cleared*cleared*100*level;level=Math.floor(lines/10)+1;clearInterval(window._loop);window._loop=setInterval(tick,Math.max(80,500-level*40));document.getElementById('sc').textContent=score;document.getElementById('ln').textContent=lines;document.getElementById('lv').textContent=level;}}
+function ghost(){let gy=py;while(!collide(piece,px,gy+1))gy++;return gy;}
+function render(){ctx.fillStyle='#09090f';ctx.fillRect(0,0,c.width,c.height);board.forEach((row,r)=>row.forEach((col,c2)=>{if(col){ctx.fillStyle=col;ctx.fillRect(c2*SZ+1,r*SZ+1,SZ-2,SZ-2);}else{ctx.fillStyle='rgba(99,102,241,.04)';ctx.fillRect(c2*SZ,r*SZ,SZ-1,SZ-1);}}));const gy=ghost();piece.forEach((row,r)=>row.forEach((v,cc)=>{if(v){ctx.fillStyle='rgba(99,102,241,.2)';ctx.fillRect((px+cc)*SZ+1,(gy+r)*SZ+1,SZ-2,SZ-2);}}));piece.forEach((row,r)=>row.forEach((v,cc)=>{if(v){ctx.fillStyle=pieceColor;ctx.fillRect((px+cc)*SZ+1,(py+r)*SZ+1,SZ-2,SZ-2);}}));nctx.fillStyle='#13131f';nctx.fillRect(0,0,80,80);nextPiece.forEach((row,r)=>row.forEach((v,cc)=>{if(v){nctx.fillStyle=nextColor;nctx.fillRect(cc*18+10,r*18+10,16,16);}}));}
+function rotate(p){return p[0].map((_,i)=>p.map(r=>r[i]).reverse());}
+document.addEventListener('keydown',e=>{if(!running)return;if(e.key==='ArrowLeft'){if(!collide(piece,px-1,py))px--;}else if(e.key==='ArrowRight'){if(!collide(piece,px+1,py))px++;}else if(e.key==='ArrowUp'){const r=rotate(piece);if(!collide(r,px,py))piece=r;}else if(e.key==='ArrowDown'){if(!collide(piece,px,py+1))py++;}else if(e.key===' '){py=ghost();place();clearLines();[piece,px,py]=spawn();}else return;e.preventDefault();render();});
+init();pieceColor=COLORS[0];
+</script></body></html>

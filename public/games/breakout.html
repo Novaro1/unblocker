@@ -1,0 +1,34 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Breakout</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#09090f;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:Inter,sans-serif;color:#e2e2f0;user-select:none}#hud{display:flex;gap:32px;margin-bottom:14px}.hud-item{text-align:center}.hud-item span{display:block;font-size:.7rem;color:#7b7b9d;text-transform:uppercase;letter-spacing:.05em}.hud-item b{font-size:1.2rem;font-weight:800;color:#a78bfa}canvas{border:1px solid rgba(99,102,241,.25);border-radius:10px}#msg{margin-top:14px;color:#7b7b9d;font-size:.85rem}
+</style></head><body>
+<div id="hud"><div class="hud-item"><span>Score</span><b id="sc">0</b></div><div class="hud-item"><span>Lives</span><b id="lv">3</b></div><div class="hud-item"><span>Level</span><b id="lev">1</b></div></div>
+<canvas id="c" width="480" height="360"></canvas>
+<div id="msg">Mouse or ← → to move · Space to launch</div>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+const W=480,H=360,COLS=10,ROWS=5,PAD_W=80,PAD_H=10,R=8;
+const COLORS=['#ef4444','#f97316','#eab308','#22c55e','#6366f1'];
+let bricks,px,bx,by,vx,vy,score,lives,level,launched,keys={};
+function initBricks(){bricks=[];for(let r=0;r<ROWS;r++)for(let c2=0;c2<COLS;c2++)bricks.push({x:c2*(46)+4,y:r*24+40,w:42,h:18,color:COLORS[r],alive:true,pts:(ROWS-r)*10});}
+function init(){px=W/2-PAD_W/2;bx=W/2;by=H-60;vx=3;vy=-4;score=0;lives=3;level=1;launched=false;initBricks();update();}
+function launch(){if(!launched){launched=true;vx=(Math.random()*4-2)||2;vy=-4-level*.5;}}
+function reset(){bx=px+PAD_W/2;by=H-60;launched=false;document.getElementById('msg').textContent='Space or click to launch';}
+function nextLevel(){level++;initBricks();bx=W/2;by=H-60;vx=3+level*.3;vy=-4-level*.5;launched=false;document.getElementById('lev').textContent=level;document.getElementById('msg').textContent='Level '+level+'! Space to launch';}
+function tick(){if(launched){bx+=vx;by+=vy;
+if(bx-R<=0){bx=R;vx=Math.abs(vx);}if(bx+R>=W){bx=W-R;vx=-Math.abs(vx);}
+if(by-R<=0){by=R;vy=Math.abs(vy);}
+if(by+R>=H-PAD_H-8&&bx>=px&&bx<=px+PAD_W){const rel=(bx-(px+PAD_W/2))/(PAD_W/2);vx=rel*5;vy=-Math.abs(vy)-.3;}
+if(by>H){lives--;document.getElementById('lv').textContent=lives;if(lives<=0){launched=false;document.getElementById('msg').textContent='Game Over! Space to restart';return;}reset();}
+bricks.forEach(b=>{if(!b.alive)return;if(bx+R>b.x&&bx-R<b.x+b.w&&by+R>b.y&&by-R<b.y+b.h){b.alive=false;score+=b.pts;document.getElementById('sc').textContent=score;const fromLeft=Math.abs(bx-b.x),fromRight=Math.abs(bx-(b.x+b.w)),fromTop=Math.abs(by-b.y),fromBot=Math.abs(by-(b.y+b.h));if(Math.min(fromTop,fromBot)<Math.min(fromLeft,fromRight))vy*=-1;else vx*=-1;}});
+if(bricks.every(b=>!b.alive))nextLevel();}
+if(keys['ArrowLeft']||keys['a'])px=Math.max(0,px-7);if(keys['ArrowRight']||keys['d'])px=Math.min(W-PAD_W,px+7);
+draw();}
+function draw(){ctx.fillStyle='#09090f';ctx.fillRect(0,0,W,H);bricks.forEach(b=>{if(!b.alive)return;ctx.fillStyle=b.color;ctx.beginPath();ctx.roundRect(b.x,b.y,b.w,b.h,3);ctx.fill();});
+ctx.fillStyle='#6366f1';ctx.beginPath();ctx.roundRect(px,H-PAD_H-8,PAD_W,PAD_H,4);ctx.fill();
+ctx.fillStyle='#f59e0b';ctx.beginPath();ctx.arc(bx,by,R,0,Math.PI*2);ctx.fill();}
+c.addEventListener('mousemove',e=>{const r=c.getBoundingClientRect();px=Math.max(0,Math.min(W-PAD_W,e.clientX-r.left-PAD_W/2));});
+c.addEventListener('click',launch);
+document.addEventListener('keydown',e=>{keys[e.key]=true;if(e.key===' '){if(lives<=0){init();}else launch();}if(['ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
+document.addEventListener('keyup',e=>delete keys[e.key]);
+init();setInterval(tick,1000/60);
+</script></body></html>
