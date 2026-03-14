@@ -86,12 +86,12 @@
 
   // ── now.gg cloud-streamed games ────────────────────────────────────────────
   const NOW_GG_GAMES = [
-    { name: "Geometry Dash",      emoji: "⬛", hue: 0,   url: "/games/nowgg/geometry-dash.html" },
-    { name: "Fortnite",           emoji: "🔫", hue: 200, url: "/games/nowgg/fortnite.html" },
-    { name: "Cookie Run",         emoji: "🍪", hue: 30,  url: "/games/nowgg/cookie-run.html" },
-    { name: "EA Sports FC Mobile",emoji: "⚽", hue: 130, url: "/games/nowgg/ea-sports-fc.html" },
-    { name: "Melon Sandbox",      emoji: "🍉", hue: 120, url: "/games/nowgg/melon-sandbox.html" },
-    { name: "Rocket League",      emoji: "🚗", hue: 210, url: "/games/nowgg/rocket-league.html" },
+    { name: "Geometry Dash",      emoji: "⬛", hue: 0,   external: true, url: "https://educationbluesky.com/play/robtop-games/1400/geometry-dash.html" },
+    { name: "Fortnite",           emoji: "🔫", hue: 200, external: true, url: "https://educationbluesky.com/play/epic-games/7308/fortnite.html" },
+    { name: "Cookie Run",         emoji: "🍪", hue: 30,  external: true, url: "https://educationbluesky.com/play/devsisters-corporation/3475/cookie-run.html" },
+    { name: "EA Sports FC Mobile",emoji: "⚽", hue: 130, external: true, url: "https://educationbluesky.com/play/electronic-arts/1353/ea-sports-fc-mobile-24-soccer.html" },
+    { name: "Melon Sandbox",      emoji: "🍉", hue: 120, external: true, url: "https://educationbluesky.com/play/playducky/7199/melon-sandbox.html" },
+    { name: "Rocket League",      emoji: "🚗", hue: 210, external: true, url: "https://educationbluesky.com/play/psyonix-studios/4656/rocket-league.html" },
   ];
 
   // ── Navigation ─────────────────────────────────────────────────────────────
@@ -131,7 +131,11 @@
 
     tile.appendChild(icon);
     tile.appendChild(label);
-    tile.addEventListener("click", () => isLocal ? navigateLocal(game.url) : navigateTo(game.url));
+    tile.addEventListener("click", () => {
+      if (game.external) { window.open(game.url, "_blank"); }
+      else if (isLocal)  { navigateLocal(game.url); }
+      else               { navigateTo(game.url); }
+    });
     return tile;
   }
 
@@ -152,7 +156,7 @@
     nowHeader.className = "gs-section-header";
     nowHeader.textContent = "Cloud Games (now.gg)";
     grid.appendChild(nowHeader);
-    NOW_GG_GAMES.forEach(g => grid.appendChild(makeTile(g, true)));
+    NOW_GG_GAMES.forEach(g => grid.appendChild(makeTile(g, false)));
 
     // ── Proxied games header + tiles ───────────────────────────────────────
     const proxyHeader = document.createElement("div");
