@@ -499,16 +499,17 @@
       return;
     }
 
-    // Entertainment/none cloaks or mode=escape: always navigate away
-    if (!isEducational || panicMode === "escape") {
+    // Escape mode: always navigate away
+    if (panicMode === "escape") {
       doEscape(escapeUrl);
       return;
     }
 
-    // Educational cloak + stealth mode: show fake UI
+    // Stealth mode: show fake UI — default to docs if cloak isn't educational
+    const effectiveCloak = isEducational ? cloak : "docs";
     const keyDisplay = formatCombo(s.panicKey);
     const hint = `<div class="panic-dismiss-hint">press ${keyDisplay} again to return</div>`;
-    showOverlay(cloak, escapeUrl, hint);
+    showOverlay(effectiveCloak, escapeUrl, hint);
   }
 
   // ── Key listener ────────────────────────────────────────────────────────
@@ -668,6 +669,10 @@
     patchSettings({ panicMode: this.value });
   });
 
-  // Init
+  // Init — ensure panicMode is persisted so loadSettings always reads it explicitly
+  const _initSettings = loadSettings();
+  if (!JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}").panicMode) {
+    patchSettings({ panicMode: _initSettings.panicMode });
+  }
   refreshUi();
 })();
