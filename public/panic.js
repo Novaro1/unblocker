@@ -64,8 +64,9 @@
   // ── Escape action ───────────────────────────────────────────────────────
   function doEscape(url) {
     const target = url || "https://www.google.com";
-    // Use server-side redirect to bypass Scramjet service worker interception
-    window.location.replace("/escape?to=" + encodeURIComponent(target));
+    const dest = "/escape?to=" + encodeURIComponent(target);
+    // Navigate the top window so about:blank cloak wrapper also leaves
+    try { window.top.location.replace(dest); } catch { window.location.replace(dest); }
   }
 
   // ── Fake UI templates ───────────────────────────────────────────────────
@@ -516,18 +517,24 @@
     const s = loadSettings();
     if (!s.panicEnabled) return;
 
-    // While overlay is active: hold detection
+    // While overlay is active: panic key dismisses, any other key held 1.5s escapes
     if (overlayVisible) {
-      const escapeUrl = getEscapeUrl(s);
-      if (!holdTimer) {
-        holdTimer = setTimeout(() => {
-          holdTimer = null;
-          doEscape(escapeUrl);
-        }, 1500);
-      }
-      // Block everything behind overlay
       e.preventDefault();
       e.stopImmediatePropagation();
+      const combo = buildCombo(e);
+      const panicKey = s.panicKey || "alt+x";
+      const tapKey = panicKey.includes(",") ? panicKey.split(",")[0].trim() : panicKey;
+      if (combo === tapKey) {
+        // Panic key pressed while overlay visible → dismiss
+        if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+        hideOverlay();
+      } else if (!holdTimer) {
+        // Any other key held → escape after 1.5s
+        holdTimer = setTimeout(() => {
+          holdTimer = null;
+          doEscape(getEscapeUrl(s));
+        }, 1500);
+      }
       return;
     }
 
