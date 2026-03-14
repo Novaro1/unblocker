@@ -336,6 +336,14 @@
             <label class="settings-label" for="panic-url-custom">URL</label>
             <input type="url" id="panic-url-custom" class="settings-input" placeholder="https://…" />
           </div>
+          <div class="settings-row">
+            <label class="settings-label" for="panic-mode-select">Behavior</label>
+            <select id="panic-mode-select" class="settings-select">
+              <option value="stealth">Stealth Overlay</option>
+              <option value="escape">Close / Navigate Away</option>
+            </select>
+          </div>
+          <p class="settings-section-desc" style="margin-top:4px;">Stealth overlay shows a convincing fake page (docs, Gmail, etc.) when an educational cloak is active. Entertainment cloaks always navigate away.</p>
         </section>
 
         <!-- about:blank Cloak -->
@@ -494,6 +502,9 @@
 
       </div>
     </div>
+
+    <!-- Panic / stealth overlay — filled by panic.js at runtime -->
+    <div id="panic-overlay" style="display:none;"></div>
 
     <script src="/history.js"></script>
     <script src="/panic.js"></script>

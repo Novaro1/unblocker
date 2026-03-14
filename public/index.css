@@ -2145,3 +2145,33 @@ body.perf-mode .ql-tile:hover {
   flex-shrink: 1;
   font-size: 0.78rem;
 }
+
+/* ── Panic / Stealth Overlay ─────────────────────────────────────────────── */
+#panic-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: white;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+  pointer-events: all;
+}
+#panic-overlay .panic-inner {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+.panic-dismiss-hint {
+  position: fixed;
+  bottom: 8px;
+  right: 12px;
+  font-size: 9px;
+  color: #ccc;
+  pointer-events: none;
+  z-index: 1000000;
+  display: none;
+  font-family: Arial, sans-serif;
+}
+body.panic-active .panic-dismiss-hint {
+  display: block;
+}

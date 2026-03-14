@@ -46,6 +46,7 @@
     panicEnabled:   true,
     panicKey:       "alt+x",
     panicUrl:       "https://classroom.google.com",
+    panicMode:      "stealth",
     saveHistory:    true,
   };
 
@@ -185,6 +186,10 @@
     const favicon = el("cloak-custom-favicon");
     if (title)   title.value   = s.cloakTitle;
     if (favicon) favicon.value = s.cloakFavicon;
+
+    // Panic mode select
+    const panicModeSelect = el("panic-mode-select");
+    if (panicModeSelect) panicModeSelect.value = s.panicMode || "stealth";
 
     const checks = {
       "fx-stars":     "fxStars",
