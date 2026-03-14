@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { readFileSync, existsSync, statSync } from "node:fs";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "url";
 import { hostname } from "node:os";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
@@ -78,6 +79,7 @@ const bareServer = createBareServer("/bare/", {
 });
 
 const fastify = Fastify({
+  bodyLimit: 1048576,
   serverFactory: (handler) => {
     return createServer()
       .on("request", (req, res) => {
@@ -125,6 +127,13 @@ fastify.register(fastifyStatic, {
   decorateReply: false,
 });
 
+// Capture raw body for GitHub webhook HMAC verification
+fastify.addContentTypeParser("application/json", { parseAs: "buffer" }, (req, body, done) => {
+  req.rawBody = body;
+  try { done(null, JSON.parse(body.toString())); }
+  catch (e) { done(e); }
+});
+
 // Caddy on-demand TLS ask endpoint — always approve
 fastify.get('/caddy-ask', (_req, reply) => {
   reply.code(200).send('ok');
@@ -161,6 +170,68 @@ fastify.get('/api/beta-features', (_req, reply) => {
       daysLeft: isBeta ? Math.ceil((betaMs - elapsed) / 86400000) : 0 };
   });
   return reply.send(result);
+});
+
+// GitHub push webhook → Discord announcements
+const GH_WEBHOOK_SECRET   = process.env.GH_WEBHOOK_SECRET   || "";
+const DISCORD_TOKEN        = process.env.DISCORD_TOKEN        || "";
+const ANNOUNCEMENTS_CHANNEL_ID = process.env.ANNOUNCEMENTS_CHANNEL_ID || "";
+
+fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply) => {
+  // Verify GitHub signature
+  if (GH_WEBHOOK_SECRET) {
+    const sig = req.headers["x-hub-signature-256"] || "";
+    const expected = "sha256=" + createHmac("sha256", GH_WEBHOOK_SECRET)
+      .update(req.rawBody ?? Buffer.alloc(0))
+      .digest("hex");
+    try {
+      if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+        return reply.code(401).send("bad signature");
+      }
+    } catch {
+      return reply.code(401).send("bad signature");
+    }
+  }
+
+  const event = req.headers["x-github-event"];
+  if (event !== "push") return reply.code(200).send("ok");
+
+  const { commits = [], ref, repository, pusher } = req.body ?? {};
+  if (!commits.length) return reply.code(200).send("ok");
+  if (!DISCORD_TOKEN || !ANNOUNCEMENTS_CHANNEL_ID) return reply.code(200).send("ok");
+
+  const branch = ref?.replace("refs/heads/", "") ?? "unknown";
+  const repoUrl = repository?.html_url ?? "";
+  const repoName = repository?.name ?? "repo";
+
+  const lines = commits.slice(0, 10).map((c) => {
+    const msg = c.message.split("\n")[0].slice(0, 80);
+    const sha = c.id.slice(0, 7);
+    return `[\`${sha}\`](${c.url}) ${msg}`;
+  });
+  if (commits.length > 10) lines.push(`…and ${commits.length - 10} more`);
+
+  const body = JSON.stringify({
+    embeds: [{
+      title: `${commits.length} new commit${commits.length !== 1 ? "s" : ""} to \`${branch}\``,
+      url: repoUrl,
+      color: 0x57F287,
+      description: lines.join("\n"),
+      footer: { text: `${repoName} • pushed by ${pusher?.name ?? "unknown"}` },
+      timestamp: new Date().toISOString(),
+    }],
+  });
+
+  await fetch(`https://discord.com/api/v10/channels/${ANNOUNCEMENTS_CHANNEL_ID}/messages`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bot ${DISCORD_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body,
+  });
+
+  return reply.code(200).send("ok");
 });
 
 fastify.setNotFoundHandler((_req, reply) => {
