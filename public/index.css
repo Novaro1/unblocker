@@ -918,6 +918,27 @@ footer a:hover { opacity: 1; text-decoration: underline; }
 .toggle input:checked + .toggle-track { background: var(--accent); }
 .toggle input:checked + .toggle-track::before { transform: translateX(18px); }
 
+/* ── Settings buttons ────────────────────────────────────────────────────── */
+.settings-btn {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-family: inherit;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.settings-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.settings-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Danger buttons ──────────────────────────────────────────────────────── */
 .settings-btn-danger {
   background: rgba(248,113,113,0.1);
@@ -1098,8 +1119,9 @@ body.no-vignette::before  { content: none; }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
   gap: 0.55rem;
-  overflow: hidden;
-  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 520px;
   transition: max-height 0.3s ease, opacity 0.25s ease;
   opacity: 1;
 }
@@ -1107,6 +1129,18 @@ body.no-vignette::before  { content: none; }
   max-height: 0;
   opacity: 0;
   pointer-events: none;
+}
+
+.gs-section-header {
+  grid-column: 1 / -1;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted, #888);
+  padding: 0.4rem 0 0.1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  margin-bottom: 0.2rem;
 }
 
 /* Game tiles reuse .ql-tile base but with emoji icon sizing */
@@ -1937,6 +1971,21 @@ body.perf-mode .ql-tile:hover {
 }
 
 /* ── Ambassador section ──────────────────────────────────────────────────── */
+.ambassador-only-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: linear-gradient(90deg, rgba(245,158,11,0.15), rgba(251,191,36,0.08));
+  border: 1px solid rgba(245,158,11,0.35);
+  border-radius: 6px;
+  color: #fbbf24;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
+
 .ambassador-badge {
   display: inline-flex;
   align-items: center;

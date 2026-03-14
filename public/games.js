@@ -35,6 +35,65 @@
     { name: "Chess",          url: "https://www.chess.com/play/online",                    emoji: "♟",  hue: 45  },
   ];
 
+  // ── Local (self-hosted) games ──────────────────────────────────────────────
+  const LOCAL_GAMES = [
+    { name: "Time Shooter 2",        emoji: "🔫", hue: 10,  url: "/games/200.html" },
+    { name: "Bowmasters",            emoji: "🏹", hue: 30,  url: "/games/0.html" },
+    { name: "Cluster Rush",          emoji: "🚛", hue: 40,  url: "/games/81.html" },
+    { name: "Dreadhead Parkour",     emoji: "🤸", hue: 200, url: "/games/310.html" },
+    { name: "Paper.io 2",            emoji: "📄", hue: 280, url: "/games/102.html" },
+    { name: "Basket Random",         emoji: "🏀", hue: 30,  url: "/games/66.html" },
+    { name: "Boxing Random",         emoji: "🥊", hue: 0,   url: "/games/77.html" },
+    { name: "Gladihoppers",          emoji: "⚔️",  hue: 350, url: "/games/4.html" },
+    { name: "OvO",                   emoji: "🏃", hue: 220, url: "/games/1-fde.html" },
+    { name: "Vex 3",                 emoji: "🤺", hue: 180, url: "/games/47.html" },
+    { name: "Vex 5",                 emoji: "🤺", hue: 190, url: "/games/50.html" },
+    { name: "Vex 6",                 emoji: "🤺", hue: 200, url: "/games/51.html" },
+    { name: "Big Tower Tiny Square", emoji: "🏗️",  hue: 50,  url: "/games/170.html" },
+    { name: "Bob The Robber 2",      emoji: "🕵️",  hue: 240, url: "/games/76.html" },
+    { name: "Fireboy & Watergirl 2", emoji: "🔥", hue: 20,  url: "/games/88.html" },
+    { name: "Fireboy & Watergirl 3", emoji: "❄️",  hue: 190, url: "/games/89.html" },
+    { name: "Moto X3M",              emoji: "🏍️",  hue: 15,  url: "/games/55.html" },
+    { name: "Moto X3M 2",            emoji: "🏍️",  hue: 20,  url: "/games/97.html" },
+    { name: "Moto X3M 3",            emoji: "🏍️",  hue: 25,  url: "/games/98.html" },
+    { name: "Moto X3M Pool Party",   emoji: "🏊", hue: 200, url: "/games/124.html" },
+    { name: "Moto X3M Spooky Land",  emoji: "🎃", hue: 30,  url: "/games/99.html" },
+    { name: "Highway Racer 2",       emoji: "🚗", hue: 210, url: "/games/92.html" },
+    { name: "FNAF 1",                emoji: "🐻", hue: 20,  url: "/games/38.html" },
+    { name: "FNAF 2",                emoji: "🐻", hue: 15,  url: "/games/39.html" },
+    { name: "FNAF 3",                emoji: "🐻", hue: 10,  url: "/games/40.html" },
+    { name: "FNAF 4",                emoji: "🐻", hue: 5,   url: "/games/41.html" },
+    { name: "Granny",                emoji: "👵", hue: 40,  url: "/games/90.html" },
+    { name: "Baldi's Basics",        emoji: "📏", hue: 60,  url: "/games/65.html" },
+    { name: "Temple Run 2",          emoji: "🏛️",  hue: 30,  url: "/games/10.html" },
+    { name: "Jetpack Joyride",       emoji: "🚀", hue: 220, url: "/games/7.html" },
+    { name: "Crossy Road",           emoji: "🐔", hue: 90,  url: "/games/24.html" },
+    { name: "Retro Bowl",            emoji: "🏈", hue: 35,  url: "/games/33.html" },
+    { name: "Tiny Fishing",          emoji: "🎣", hue: 190, url: "/games/108.html" },
+    { name: "BitLife",               emoji: "💬", hue: 240, url: "/games/70.html" },
+    { name: "Gunspin",               emoji: "🔫", hue: 0,   url: "/games/91.html" },
+    { name: "WebOsu",                emoji: "🎵", hue: 340, url: "/games/130.html" },
+    { name: "Flappy Bird",           emoji: "🐦", hue: 55,  url: "/games/129.html" },
+    { name: "Minecraft Beta 1.7.3",  emoji: "⛏️",  hue: 100, url: "/games/300.html" },
+    { name: "Wordle",                emoji: "🟩", hue: 130, url: "/games/112.html" },
+    { name: "2048",                  emoji: "🔢", hue: 40,  url: "/games/2048.html" },
+    { name: "Snake",                 emoji: "🐍", hue: 120, url: "/games/snake.html" },
+    { name: "Tetris",                emoji: "🟦", hue: 220, url: "/games/tetris.html" },
+    { name: "Pong",                  emoji: "🏓", hue: 180, url: "/games/pong.html" },
+    { name: "Breakout",              emoji: "🧱", hue: 30,  url: "/games/breakout.html" },
+    { name: "Minesweeper",           emoji: "💣", hue: 0,   url: "/games/minesweeper.html" },
+  ];
+
+  // ── now.gg cloud-streamed games ────────────────────────────────────────────
+  const NOW_GG_GAMES = [
+    { name: "Geometry Dash",      emoji: "⬛", hue: 0,   url: "/games/nowgg/geometry-dash.html" },
+    { name: "Fortnite",           emoji: "🔫", hue: 200, url: "/games/nowgg/fortnite.html" },
+    { name: "Cookie Run",         emoji: "🍪", hue: 30,  url: "/games/nowgg/cookie-run.html" },
+    { name: "EA Sports FC Mobile",emoji: "⚽", hue: 130, url: "/games/nowgg/ea-sports-fc.html" },
+    { name: "Melon Sandbox",      emoji: "🍉", hue: 120, url: "/games/nowgg/melon-sandbox.html" },
+    { name: "Rocket League",      emoji: "🚗", hue: 210, url: "/games/nowgg/rocket-league.html" },
+  ];
+
   // ── Navigation ─────────────────────────────────────────────────────────────
   function navigateTo(url) {
     const input = document.getElementById("sj-address");
@@ -44,30 +103,63 @@
     form.requestSubmit();
   }
 
+  function navigateLocal(path) {
+    const w = window.open("about:blank", "_blank");
+    if (!w) return;
+    const iframe = w.document.createElement("iframe");
+    iframe.src = location.origin + path;
+    iframe.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;border:none;margin:0;padding:0;";
+    w.document.documentElement.style.cssText = "margin:0;padding:0;height:100%;overflow:hidden;";
+    w.document.body.style.cssText = "margin:0;padding:0;height:100%;overflow:hidden;";
+    w.document.body.appendChild(iframe);
+  }
+
   // ── Render grid ────────────────────────────────────────────────────────────
+  function makeTile(game, isLocal) {
+    const tile = document.createElement("div");
+    tile.className = "ql-tile";
+    tile.title = game.name;
+
+    const icon = document.createElement("div");
+    icon.className = "gs-tile-icon";
+    icon.textContent = game.emoji || "🎮";
+    icon.style.background = `hsla(${game.hue ?? 220}, 55%, 20%, 1)`;
+
+    const label = document.createElement("div");
+    label.className = "ql-tile-name";
+    label.textContent = game.name;
+
+    tile.appendChild(icon);
+    tile.appendChild(label);
+    tile.addEventListener("click", () => isLocal ? navigateLocal(game.url) : navigateTo(game.url));
+    return tile;
+  }
+
   function renderWith(gamesList) {
     const grid = document.getElementById("gs-grid");
     if (!grid) return;
     grid.innerHTML = "";
-    for (const game of gamesList) {
-      const tile = document.createElement("div");
-      tile.className = "ql-tile";
-      tile.title = game.url;
 
-      const icon = document.createElement("div");
-      icon.className = "gs-tile-icon";
-      icon.textContent = game.emoji || "🎮";
-      icon.style.background = `hsla(${game.hue ?? 220}, 55%, 20%, 1)`;
+    // ── Local games header + tiles ─────────────────────────────────────────
+    const localHeader = document.createElement("div");
+    localHeader.className = "gs-section-header";
+    localHeader.textContent = "Offline Games";
+    grid.appendChild(localHeader);
+    LOCAL_GAMES.forEach(g => grid.appendChild(makeTile(g, true)));
 
-      const label = document.createElement("div");
-      label.className = "ql-tile-name";
-      label.textContent = game.name;
+    // ── now.gg cloud games header + tiles ─────────────────────────────────
+    const nowHeader = document.createElement("div");
+    nowHeader.className = "gs-section-header";
+    nowHeader.textContent = "Cloud Games (now.gg)";
+    grid.appendChild(nowHeader);
+    NOW_GG_GAMES.forEach(g => grid.appendChild(makeTile(g, true)));
 
-      tile.appendChild(icon);
-      tile.appendChild(label);
-      tile.addEventListener("click", () => navigateTo(game.url));
-      grid.appendChild(tile);
-    }
+    // ── Proxied games header + tiles ───────────────────────────────────────
+    const proxyHeader = document.createElement("div");
+    proxyHeader.className = "gs-section-header";
+    proxyHeader.textContent = "Online Games";
+    grid.appendChild(proxyHeader);
+    gamesList.forEach(g => grid.appendChild(makeTile(g, false)));
   }
 
   // ── CSV parsing (handles quoted fields) ────────────────────────────────────

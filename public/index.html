@@ -338,6 +338,23 @@
           </div>
         </section>
 
+        <!-- about:blank Cloak -->
+        <section class="settings-section">
+          <div class="settings-section-title">about:blank Cloak <span id="blank-cloak-lock" class="ambassador-only-badge">⭐ Ambassador</span></div>
+          <p class="settings-section-desc">Opens Veil inside an about:blank tab so the URL bar shows nothing suspicious.</p>
+          <div class="settings-row">
+            <span class="settings-label">Open now</span>
+            <button class="settings-btn" id="blank-cloak-btn" disabled>🔒 Ambassador</button>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Auto-open on load</span>
+            <label class="toggle">
+              <input type="checkbox" id="blank-cloak-auto" disabled />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+        </section>
+
         <!-- Appearance -->
         <section class="settings-section">
           <div class="settings-section-title">Appearance</div>
@@ -448,6 +465,7 @@
           </div>
 
           <div class="settings-row settings-row--actions" id="ambassador-revoke-row" style="display:none;">
+            <button class="settings-btn" id="ambassador-copy-link-btn">Copy Login Link</button>
             <button class="settings-btn-danger" id="ambassador-revoke-btn">Remove Token</button>
           </div>
 
@@ -491,5 +509,6 @@
     <script src="/shortcuts.js"></script>
     <script src="/games.js"></script>
     <script src="/settings.js"></script>
+    <script src="/blank-cloak.js"></script>
   </body>
 </html>

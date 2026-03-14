@@ -105,22 +105,26 @@
 
   function applyCloak(s) {
     const faviconEl = document.querySelector("link[rel='icon']");
+    let title = null, favicon = null;
 
     if (s.cloak === "none") {
       if (faviconEl) faviconEl.href = "/favicon.ico";
-      return;
+    } else if (s.cloak === "custom") {
+      if (s.cloakTitle)   { document.title = s.cloakTitle; title = s.cloakTitle; }
+      if (faviconEl && s.cloakFavicon) { faviconEl.href = s.cloakFavicon; favicon = s.cloakFavicon; }
+    } else {
+      const preset = CLOAK_PRESETS[s.cloak];
+      if (preset) {
+        document.title = preset.title;
+        if (faviconEl) faviconEl.href = preset.favicon;
+        title = preset.title;
+        favicon = preset.favicon;
+      }
     }
 
-    if (s.cloak === "custom") {
-      if (s.cloakTitle)   document.title     = s.cloakTitle;
-      if (faviconEl && s.cloakFavicon) faviconEl.href = s.cloakFavicon;
-      return;
-    }
-
-    const preset = CLOAK_PRESETS[s.cloak];
-    if (preset) {
-      document.title = preset.title;
-      if (faviconEl) faviconEl.href = preset.favicon;
+    // Notify parent about:blank window so it can update its own title/favicon
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: "veil-cloak", title, favicon }, "*");
     }
   }
 
@@ -369,6 +373,14 @@
         el.title       = `${g.charAt(0).toUpperCase() + g.slice(1)} (Ambassador)`;
         el.classList.remove("bg-swatch--locked");
       });
+
+      // Unlock about:blank cloak
+      const blankBtn  = document.getElementById("blank-cloak-btn");
+      const blankAuto = document.getElementById("blank-cloak-auto");
+      const blankLock = document.getElementById("blank-cloak-lock");
+      if (blankBtn)  { blankBtn.disabled = false; blankBtn.textContent = "Open"; }
+      if (blankAuto) blankAuto.disabled = false;
+      if (blankLock) blankLock.style.display = "none";
     } else {
       if (verifiedEl) verifiedEl.style.display = "none";
       if (formEl)     formEl.style.display     = "";
@@ -402,6 +414,14 @@
         el.title       = `${g.charAt(0).toUpperCase() + g.slice(1)} (Ambassador only)`;
         el.classList.add("bg-swatch--locked");
       });
+
+      // Re-lock about:blank cloak
+      const blankBtn  = document.getElementById("blank-cloak-btn");
+      const blankAuto = document.getElementById("blank-cloak-auto");
+      const blankLock = document.getElementById("blank-cloak-lock");
+      if (blankBtn)  { blankBtn.disabled = true; blankBtn.textContent = "🔒 Ambassador"; }
+      if (blankAuto) blankAuto.disabled = true;
+      if (blankLock) blankLock.style.display = "";
 
       // Revert any locked theme/gradient that was active
       const activeTheme = document.documentElement.dataset.theme;
@@ -537,10 +557,59 @@
     }
   }
 
+  // Auto-redeem from URL param (?amb=TOKEN) — lets ambassadors bookmark a login link
+  (async function autoRedeemFromUrl() {
+    const params = new URLSearchParams(location.search);
+    const token  = params.get("amb");
+    if (!token || loadAmbassador()) return; // skip if no param or already logged in
+    try {
+      const res  = await fetch(`/api/verify-token?token=${encodeURIComponent(token)}`);
+      const data = await res.json();
+      if (data.valid) {
+        saveAmbassador({ token, username: data.username });
+        // Clean the token from the URL without reloading
+        const clean = new URL(location.href);
+        clean.searchParams.delete("amb");
+        history.replaceState(null, "", clean.toString());
+      }
+    } catch { /* silent fail */ }
+    applyAmbassador(loadAmbassador());
+    applyBetaFeatures();
+    renderLeaderboard();
+  })();
+
   // Apply on page load
   applyAmbassador(loadAmbassador());
   applyBetaFeatures();
   renderLeaderboard();
+
+  // Guard: watch ambassador-gated elements and revert any unauthorized DOM changes
+  (function guardAmbassador() {
+    const selectors = [
+      ...AMB_THEMES.map(t => `.theme-swatch[data-theme="${t}"]`),
+      ...AMB_GRADS.map(g => `.bg-swatch[data-gradient="${g}"]`),
+      ...AMB_CLOAKS.map(c => `#cloak-opt-${c}`),
+      "#ambassador-verified", "#ambassador-revoke-row", "#ambassador-home-star", "#ambassador-form",
+      "#blank-cloak-btn", "#blank-cloak-auto",
+    ];
+    const revert = () => applyAmbassador(loadAmbassador());
+    const observer = new MutationObserver((mutations) => {
+      if (loadAmbassador()) return; // legitimately unlocked, allow changes
+      for (const m of mutations) {
+        const el = m.target;
+        const matched = selectors.some(sel => el.matches?.(sel));
+        if (matched) { observer.disconnect(); revert(); observe(); return; }
+      }
+    });
+    const observe = () => {
+      selectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+          observer.observe(el, { attributes: true, attributeFilter: ["disabled", "class", "style"] });
+        });
+      });
+    };
+    observe();
+  })();
 
   // Redeem button
   document.getElementById("ambassador-redeem-btn")?.addEventListener("click", async function () {
@@ -571,6 +640,20 @@
       this.disabled    = false;
       this.textContent = "Redeem";
     }
+  });
+
+  // Copy login link button
+  document.getElementById("ambassador-copy-link-btn")?.addEventListener("click", function () {
+    const data = loadAmbassador();
+    if (!data) return;
+    const url = new URL(location.href);
+    url.search = "";
+    url.searchParams.set("amb", data.token);
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      const orig = this.textContent;
+      this.textContent = "Copied!";
+      setTimeout(() => { this.textContent = orig; }, 2000);
+    });
   });
 
   // Revoke button

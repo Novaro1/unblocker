@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "url";
 import { hostname } from "node:os";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
@@ -36,13 +36,39 @@ function rateLimit(req, reply, { max, windowMs }) {
   return false;
 }
 Object.assign(wisp.options, {
-  allow_udp_streams: false,
-  dns_servers: ["1.1.1.3", "1.0.0.3"],
+  allow_udp_streams: true,
+  dns_servers: ["1.1.1.1", "1.0.0.1"],
 });
 
 // Bare server handles HTTPS fetching server-side using Node.js CA bundle.
 // Raise the keep-alive connection limit — default of 10/min is hit immediately
 // by pages like YouTube that make dozens of parallel requests.
+// ── File caches (avoids readFileSync on every request) ────────────────────
+let _tokensCache = null, _tokensMtime = 0;
+let _betaCache   = null, _betaMtime   = 0;
+
+function loadTokens() {
+  try {
+    const { mtimeMs } = statSync(tokensPath);
+    if (mtimeMs !== _tokensMtime) {
+      _tokensCache  = JSON.parse(readFileSync(tokensPath, "utf-8"));
+      _tokensMtime  = mtimeMs;
+    }
+  } catch { _tokensCache = []; }
+  return _tokensCache ?? [];
+}
+
+function loadBeta() {
+  try {
+    const { mtimeMs } = statSync(betaFeaturesPath);
+    if (mtimeMs !== _betaMtime) {
+      _betaCache  = JSON.parse(readFileSync(betaFeaturesPath, "utf-8"));
+      _betaMtime  = mtimeMs;
+    }
+  } catch { _betaCache = []; }
+  return _betaCache ?? [];
+}
+
 const bareServer = createBareServer("/bare/", {
   connectionLimiter: {
     maxConnectionsPerIP: 10000,
@@ -109,59 +135,32 @@ fastify.get('/api/verify-token', (req, reply) => {
   if (rateLimit(req, reply, { max: 10, windowMs: 60_000 })) return;
   const { token } = req.query;
   if (!token) return reply.code(400).send({ valid: false });
-  try {
-    const tokens = existsSync(tokensPath)
-      ? JSON.parse(readFileSync(tokensPath, "utf-8"))
-      : [];
-    const entry = tokens.find((t) => t.token === token);
-    if (entry) return reply.send({ valid: true, username: entry.username });
-    return reply.send({ valid: false });
-  } catch {
-    return reply.code(500).send({ valid: false });
-  }
+  const entry = loadTokens().find((t) => t.token === token);
+  if (entry) return reply.send({ valid: true, username: entry.username });
+  return reply.send({ valid: false });
 });
 
 // Ambassador leaderboard — returns top ambassadors sorted by points (no tokens exposed)
 fastify.get('/api/leaderboard', (_req, reply) => {
-  try {
-    const tokens = existsSync(tokensPath)
-      ? JSON.parse(readFileSync(tokensPath, "utf-8"))
-      : [];
-    const board = tokens
-      .map((t) => ({ username: t.username, points: t.points ?? 0 }))
-      .sort((a, b) => b.points - a.points)
-      .slice(0, 20)
-      .map((t, i) => ({ rank: i + 1, username: t.username, points: t.points }));
-    return reply.send(board);
-  } catch {
-    return reply.code(500).send([]);
-  }
+  const board = loadTokens()
+    .map((t) => ({ username: t.username, points: t.points ?? 0 }))
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 20)
+    .map((t, i) => ({ rank: i + 1, username: t.username, points: t.points }));
+  return reply.send(board);
 });
 
 // Beta feature status — computes whether each feature is still in its ambassador-only window
 fastify.get('/api/beta-features', (_req, reply) => {
-  try {
-    const raw = existsSync(betaFeaturesPath)
-      ? JSON.parse(readFileSync(betaFeaturesPath, "utf-8"))
-      : [];
-    const now = Date.now();
-    const result = raw.map((f) => {
-      const betaMs  = (f.betaDays ?? 14) * 86400000;
-      const elapsed = now - new Date(f.releasedAt).getTime();
-      const isBeta  = elapsed < betaMs;
-      return {
-        id:       f.id,
-        type:     f.type,
-        key:      f.key,
-        label:    f.label,
-        isBeta,
-        daysLeft: isBeta ? Math.ceil((betaMs - elapsed) / 86400000) : 0,
-      };
-    });
-    return reply.send(result);
-  } catch {
-    return reply.code(500).send([]);
-  }
+  const now = Date.now();
+  const result = loadBeta().map((f) => {
+    const betaMs  = (f.betaDays ?? 14) * 86400000;
+    const elapsed = now - new Date(f.releasedAt).getTime();
+    const isBeta  = elapsed < betaMs;
+    return { id: f.id, type: f.type, key: f.key, label: f.label, isBeta,
+      daysLeft: isBeta ? Math.ceil((betaMs - elapsed) / 86400000) : 0 };
+  });
+  return reply.send(result);
 });
 
 fastify.setNotFoundHandler((_req, reply) => {
@@ -187,4 +186,4 @@ function shutdown() {
 let port = parseInt(process.env.PORT || "");
 if (isNaN(port)) port = 8080;
 
-fastify.listen({ port, host: "127.0.0.1" });
+fastify.listen({ port, host: "0.0.0.0" });
