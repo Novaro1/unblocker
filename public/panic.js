@@ -6,7 +6,7 @@
 
   const URL_PRESETS = {
     classroom: "https://classroom.google.com",
-    google:    "https://www.google.com",
+    docs:      "https://docs.google.com",
     gmail:     "https://mail.google.com",
     desmos:    "https://www.desmos.com/calculator",
     khan:      "https://www.khanacademy.org",
