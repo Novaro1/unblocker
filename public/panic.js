@@ -69,16 +69,32 @@
     try { window.top.location.replace(dest); } catch { window.location.replace(dest); }
   }
 
-  // ── Fake UI templates ───────────────────────────────────────────────────
-  function getEscapeUrl(s) {
+  // ── URL helpers ─────────────────────────────────────────────────────────
+  // Navigate away → cloak's real escape URL
+  function getCloakEscapeUrl(s) {
     const CLOAK_ESCAPE = {
       docs:      "https://docs.google.com",
       classroom: "https://classroom.google.com",
       gmail:     "https://mail.google.com",
       desmos:    "https://www.desmos.com",
       khan:      "https://www.khanacademy.org",
+      youtube:   "https://www.youtube.com",
+      spotify:   "https://open.spotify.com",
+      discord:   "https://discord.com/app",
+      roblox:    "https://www.roblox.com",
     };
-    return s.panicUrl || CLOAK_ESCAPE[s.cloak] || "https://www.google.com";
+    return CLOAK_ESCAPE[s.cloak] || s.panicUrl || "https://www.google.com";
+  }
+
+  // Stealth overlay → fake UI based on redirect destination URL
+  function getStealthCloak(s) {
+    const url = s.panicUrl || "";
+    if (url.includes("classroom.google.com")) return "classroom";
+    if (url.includes("mail.google.com"))      return "gmail";
+    if (url.includes("desmos.com"))           return "desmos";
+    if (url.includes("khanacademy.org"))      return "khan";
+    if (url.includes("docs.google.com"))      return "docs";
+    return "docs";
   }
 
   function buildFakeUI(cloak, dismissHint) {
@@ -488,28 +504,24 @@
 
   function triggerPanic() {
     const s = loadSettings();
-    const cloak = s.cloak || "none";
     const panicMode = s.panicMode || "stealth";
-    const escapeUrl = getEscapeUrl(s);
-    const isEducational = EDUCATIONAL_CLOAKS.includes(cloak);
 
     if (overlayVisible) {
-      // Already showing: dismiss (return to proxy)
       hideOverlay();
       return;
     }
 
-    // Escape mode: always navigate away
     if (panicMode === "escape") {
-      doEscape(escapeUrl);
+      // Navigate away → cloak's real site
+      doEscape(getCloakEscapeUrl(s));
       return;
     }
 
-    // Stealth mode: show fake UI — default to docs if cloak isn't educational
-    const effectiveCloak = isEducational ? cloak : "docs";
+    // Stealth mode → fake UI based on redirect destination
+    const stealthCloak = getStealthCloak(s);
     const keyDisplay = formatCombo(s.panicKey);
     const hint = `<div class="panic-dismiss-hint">press ${keyDisplay} again to return</div>`;
-    showOverlay(effectiveCloak, escapeUrl, hint);
+    showOverlay(stealthCloak, getCloakEscapeUrl(s), hint);
   }
 
   // ── Key listener ────────────────────────────────────────────────────────
@@ -533,7 +545,7 @@
         // Any other key held → escape after 1.5s
         holdTimer = setTimeout(() => {
           holdTimer = null;
-          doEscape(getEscapeUrl(s));
+          doEscape(getCloakEscapeUrl(s));
         }, 1500);
       }
       return;
