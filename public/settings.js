@@ -10,13 +10,13 @@
     docs:      { title: "Untitled document",           favicon: "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico" },
     classroom: { title: "Google Classroom",            favicon: "https://ssl.gstatic.com/classroom/favicon.png" },
     gmail:     { title: "Inbox (1) - Gmail",           favicon: "https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico" },
-    desmos:    { title: "Desmos | Graphing Calculator",favicon: "https://www.desmos.com/favicon.ico" },
-    khan:      { title: "Khan Academy",                favicon: "https://www.khanacademy.org/favicon.ico" },
+    desmos:    { title: "Desmos | Graphing Calculator",favicon: "/favicons/desmos.ico" },
+    khan:      { title: "Khan Academy",                favicon: "/favicons/khan.ico" },
     // Ambassador-exclusive cloaks
     youtube:   { title: "YouTube",                     favicon: "https://www.youtube.com/favicon.ico" },
-    spotify:   { title: "Spotify - Web Player",        favicon: "https://open.spotify.com/favicon.ico" },
-    discord:   { title: "Discord",                     favicon: "https://discord.com/favicon.ico" },
-    roblox:    { title: "Roblox",                      favicon: "https://www.roblox.com/favicon.ico" },
+    spotify:   { title: "Spotify - Web Player",        favicon: "/favicons/spotify.ico" },
+    discord:   { title: "Discord",                     favicon: "/favicons/discord.ico" },
+    roblox:    { title: "Roblox",                      favicon: "/favicons/roblox.ico" },
   };
 
   const BG_GRADIENTS = {
