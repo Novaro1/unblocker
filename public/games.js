@@ -94,14 +94,7 @@
   }
 
   function navigateLocal(path) {
-    const w = window.open("about:blank", "_blank");
-    if (!w) return;
-    const iframe = w.document.createElement("iframe");
-    iframe.src = location.origin + path;
-    iframe.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;border:none;margin:0;padding:0;";
-    w.document.documentElement.style.cssText = "margin:0;padding:0;height:100%;overflow:hidden;";
-    w.document.body.style.cssText = "margin:0;padding:0;height:100%;overflow:hidden;";
-    w.document.body.appendChild(iframe);
+    window.open(location.origin + path, "_blank");
   }
 
   // ── Render grid ────────────────────────────────────────────────────────────
