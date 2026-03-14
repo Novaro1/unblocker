@@ -78,7 +78,7 @@
       desmos:    "https://www.desmos.com",
       khan:      "https://www.khanacademy.org",
     };
-    return CLOAK_ESCAPE[s.cloak] || s.panicUrl || "https://www.google.com";
+    return s.panicUrl || CLOAK_ESCAPE[s.cloak] || "https://www.google.com";
   }
 
   function buildFakeUI(cloak, dismissHint) {
