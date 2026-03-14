@@ -2,17 +2,21 @@
 
 const BLANK_CLOAK_AUTO_KEY = "veil_blank_cloak_auto";
 
+function gFavicon(domain) {
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+}
+
 const CLOAK_PRESETS = {
   none:      { title: "Veil",                         favicon: "/favicon.ico" },
-  docs:      { title: "Untitled document",            favicon: "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico" },
-  classroom: { title: "Google Classroom",             favicon: "https://ssl.gstatic.com/classroom/favicon.png" },
-  gmail:     { title: "Inbox (1) - Gmail",            favicon: "https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico" },
-  desmos:    { title: "Desmos | Graphing Calculator", favicon: "https://www.desmos.com/favicon.ico" },
-  khan:      { title: "Khan Academy",                 favicon: "https://cdn.kastatic.org/images/favicon.ico" },
-  youtube:   { title: "YouTube",                      favicon: "https://www.youtube.com/favicon.ico" },
-  spotify:   { title: "Spotify - Web Player",        favicon: "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png" },
-  discord:   { title: "Discord",                      favicon: "https://discord.com/assets/847541504914fd33810e70a0ea73177e.ico" },
-  roblox:    { title: "Roblox",                       favicon: "https://www.roblox.com/favicon.ico" },
+  docs:      { title: "Untitled document",            favicon: gFavicon("docs.google.com") },
+  classroom: { title: "Google Classroom",             favicon: gFavicon("classroom.google.com") },
+  gmail:     { title: "Inbox (1) - Gmail",            favicon: gFavicon("mail.google.com") },
+  desmos:    { title: "Desmos | Graphing Calculator", favicon: gFavicon("desmos.com") },
+  khan:      { title: "Khan Academy",                 favicon: gFavicon("khanacademy.org") },
+  youtube:   { title: "YouTube",                      favicon: gFavicon("youtube.com") },
+  spotify:   { title: "Spotify - Web Player",        favicon: gFavicon("open.spotify.com") },
+  discord:   { title: "Discord",                      favicon: gFavicon("discord.com") },
+  roblox:    { title: "Roblox",                       favicon: gFavicon("roblox.com") },
 };
 
 const CLOAK_ESCAPE_URLS = {
