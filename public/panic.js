@@ -63,7 +63,9 @@
 
   // ── Escape action ───────────────────────────────────────────────────────
   function doEscape(url) {
-    window.location.replace(url || "https://www.google.com");
+    const target = url || "https://www.google.com";
+    // Use server-side redirect to bypass Scramjet service worker interception
+    window.location.replace("/escape?to=" + encodeURIComponent(target));
   }
 
   // ── Fake UI templates ───────────────────────────────────────────────────

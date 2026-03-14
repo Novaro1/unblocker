@@ -134,6 +134,13 @@ fastify.addContentTypeParser("application/json", { parseAs: "buffer" }, (req, bo
   catch (e) { done(e); }
 });
 
+// Panic escape redirect — bypasses Scramjet service worker interception
+fastify.get('/escape', (req, reply) => {
+  const { to } = req.query;
+  if (!to || !/^https?:\/\//.test(to)) return reply.code(400).send('bad url');
+  return reply.code(302).header('Location', to).send();
+});
+
 // Caddy on-demand TLS ask endpoint — always approve
 fastify.get('/caddy-ask', (_req, reply) => {
   reply.code(200).send('ok');
