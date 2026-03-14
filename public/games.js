@@ -84,16 +84,6 @@
     { name: "Minesweeper",           emoji: "💣", hue: 0,   url: "/games/minesweeper.html" },
   ];
 
-  // ── now.gg cloud-streamed games ────────────────────────────────────────────
-  const NOW_GG_GAMES = [
-    { name: "Geometry Dash",      emoji: "⬛", hue: 0,   direct: true, url: "https://educationbluesky.com/play/robtop-games/1400/geometry-dash.html" },
-    { name: "Fortnite",           emoji: "🔫", hue: 200, direct: true, url: "https://educationbluesky.com/play/epic-games/7308/fortnite.html" },
-    { name: "Cookie Run",         emoji: "🍪", hue: 30,  direct: true, url: "https://educationbluesky.com/play/devsisters-corporation/3475/cookie-run.html" },
-    { name: "EA Sports FC Mobile",emoji: "⚽", hue: 130, direct: true, url: "https://educationbluesky.com/play/electronic-arts/1353/ea-sports-fc-mobile-24-soccer.html" },
-    { name: "Melon Sandbox",      emoji: "🍉", hue: 120, direct: true, url: "https://educationbluesky.com/play/playducky/7199/melon-sandbox.html" },
-    { name: "Rocket League",      emoji: "🚗", hue: 210, direct: true, url: "https://educationbluesky.com/play/psyonix-studios/4656/rocket-league.html" },
-  ];
-
   // ── Navigation ─────────────────────────────────────────────────────────────
   function navigateTo(url) {
     const input = document.getElementById("sj-address");
@@ -132,9 +122,8 @@
     tile.appendChild(icon);
     tile.appendChild(label);
     tile.addEventListener("click", () => {
-      if (game.direct) { window.open(game.url, "_blank"); }
-      else if (isLocal) { navigateLocal(game.url); }
-      else              { navigateTo(game.url); }
+      if (isLocal) { navigateLocal(game.url); }
+      else         { navigateTo(game.url); }
     });
     return tile;
   }
@@ -150,13 +139,6 @@
     localHeader.textContent = "Offline Games";
     grid.appendChild(localHeader);
     LOCAL_GAMES.forEach(g => grid.appendChild(makeTile(g, true)));
-
-    // ── now.gg cloud games header + tiles ─────────────────────────────────
-    const nowHeader = document.createElement("div");
-    nowHeader.className = "gs-section-header";
-    nowHeader.textContent = "Cloud Games (now.gg)";
-    grid.appendChild(nowHeader);
-    NOW_GG_GAMES.forEach(g => grid.appendChild(makeTile(g, false)));
 
     // ── Proxied games header + tiles ───────────────────────────────────────
     const proxyHeader = document.createElement("div");
