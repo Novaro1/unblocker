@@ -614,6 +614,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /findlink
   if (commandName === "findlink") {
+    const glToken = cfg.glApiKey;
+    if (!glToken) {
+      return interaction.reply({
+        content: "This server hasn't set up a glseries API key yet. An admin needs to run `/set-findlink-key` first.\nGet a free key at **live.glseries.net**.",
+        ephemeral: true,
+      });
+    }
+
     const filterKey      = interaction.options.getString("filter");
     const MONTHLY_LIMIT  = 5;
     const uses           = getFindlinkUses(interaction.user.id);
@@ -645,7 +653,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     const pool       = [...allDomains].sort(() => Math.random() - 0.5);
-    const GL_TOKEN   = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
     const MAX_TRIES  = 30;
     const UNCATEG    = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
     let found = null, checked = 0, filterName = filterKey;
@@ -655,7 +662,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       try {
         let results = getFindlinkCache(domain);
         if (!results) {
-          const res  = await fetch(`https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`);
+          const res  = await fetch(`https://live.glseries.net/api/v1/check?token=${glToken}&url=${encodeURIComponent(domain)}`);
           const data = await res.json();
           if (!data.success) continue;
           results = data.results;
@@ -909,7 +916,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   //  ADMIN COMMANDS
   // ══════════════════════════════════════════════════════════
 
-  if (["set-channel", "set-role", "viewconfig", "setuptickets", "setupverify", "livestatus", "set-welcome-message"].includes(commandName)) {
+  if (["set-channel", "set-role", "viewconfig", "setuptickets", "setupverify", "livestatus", "set-welcome-message", "set-findlink-key"].includes(commandName)) {
     if (!isAdmin(interaction.member)) {
       return interaction.reply({ content: "You need Administrator permission to use this command.", ephemeral: true });
     }
@@ -947,6 +954,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const message = interaction.options.getString("message");
     setConfig(interaction.guild.id, { welcomeMessage: message });
     return interaction.reply({ content: "✅ Welcome message updated.", ephemeral: true });
+  }
+
+  // /set-findlink-key
+  if (commandName === "set-findlink-key") {
+    const key = interaction.options.getString("key");
+    setConfig(interaction.guild.id, { glApiKey: key });
+    return interaction.reply({ content: "✅ glseries API key saved. `/findlink` is now enabled for this server.", ephemeral: true });
   }
 
   // /viewconfig

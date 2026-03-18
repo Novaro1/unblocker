@@ -220,6 +220,18 @@ const commands = [
     ],
   },
   {
+    name: "set-findlink-key",
+    description: "Set your glseries.net API key to enable /findlink [Admin]",
+    options: [
+      {
+        name: "key",
+        description: "Your glseries API key (get one at live.glseries.net)",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+    ],
+  },
+  {
     name: "set-welcome-message",
     description: "Set a custom welcome message [Admin]",
     options: [
