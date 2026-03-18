@@ -17,6 +17,7 @@ import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
+import Anthropic from "@anthropic-ai/sdk";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LINKS_FILE         = join(__dirname, "links.json");
@@ -138,7 +139,12 @@ function checkStatus(url) {
 
 // ── Client setup ───────────────────────────────────────────────────────────
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
 const {
@@ -236,10 +242,107 @@ async function refreshLiveMessages() {
   }
 }
 
+// ── AI Server Monitor ────────────────────────────────────────────────────────
+
+const AI_ALERT_CHANNEL_ID = process.env.AI_ALERT_CHANNEL_ID;
+const AI_INTERVAL_MINUTES = parseInt(process.env.AI_INTERVAL_MINUTES ?? "30");
+const anthropic = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
+
+// Ring buffer of last 300 messages
+const msgBuffer = [];
+
+client.on(Events.MessageCreate, (message) => {
+  if (message.author.bot || !message.guild) return;
+  msgBuffer.push({
+    channel: message.channel.name ?? "unknown",
+    author:  message.author.username,
+    content: message.content.slice(0, 500),
+    ts:      new Date().toLocaleTimeString(),
+  });
+  if (msgBuffer.length > 300) msgBuffer.shift();
+});
+
+async function runAiScan(guild) {
+  if (!anthropic || !AI_ALERT_CHANNEL_ID) return;
+  if (msgBuffer.length < 3) return;
+
+  const transcript = msgBuffer.slice(-150).map(
+    (m) => `[#${m.channel}] ${m.author}: ${m.content}`
+  ).join("\n");
+
+  let alerts;
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-opus-4-6",
+      max_tokens: 1024,
+      thinking: { type: "adaptive" },
+      system: `You are a Discord server monitor for a school proxy service called Veil. Analyze recent server messages and identify things the server owner should act on. Be selective — only surface genuine issues, not normal chat. Return ONLY a valid JSON array (no markdown, no explanation). Each item: { "priority": "low"|"medium"|"high"|"urgent", "category": "unanswered_question"|"conflict"|"spam"|"feedback"|"bug_report"|"moderation_needed"|"other", "summary": "brief description", "channel": "#channel-name", "action": "recommended action" }. Return [] if nothing needs attention.`,
+      messages: [{
+        role: "user",
+        content: `Server: ${guild.name}\n\nRecent messages:\n${transcript}\n\nWhat needs attention?`,
+      }],
+    });
+
+    const text = response.content.find((b) => b.type === "text")?.text ?? "[]";
+    alerts = JSON.parse(text.replace(/```json?\n?/g, "").replace(/```/g, "").trim());
+    if (!Array.isArray(alerts)) alerts = [];
+  } catch (err) {
+    console.error("[AI Monitor] Error:", err.message);
+    return;
+  }
+
+  if (!alerts.length) return;
+
+  const alertChannel = guild.channels.cache.get(AI_ALERT_CHANNEL_ID);
+  if (!alertChannel) return;
+
+  const PRIORITY_COLOR = { low: 0x6366f1, medium: 0xf59e0b, high: 0xf97316, urgent: 0xef4444 };
+  const PRIORITY_ICON  = { low: "🔵", medium: "🟡", high: "🟠", urgent: "🔴" };
+  const CAT_LABEL = {
+    unanswered_question: "❓ Unanswered Question",
+    conflict:            "⚔️ Conflict",
+    spam:                "🚫 Spam",
+    feedback:            "💬 Feedback",
+    bug_report:          "🐛 Bug Report",
+    moderation_needed:   "🔨 Moderation Needed",
+    other:               "📌 Other",
+  };
+
+  const order = { urgent: 0, high: 1, medium: 2, low: 3 };
+  alerts.sort((a, b) => (order[a.priority] ?? 3) - (order[b.priority] ?? 3));
+
+  const embed = new EmbedBuilder()
+    .setColor(PRIORITY_COLOR[alerts[0].priority] ?? 0x6366f1)
+    .setTitle("🤖 AI Monitor — Things to Check")
+    .setDescription(`Found **${alerts.length}** item${alerts.length > 1 ? "s" : ""} from the last ${msgBuffer.length} messages.`)
+    .setTimestamp();
+
+  for (const alert of alerts.slice(0, 5)) {
+    embed.addFields({
+      name:  `${PRIORITY_ICON[alert.priority] ?? "•"} ${CAT_LABEL[alert.category] ?? alert.category} — ${alert.channel}`,
+      value: `**${alert.summary}**\n> ${alert.action}`,
+    });
+  }
+
+  embed.setFooter({ text: `Powered by Claude AI · runs every ${AI_INTERVAL_MINUTES}m` });
+  await alertChannel.send({ embeds: [embed] }).catch(console.error);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 client.once(Events.ClientReady, () => {
   console.log(`Veil Bot ready as ${client.user.tag}`);
   // Refresh live embeds every 60 seconds
   setInterval(refreshLiveMessages, 60_000);
+  // Start AI monitor if configured
+  if (anthropic && AI_ALERT_CHANNEL_ID) {
+    setInterval(() => {
+      client.guilds.cache.forEach((guild) => runAiScan(guild));
+    }, AI_INTERVAL_MINUTES * 60 * 1000);
+    console.log(`[AI Monitor] Active — scanning every ${AI_INTERVAL_MINUTES}m`);
+  }
 });
 
 // ── Auto-role + welcome on join ────────────────────────────────────────────
@@ -1168,6 +1271,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } catch (err) {
       return interaction.editReply({ content: `Error: ${err.message}` });
     }
+  }
+
+  // /ai-scan
+  if (commandName === "ai-scan") {
+    if (!anthropic || !AI_ALERT_CHANNEL_ID) {
+      return interaction.reply({ content: "AI monitor is not configured. Add `ANTHROPIC_API_KEY` and `AI_ALERT_CHANNEL_ID` to the bot `.env`.", ephemeral: true });
+    }
+    await interaction.reply({ content: "🤖 Running AI scan...", ephemeral: true });
+    await runAiScan(interaction.guild);
+    return interaction.editReply({ content: "✅ Scan complete. Check the alert channel." });
   }
 
   // /uptime

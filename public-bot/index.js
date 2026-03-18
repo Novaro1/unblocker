@@ -17,7 +17,6 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
-import Anthropic from "@anthropic-ai/sdk";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR          = join(__dirname, "data");
@@ -227,149 +226,19 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions,
   ],
 });
 
-// ── AI Monitor ───────────────────────────────────────────────────────────────
-
-// Per-guild message buffer: guildId -> array of { channel, author, content, ts }
-const msgBuffer = new Map();
-// Per-guild scan intervals: guildId -> intervalId
-const monitorTimers = new Map();
-
-client.on(Events.MessageCreate, (message) => {
-  if (message.author.bot || !message.guild) return;
-  const guildId = message.guild.id;
-  if (!msgBuffer.has(guildId)) msgBuffer.set(guildId, []);
-  const buf = msgBuffer.get(guildId);
-  buf.push({
-    channel: message.channel.name ?? "unknown",
-    author:  message.author.username,
-    content: message.content.slice(0, 500), // cap per message
-    ts:      new Date().toLocaleTimeString(),
-  });
-  if (buf.length > 300) buf.shift(); // keep last 300
-});
-
-async function runAiScan(guild) {
-  const cfg = getConfig(guild.id);
-  if (!cfg.aiAlertChannelId || !cfg.aiApiKey) return;
-
-  const buf = msgBuffer.get(guild.id) ?? [];
-  if (buf.length < 3) return;
-
-  const transcript = buf.slice(-150).map(
-    (m) => `[#${m.channel}] ${m.author}: ${m.content}`
-  ).join("\n");
-
-  const anthropic = new Anthropic({ apiKey: cfg.aiApiKey });
-
-  let raw;
-  try {
-    const response = await anthropic.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 1024,
-      thinking: { type: "adaptive" },
-      system: `You are a Discord server monitor assistant. Analyze recent server messages and identify anything the server owner should be aware of or act on. Be selective — only surface genuine issues, not normal chat. Return ONLY a valid JSON array (no markdown, no explanation). Each item: { "priority": "low"|"medium"|"high"|"urgent", "category": "unanswered_question"|"conflict"|"spam"|"feedback"|"bug_report"|"moderation_needed"|"other", "summary": "brief description", "channel": "#channel-name", "action": "what to do" }. Return [] if nothing needs attention.`,
-      messages: [{
-        role: "user",
-        content: `Server: ${guild.name}\n\nRecent messages:\n${transcript}\n\nWhat needs attention?`,
-      }],
-    });
-
-    const text = response.content.find((b) => b.type === "text")?.text ?? "[]";
-    // Strip any markdown code fences if present
-    raw = text.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
-  } catch (err) {
-    console.error(`[AI Monitor] Claude error for ${guild.name}:`, err.message);
-    return;
-  }
-
-  let alerts;
-  try {
-    alerts = JSON.parse(raw);
-    if (!Array.isArray(alerts)) alerts = [];
-  } catch {
-    console.error("[AI Monitor] Could not parse Claude response:", raw);
-    return;
-  }
-
-  if (!alerts.length) return;
-
-  const alertChannel = guild.channels.cache.get(cfg.aiAlertChannelId);
-  if (!alertChannel) return;
-
-  const PRIORITY_COLOR = { low: 0x6366f1, medium: 0xf59e0b, high: 0xf97316, urgent: 0xef4444 };
-  const PRIORITY_ICON  = { low: "🔵", medium: "🟡", high: "🟠", urgent: "🔴" };
-  const CAT_LABEL = {
-    unanswered_question: "❓ Unanswered Question",
-    conflict:            "⚔️ Conflict",
-    spam:                "🚫 Spam",
-    feedback:            "💬 Feedback",
-    bug_report:          "🐛 Bug Report",
-    moderation_needed:   "🔨 Moderation Needed",
-    other:               "📌 Other",
-  };
-
-  // Sort by priority
-  const order = { urgent: 0, high: 1, medium: 2, low: 3 };
-  alerts.sort((a, b) => (order[a.priority] ?? 3) - (order[b.priority] ?? 3));
-
-  const embed = new EmbedBuilder()
-    .setColor(PRIORITY_COLOR[alerts[0].priority] ?? VEIL_COLOR)
-    .setTitle("🤖 AI Server Monitor — Things to Check")
-    .setDescription(`Found **${alerts.length}** item${alerts.length > 1 ? "s" : ""} from the last ${buf.length} messages.`)
-    .setTimestamp();
-
-  for (const alert of alerts.slice(0, 5)) {
-    embed.addFields({
-      name: `${PRIORITY_ICON[alert.priority] ?? "•"} ${CAT_LABEL[alert.category] ?? alert.category} — ${alert.channel}`,
-      value: `**${alert.summary}**\n> ${alert.action}`,
-    });
-  }
-
-  embed.setFooter({ text: "Powered by Claude AI · /ai-scan to run manually" });
-  await alertChannel.send({ embeds: [embed] }).catch(() => {});
-}
-
-function startMonitor(guild, intervalMinutes) {
-  stopMonitor(guild.id);
-  const ms = intervalMinutes * 60 * 1000;
-  const timer = setInterval(() => runAiScan(guild), ms);
-  monitorTimers.set(guild.id, timer);
-}
-
-function stopMonitor(guildId) {
-  if (monitorTimers.has(guildId)) {
-    clearInterval(monitorTimers.get(guildId));
-    monitorTimers.delete(guildId);
-  }
-}
-
 // ── Ready ────────────────────────────────────────────────────────────────────
 
-client.once(Events.ClientReady, async () => {
+client.once(Events.ClientReady, () => {
   console.log(`Veil Bot ready as ${client.user.tag}`);
 
   // Restore active giveaways from disk
   const giveaways = loadGiveaways();
   for (const [msgId, g] of Object.entries(giveaways)) {
     scheduleGiveaway(msgId, g.channelId, g.endsAt);
-  }
-
-  // Restore AI monitors
-  const allCfgs = load(CONFIGS_FILE, {});
-  for (const [guildId, cfg] of Object.entries(allCfgs)) {
-    if (cfg.aiAlertChannelId && cfg.aiApiKey && cfg.aiIntervalMinutes) {
-      try {
-        const guild = await client.guilds.fetch(guildId);
-        startMonitor(guild, cfg.aiIntervalMinutes);
-        console.log(`[AI Monitor] Restored for ${guild.name} (every ${cfg.aiIntervalMinutes}m)`);
-      } catch {}
-    }
   }
 });
 
@@ -1092,7 +961,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   //  ADMIN COMMANDS
   // ══════════════════════════════════════════════════════════
 
-  if (["set-channel", "set-role", "viewconfig", "setuptickets", "setupverify", "livestatus", "set-welcome-message", "set-findlink-key", "setup-ai-monitor", "ai-monitor-stop"].includes(commandName)) {
+  if (["set-channel", "set-role", "viewconfig", "setuptickets", "setupverify", "livestatus", "set-welcome-message", "set-findlink-key"].includes(commandName)) {
     if (!isAdmin(interaction.member)) {
       return interaction.reply({ content: "You need Administrator permission to use this command.", ephemeral: true });
     }
@@ -1139,65 +1008,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return interaction.reply({ content: "✅ glseries API key saved. `/findlink` is now enabled for this server.", ephemeral: true });
   }
 
-  // /setup-ai-monitor
-  if (commandName === "setup-ai-monitor") {
-    const modal = new ModalBuilder()
-      .setCustomId("veil_ai_monitor_modal")
-      .setTitle("Set Up AI Server Monitor");
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId("ai_api_key")
-          .setLabel("Anthropic API Key")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setPlaceholder("sk-ant-...")
-          .setMinLength(10)
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId("ai_channel_id")
-          .setLabel("Alert Channel ID (right-click channel → Copy ID)")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setPlaceholder("123456789012345678")
-          .setMinLength(17)
-          .setMaxLength(20)
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId("ai_interval")
-          .setLabel("Scan interval in minutes (e.g. 30)")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setPlaceholder("30")
-          .setMinLength(1)
-          .setMaxLength(4)
-      ),
-    );
-    return interaction.showModal(modal);
-  }
-
-  // /ai-monitor-stop
-  if (commandName === "ai-monitor-stop") {
-    stopMonitor(interaction.guild.id);
-    setConfig(interaction.guild.id, { aiAlertChannelId: null, aiApiKey: null, aiIntervalMinutes: null });
-    return interaction.reply({ content: "✅ AI monitor stopped and config cleared.", ephemeral: true });
-  }
-
-  // /ai-scan (public — mod only)
-  if (commandName === "ai-scan") {
-    if (!isMod(interaction.member, cfg)) {
-      return interaction.reply({ content: "You need the staff role or Manage Messages permission.", ephemeral: true });
-    }
-    const monitorCfg = getConfig(interaction.guild.id);
-    if (!monitorCfg.aiAlertChannelId || !monitorCfg.aiApiKey) {
-      return interaction.reply({ content: "AI monitor isn't set up. An admin needs to run `/setup-ai-monitor` first.", ephemeral: true });
-    }
-    await interaction.reply({ content: "🤖 Running AI scan...", ephemeral: true });
-    await runAiScan(interaction.guild);
-    return interaction.editReply({ content: "✅ Scan complete. Check the alert channel." });
-  }
 
   // /viewconfig
   if (commandName === "viewconfig") {

@@ -220,18 +220,6 @@ const commands = [
     ],
   },
   {
-    name: "ai-scan",
-    description: "Manually run an AI scan of recent server messages [Mod]",
-  },
-  {
-    name: "setup-ai-monitor",
-    description: "Set up the AI server monitor — opens a setup form [Admin]",
-  },
-  {
-    name: "ai-monitor-stop",
-    description: "Stop the AI monitor and clear its config [Admin]",
-  },
-  {
     name: "set-findlink-key",
     description: "Set your glseries.net API key to enable /findlink [Admin]",
     options: [
