@@ -296,7 +296,10 @@ async function runAiScan(guild) {
     return;
   }
 
-  if (!alerts.length) return;
+  if (!alerts.length) {
+    console.log("[AI Monitor] Scan complete — nothing flagged.");
+    return;
+  }
 
   const alertChannel = guild.channels.cache.get(AI_ALERT_CHANNEL_ID);
   if (!alertChannel) return;
@@ -1278,12 +1281,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /ai-scan
   if (commandName === "ai-scan") {
-    if (!openai || !AI_ALERT_CHANNEL_ID) {
-      return interaction.reply({ content: "AI monitor is not configured. Add `OPENAI_API_KEY` and `AI_ALERT_CHANNEL_ID` to the bot `.env`.", ephemeral: true });
+    if (!openai) {
+      return interaction.reply({ content: "❌ `OPENAI_API_KEY` is not set in the bot `.env`.", ephemeral: true });
     }
-    await interaction.reply({ content: "🤖 Running AI scan...", ephemeral: true });
+    if (!AI_ALERT_CHANNEL_ID) {
+      return interaction.reply({ content: "❌ `AI_ALERT_CHANNEL_ID` is not set in the bot `.env`.", ephemeral: true });
+    }
+    if (msgBuffer.length < 3) {
+      return interaction.reply({ content: `❌ Not enough messages buffered yet (${msgBuffer.length}/3 minimum). Send some messages in the server first, then try again.`, ephemeral: true });
+    }
+    const alertChannel = interaction.guild.channels.cache.get(AI_ALERT_CHANNEL_ID);
+    if (!alertChannel) {
+      return interaction.reply({ content: `❌ Alert channel \`${AI_ALERT_CHANNEL_ID}\` not found. Check \`AI_ALERT_CHANNEL_ID\` in the bot \`.env\`.`, ephemeral: true });
+    }
+    await interaction.reply({ content: `🤖 Scanning ${msgBuffer.length} buffered messages...`, ephemeral: true });
     await runAiScan(interaction.guild);
-    return interaction.editReply({ content: "✅ Scan complete. Check the alert channel." });
+    return interaction.editReply({ content: `✅ Scan complete. Check ${alertChannel}.` });
   }
 
   // /uptime
