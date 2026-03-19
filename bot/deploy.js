@@ -204,6 +204,11 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   new SlashCommandBuilder()
+    .setName("ai-scan")
+    .setDescription("Manually trigger an AI scan of recent server messages (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+  new SlashCommandBuilder()
     .setName("findlink")
     .setDescription("Find a FreeDNS domain that is unblocked by a specific school content filter")
     .addStringOption((o) =>
