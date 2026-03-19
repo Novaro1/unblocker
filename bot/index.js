@@ -17,7 +17,7 @@ import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LINKS_FILE         = join(__dirname, "links.json");
@@ -246,8 +246,8 @@ async function refreshLiveMessages() {
 
 const AI_ALERT_CHANNEL_ID = process.env.AI_ALERT_CHANNEL_ID;
 const AI_INTERVAL_MINUTES = parseInt(process.env.AI_INTERVAL_MINUTES ?? "30");
-const anthropic = process.env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
 // Ring buffer of last 300 messages
@@ -265,7 +265,7 @@ client.on(Events.MessageCreate, (message) => {
 });
 
 async function runAiScan(guild) {
-  if (!anthropic || !AI_ALERT_CHANNEL_ID) return;
+  if (!openai || !AI_ALERT_CHANNEL_ID) return;
   if (msgBuffer.length < 3) return;
 
   const transcript = msgBuffer.slice(-150).map(
@@ -274,20 +274,23 @@ async function runAiScan(guild) {
 
   let alerts;
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 1024,
-      thinking: { type: "adaptive" },
-      system: `You are a Discord server monitor for a school proxy service called Veil. Analyze recent server messages and identify things the server owner should act on. Be selective — only surface genuine issues, not normal chat. Return ONLY a valid JSON array (no markdown, no explanation). Each item: { "priority": "low"|"medium"|"high"|"urgent", "category": "unanswered_question"|"conflict"|"spam"|"feedback"|"bug_report"|"moderation_needed"|"other", "summary": "brief description", "channel": "#channel-name", "action": "recommended action" }. Return [] if nothing needs attention.`,
-      messages: [{
-        role: "user",
-        content: `Server: ${guild.name}\n\nRecent messages:\n${transcript}\n\nWhat needs attention?`,
-      }],
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `You are a Discord server monitor for a school proxy service called Veil. Analyze recent server messages and identify things the server owner should act on. Be selective — only surface genuine issues, not normal chat. Return ONLY a valid JSON object with key "alerts" containing an array. Each item: { "priority": "low"|"medium"|"high"|"urgent", "category": "unanswered_question"|"conflict"|"spam"|"feedback"|"bug_report"|"moderation_needed"|"other", "summary": "brief description", "channel": "#channel-name", "action": "recommended action" }. Return {"alerts":[]} if nothing needs attention.`,
+        },
+        {
+          role: "user",
+          content: `Server: ${guild.name}\n\nRecent messages:\n${transcript}\n\nWhat needs attention?`,
+        },
+      ],
     });
 
-    const text = response.content.find((b) => b.type === "text")?.text ?? "[]";
-    alerts = JSON.parse(text.replace(/```json?\n?/g, "").replace(/```/g, "").trim());
-    if (!Array.isArray(alerts)) alerts = [];
+    const parsed = JSON.parse(response.choices[0].message.content);
+    alerts = Array.isArray(parsed.alerts) ? parsed.alerts : [];
   } catch (err) {
     console.error("[AI Monitor] Error:", err.message);
     return;
@@ -337,7 +340,7 @@ client.once(Events.ClientReady, () => {
   // Refresh live embeds every 60 seconds
   setInterval(refreshLiveMessages, 60_000);
   // Start AI monitor if configured
-  if (anthropic && AI_ALERT_CHANNEL_ID) {
+  if (openai && AI_ALERT_CHANNEL_ID) {
     setInterval(() => {
       client.guilds.cache.forEach((guild) => runAiScan(guild));
     }, AI_INTERVAL_MINUTES * 60 * 1000);
@@ -1275,8 +1278,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /ai-scan
   if (commandName === "ai-scan") {
-    if (!anthropic || !AI_ALERT_CHANNEL_ID) {
-      return interaction.reply({ content: "AI monitor is not configured. Add `ANTHROPIC_API_KEY` and `AI_ALERT_CHANNEL_ID` to the bot `.env`.", ephemeral: true });
+    if (!openai || !AI_ALERT_CHANNEL_ID) {
+      return interaction.reply({ content: "AI monitor is not configured. Add `OPENAI_API_KEY` and `AI_ALERT_CHANNEL_ID` to the bot `.env`.", ephemeral: true });
     }
     await interaction.reply({ content: "🤖 Running AI scan...", ephemeral: true });
     await runAiScan(interaction.guild);
