@@ -404,6 +404,19 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* Quality badge */
+    #mp-quality {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      display: inline-block;
+      margin: 0 auto;
+    }
+    #mp-quality.full    { background: rgba(34,197,94,0.15); color: #22c55e; }
+    #mp-quality.preview { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    #mp-quality.loading { background: rgba(255,255,255,0.07); color: var(--sub); }
+
     /* Mobile */
     @media (max-width: 700px) {
       #mp-app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
@@ -470,9 +483,12 @@
       <input type="range" id="mp-vol" min="0" max="1" step="0.01" value="0.8">
     </div>
 
+    <div style="text-align:center">
+      <span id="mp-quality" class="loading">— select a song —</span>
+    </div>
     <div id="mp-preview-note">
-      ⓘ 30-second previews via Apple Music ·
-      <a href="#" id="mp-yt-link">Search YouTube</a>
+      ⓘ Full songs via YouTube ·
+      <a href="#" id="mp-yt-link">Open in YouTube</a>
     </div>
   </div>
 
@@ -616,11 +632,17 @@ elBarOuter.addEventListener("click", (e) => {
 elVol.addEventListener("input", () => { audio.volume = parseFloat(elVol.value); });
 
 // ── Load + play a track ───────────────────────────────────────────────────────
-function loadTrack(track) {
-  if (!track.preview) return;
+const elQuality = document.getElementById("mp-quality");
+
+function setQuality(state, label) {
+  elQuality.className = state;
+  elQuality.textContent = label;
+}
+
+async function loadTrack(track) {
   currentTrack = track;
 
-  // Update artwork
+  // Update artwork immediately
   if (track.artwork) {
     elArt.src = track.artwork;
     elArt.style.display = "";
@@ -632,40 +654,69 @@ function loadTrack(track) {
     elBackdrop.style.backgroundImage = "none";
   }
 
-  elTitle.textContent  = track.title;
-  elArtist.textContent = track.artist;
-  elAlbum.textContent  = track.album;
-  elTotal.textContent  = fmt(track.duration);
-  elTime.textContent   = "0:00";
+  elTitle.textContent   = track.title;
+  elArtist.textContent  = track.artist;
+  elAlbum.textContent   = track.album;
+  elTotal.textContent   = fmt(track.duration);
+  elTime.textContent    = "0:00";
   elBarFill.style.width = "0%";
   elBarThumb.style.left = "0%";
+  document.title        = `${track.title} — Veil Music`;
 
-  // YouTube search link
-  elYtLink.href = "javascript:void(0)";
-  elYtLink.onclick = () => {
-    const q = encodeURIComponent(`${track.title} ${track.artist}`);
-    const ytUrl = `https://music.youtube.com/search?q=${q}`;
-    // Navigate through proxy
-    const input = window.opener
-      ? null
-      : document.getElementById("sj-address");
-    // Just open a new tab with the proxy — user already has service worker
-    const w = window.open("about:blank", "_blank");
-    if (w) {
-      w.location.href = location.origin + "?q=" + encodeURIComponent(ytUrl);
-    }
-  };
-
-  // Update active highlight
+  // Highlight active song in list
   document.querySelectorAll(".mp-song").forEach(el => {
     el.classList.toggle("active", el.dataset.id === String(track.id));
     el.classList.remove("paused");
   });
 
-  audio.src = track.preview;
+  // Show loading state on play button
+  setQuality("loading", "⏳ Finding full song...");
+  elPlayPause.disabled = true;
+  audio.src = "";
+
+  try {
+    const q   = `${track.title} ${track.artist} official audio`;
+    const res = await fetch(`/api/music/yt-id?q=${encodeURIComponent(q)}`);
+    const { id } = await res.json();
+
+    if (id) {
+      track._ytId = id;
+      audio.src   = `/api/music/stream?id=${id}`;
+      setQuality("full", "● Full Song");
+
+      elYtLink.href    = "javascript:void(0)";
+      elYtLink.textContent = "Open in YouTube";
+      elYtLink.onclick = () => {
+        const w = window.open("about:blank", "_blank");
+        if (w) w.location.href = location.origin + "?q=" + encodeURIComponent(`https://www.youtube.com/watch?v=${id}`);
+      };
+    } else if (track.preview) {
+      audio.src = track.preview;
+      setQuality("preview", "● 30s Preview");
+      elYtLink.textContent = "Search YouTube";
+      elYtLink.onclick = () => {
+        const w = window.open("about:blank", "_blank");
+        if (w) w.location.href = location.origin + "?q=" + encodeURIComponent(`https://music.youtube.com/search?q=${encodeURIComponent(track.title + " " + track.artist)}`);
+      };
+    } else {
+      setQuality("preview", "✕ No audio available");
+      elPlayPause.disabled = false;
+      return;
+    }
+  } catch {
+    if (track.preview) {
+      audio.src = track.preview;
+      setQuality("preview", "● 30s Preview");
+    } else {
+      setQuality("preview", "✕ No audio available");
+      elPlayPause.disabled = false;
+      return;
+    }
+  }
+
+  elPlayPause.disabled = false;
   audio.currentTime = 0;
   audio.play().catch(() => {});
-  document.title = `${track.title} — Veil Music`;
 }
 
 // ── Playback controls ─────────────────────────────────────────────────────────
@@ -800,13 +851,11 @@ function makeSongEl(track, isActive = false, inQueue = false) {
     <div class="mp-song-dur">${fmt(track.duration)}</div>
   `;
 
-  if (hasPreview) {
-    el.addEventListener("click", (e) => {
-      if (e.target.closest(".mp-song-actions")) return;
-      if (inQueue) return; // handled by caller
-      addToQueue(track, true);
-    });
-  }
+  el.addEventListener("click", (e) => {
+    if (e.target.closest(".mp-song-actions")) return;
+    if (inQueue) return; // handled by caller
+    addToQueue(track, true);
+  });
 
   const addBtn = el.querySelector(".mp-add-btn");
   if (addBtn) {

@@ -9,6 +9,7 @@ import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
 import { baremuxPath } from "@mercuryworkshop/bare-mux/node";
+import ytdl from "@distube/ytdl-core";
 
 const publicPath        = fileURLToPath(new URL("../public/", import.meta.url));
 const tokensPath        = fileURLToPath(new URL("../tokens.json", import.meta.url));
@@ -244,6 +245,61 @@ fastify.get('/api/music/preview', async (req, reply) => {
     reply.send(Buffer.from(await upstream.arrayBuffer()));
   } catch {
     reply.status(502).send("Failed to fetch preview");
+  }
+});
+
+// YouTube video ID lookup via public Invidious instances (no API key needed)
+const INVIDIOUS_INSTANCES = [
+  "https://iv.ggtyler.dev",
+  "https://invidious.privacyredirect.com",
+  "https://invidious.nikkosphere.com",
+  "https://yt.drgnz.club",
+];
+fastify.get("/api/music/yt-id", async (req, reply) => {
+  const q = String(req.query.q || "").trim();
+  if (!q) return reply.send({ id: null });
+  for (const base of INVIDIOUS_INSTANCES) {
+    try {
+      const res = await fetch(
+        `${base}/api/v1/search?q=${encodeURIComponent(q)}&type=video&page=1`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      const video = Array.isArray(data) && data[0];
+      if (video?.videoId) return reply.send({ id: video.videoId });
+    } catch {}
+  }
+  return reply.send({ id: null });
+});
+
+// YouTube audio stream via ytdl-core — proxied so school filters can't block it
+fastify.get("/api/music/stream", async (req, reply) => {
+  const id = String(req.query.id || "");
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return reply.status(400).send("Invalid ID");
+  try {
+    const info    = await ytdl.getInfo(`https://www.youtube.com/watch?v=${id}`);
+    const formats = ytdl.filterFormats(info.formats, "audioonly");
+    const format  = formats
+      .filter(f => f.audioBitrate && f.url)
+      .sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
+    if (!format?.url) return reply.status(404).send("No audio format found");
+
+    const upHeaders = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" };
+    if (req.headers.range) upHeaders["Range"] = req.headers.range;
+
+    const upstream = await fetch(format.url, { headers: upHeaders });
+    reply.status(upstream.status);
+    reply.header("Content-Type",  upstream.headers.get("content-type") || "audio/webm");
+    reply.header("Accept-Ranges", "bytes");
+    const cl = upstream.headers.get("content-length");
+    const cr = upstream.headers.get("content-range");
+    if (cl) reply.header("Content-Length", cl);
+    if (cr) reply.header("Content-Range",  cr);
+    return reply.send(Buffer.from(await upstream.arrayBuffer()));
+  } catch (err) {
+    console.error("[music/stream]", err.message);
+    return reply.status(502).send("Stream failed");
   }
 });
 
