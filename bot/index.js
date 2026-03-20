@@ -1305,56 +1305,141 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "makelink") {
     const subdomain = interaction.options.getString("subdomain");
     const serverIp  = process.env.SERVER_IP || "";
-    const freednsUser = process.env.FREEDNS_USER || "";
-    const freednsPass = process.env.FREEDNS_PASS || "";
-
-    if (!serverIp)    return interaction.reply({ content: "❌ `SERVER_IP` is not set in the bot `.env`.", ephemeral: true });
-    if (!freednsUser) return interaction.reply({ content: "❌ `FREEDNS_USER` is not set in the bot `.env`.", ephemeral: true });
-    if (!freednsPass) return interaction.reply({ content: "❌ `FREEDNS_PASS` is not set in the bot `.env`.", ephemeral: true });
+    if (!serverIp) return interaction.reply({ content: "❌ `SERVER_IP` is not set in the bot `.env`.", ephemeral: true });
 
     await interaction.deferReply({ ephemeral: true });
 
-    try {
-      // ── 1. Log in to FreeDNS ────────────────────────────────────────────────
-      const loginRes = await fetch("https://freedns.afraid.org/zc.php?step=2", {
+    // ── helpers ───────────────────────────────────────────────────────────────
+    const FREEDNS_CREDS_FILE = join(__dirname, "../freedns-creds.json");
+
+    function randStr(len) {
+      const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+      return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    }
+
+    async function freednsLogin(user, pass) {
+      const res = await fetch("https://freedns.afraid.org/zc.php?step=2", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0" },
-        body: new URLSearchParams({ username: freednsUser, password: freednsPass, submit: "Login" }),
+        body: new URLSearchParams({ username: user, password: pass, submit: "Login" }),
         redirect: "manual",
       });
-      const cookies = (loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean))
+      const cookies = (res.headers.getSetCookie?.() ?? [res.headers.get("set-cookie")].filter(Boolean))
         .map(c => c.split(";")[0]).join("; ");
+      return cookies.includes("dns_cookie") ? cookies : null;
+    }
 
-      if (!cookies.includes("dns_cookie")) {
-        return interaction.editReply({ content: "❌ FreeDNS login failed. Check `FREEDNS_USER` / `FREEDNS_PASS` in `.env`." });
+    async function createFreeDNSAccount() {
+      // 1. Get a mail.tm address
+      const domainsRes = await fetch("https://api.mail.tm/domains").then(r => r.json());
+      const mailDomain = domainsRes?.["hydra:member"]?.[0]?.domain;
+      if (!mailDomain) throw new Error("mail.tm unavailable");
+
+      const mailUser = randStr(12);
+      const mailPass = randStr(16);
+      const email    = `${mailUser}@${mailDomain}`;
+
+      await fetch("https://api.mail.tm/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: email, password: mailPass }),
+      });
+
+      const tokenRes = await fetch("https://api.mail.tm/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: email, password: mailPass }),
+      }).then(r => r.json());
+      const mailToken = tokenRes.token;
+      if (!mailToken) throw new Error("Could not get mail.tm token");
+
+      // 2. Sign up on FreeDNS
+      const fdUser = "veil" + randStr(8);
+      const fdPass = randStr(20);
+
+      // Get signup captcha token
+      const signupPage = await fetch("https://freedns.afraid.org/signup/", {
+        headers: { "User-Agent": "Mozilla/5.0" },
+      }).then(r => r.text());
+      const captchaToken = signupPage.match(/name="captcha_token"\s+value="([^"]+)"/)?.[1] ?? "";
+
+      await fetch("https://freedns.afraid.org/signup/?step=2", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0" },
+        body: new URLSearchParams({
+          username: fdUser, password: fdPass, password2: fdPass,
+          email, email2: email,
+          firstname: randStr(6), lastname: randStr(8),
+          captcha_token: captchaToken,
+          action: "signup", send: "Send+activation+email",
+        }),
+      });
+
+      // 3. Poll mail.tm for activation email (up to 3 min)
+      let activationCode = null;
+      for (let i = 0; i < 36; i++) {
+        await new Promise(r => setTimeout(r, 5000));
+        const msgs = await fetch("https://api.mail.tm/messages", {
+          headers: { Authorization: `Bearer ${mailToken}` },
+        }).then(r => r.json());
+        const msg = msgs?.["hydra:member"]?.[0];
+        if (msg) {
+          const body = await fetch(`https://api.mail.tm/messages/${msg.id}`, {
+            headers: { Authorization: `Bearer ${mailToken}` },
+          }).then(r => r.json());
+          const text = body.text || body.html || "";
+          const match = text.match(/activate\.php\?([^"'\s<>]+)/);
+          if (match) { activationCode = match[1]; break; }
+        }
+      }
+      if (!activationCode) throw new Error("Activation email never arrived (timed out after 3 min)");
+
+      // 4. Activate
+      await fetch(`https://freedns.afraid.org/signup/activate.php?${activationCode}`, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+      });
+
+      return { username: fdUser, password: fdPass };
+    }
+
+    try {
+      // ── Load or auto-create FreeDNS credentials ───────────────────────────
+      let fdUser = process.env.FREEDNS_USER || "";
+      let fdPass = process.env.FREEDNS_PASS || "";
+
+      if (!fdUser || !fdPass) {
+        if (existsSync(FREEDNS_CREDS_FILE)) {
+          ({ username: fdUser, password: fdPass } = JSON.parse(readFileSync(FREEDNS_CREDS_FILE, "utf-8")));
+        }
       }
 
-      // ── 2. Pick a random public domain from FreeDNS registry (page 1-3) ────
+      let cookies = fdUser ? await freednsLogin(fdUser, fdPass) : null;
+
+      if (!cookies) {
+        await interaction.editReply({ content: "⏳ No FreeDNS account found — auto-creating one via mail.tm… (up to 3 min)" });
+        const creds = await createFreeDNSAccount();
+        writeFileSync(FREEDNS_CREDS_FILE, JSON.stringify(creds, null, 2));
+        fdUser = creds.username; fdPass = creds.password;
+        cookies = await freednsLogin(fdUser, fdPass);
+        if (!cookies) throw new Error("Newly created account failed to log in");
+        await interaction.editReply({ content: `✅ FreeDNS account created (\`${fdUser}\`). Creating subdomain…` });
+      }
+
+      // ── Pick a random public domain ───────────────────────────────────────
       const pageNum = Math.floor(Math.random() * 3) + 1;
       const regHtml = await fetch(`https://freedns.afraid.org/domain/registry/?page=${pageNum}&sort=2&q=`, {
         headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" },
       }).then(r => r.text());
 
-      const domainMatches = [...regHtml.matchAll(/<a href=\/subdomain\/edit\.php\?edit_domain_id=(\d+)>[\w.-]+<\/a>.+?<td>(public)<\/td>/g)];
+      const domainMatches = [...regHtml.matchAll(/edit_domain_id=(\d+)">([\w.-]+)<\/a>(?:(?!<tr).)*?<td>public<\/td>/gs)];
       if (!domainMatches.length) return interaction.editReply({ content: "❌ Could not fetch domain list from FreeDNS." });
 
-      // Pick a random domain from the results
       const pick = domainMatches[Math.floor(Math.random() * domainMatches.length)];
       const domainId = pick[1];
+      const domainName = pick[2];
 
-      // Get the actual domain name
-      const domainNameMatch = regHtml.match(new RegExp(`edit_domain_id=${domainId}">([\\.\\w-]+)</a>`));
-      const domainName = domainNameMatch?.[1] ?? "unknown";
-
-      // ── 3. Get captcha ──────────────────────────────────────────────────────
-      const captchaRes = await fetch("https://freedns.afraid.org/subdomain/edit.php", {
-        headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" },
-      });
-      const captchaHtml = await captchaRes.text();
-      const captchaToken = captchaHtml.match(/name="captcha_token"\s+value="([^"]+)"/)?.[1] ?? "";
-
-      // ── 4. Create the subdomain ─────────────────────────────────────────────
-      const sub = subdomain || `veil${Math.floor(Math.random() * 9000) + 1000}`;
+      // ── Create subdomain ──────────────────────────────────────────────────
+      const sub = subdomain || `veil${randStr(6)}`;
       const createRes = await fetch("https://freedns.afraid.org/subdomain/save.php?step=2", {
         method: "POST",
         headers: {
@@ -1364,38 +1449,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
           Referer: "https://freedns.afraid.org/subdomain/edit.php",
         },
         body: new URLSearchParams({
-          type: "A",
-          subdomain: sub,
-          domain_id: domainId,
-          address: serverIp,
-          send: "Save!",
-          captcha_token: captchaToken,
-          skip_duplicate: "0",
+          type: "A", subdomain: sub, domain_id: domainId,
+          address: serverIp, send: "Save!", skip_duplicate: "0",
         }),
       });
       const createHtml = await createRes.text();
-
       const fullDomain = `${sub}.${domainName}`;
-      if (createHtml.includes("has been saved") || createHtml.includes("Successfully") || createRes.url.includes("subdomain")) {
-        const embed = new EmbedBuilder()
-          .setColor(0x57F287)
-          .setTitle("✅ Link Created")
-          .addFields(
-            { name: "URL", value: `https://${fullDomain}` },
-            { name: "Points to", value: serverIp },
-          )
-          .setFooter({ text: "DNS may take 1–5 minutes to propagate" })
-          .setTimestamp();
-        return interaction.editReply({ embeds: [embed] });
-      } else {
-        // Might have failed (captcha, duplicate, etc.) — still show the domain
-        const embed = new EmbedBuilder()
-          .setColor(0xFEE75C)
-          .setTitle("⚠️ Link May Have Been Created")
-          .setDescription(`Try: https://${fullDomain}\n\nIf it doesn't work, log into [FreeDNS](https://freedns.afraid.org) to verify.`)
-          .setTimestamp();
-        return interaction.editReply({ embeds: [embed] });
-      }
+
+      const success = createHtml.includes("has been saved") || createHtml.includes("Successfully") ||
+                      !createHtml.includes("error") && createRes.redirected;
+
+      const embed = new EmbedBuilder()
+        .setColor(success ? 0x57F287 : 0xFEE75C)
+        .setTitle(success ? "✅ Link Created" : "⚠️ Link May Have Been Created")
+        .addFields(
+          { name: "URL", value: `https://${fullDomain}` },
+          { name: "Points to", value: serverIp },
+          { name: "Account", value: `\`${fdUser}\`` },
+        )
+        .setFooter({ text: "DNS may take 1–5 minutes to propagate" })
+        .setTimestamp();
+      return interaction.editReply({ embeds: [embed] });
+
     } catch (e) {
       console.error("[makelink] error:", e);
       return interaction.editReply({ content: `❌ Error: ${e.message}` });
