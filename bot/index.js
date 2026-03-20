@@ -17,6 +17,8 @@ import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
+import { execFile } from "child_process";
+import { tmpdir } from "os";
 import OpenAI from "openai";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -1297,6 +1299,59 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await interaction.reply({ content: `🤖 Scanning ${msgBuffer.length} buffered messages...`, ephemeral: true });
     await runAiScan(interaction.guild);
     return interaction.editReply({ content: `✅ Scan complete. Check ${alertChannel}.` });
+  }
+
+  // /makelink
+  if (commandName === "makelink") {
+    const count      = interaction.options.getInteger("number") ?? 1;
+    const subdomains = interaction.options.getString("subdomains") ?? null;
+    const serverIp   = process.env.SERVER_IP || "";
+
+    if (!serverIp) {
+      return interaction.reply({ content: "❌ `SERVER_IP` is not set in the bot `.env`.", ephemeral: true });
+    }
+
+    await interaction.reply({ content: `⏳ Generating ${count} link${count !== 1 ? "s" : ""} via domain92… this may take a minute.`, ephemeral: true });
+
+    const outfile = join(tmpdir(), `domain92-${Date.now()}.txt`);
+    const args = [
+      "-m", "domain92",
+      "--number", String(count),
+      "--ip", serverIp,
+      "--auto",
+      "--silent",
+      "--webhook", "none",
+      "--outfile", outfile,
+    ];
+    if (subdomains) args.push("--subdomains", subdomains);
+
+    const result = await new Promise((resolve) => {
+      execFile("python3", args, { timeout: 120000 }, (err, stdout, stderr) => {
+        resolve({ err, stdout, stderr });
+      });
+    });
+
+    let domains = [];
+    try {
+      const { readFileSync: rfs, existsSync: efs } = await import("fs");
+      if (efs(outfile)) {
+        domains = rfs(outfile, "utf-8").split("\n").map(d => d.trim()).filter(Boolean);
+      }
+    } catch {}
+
+    if (!domains.length) {
+      console.error("[makelink] domain92 error:", result.stderr || result.err?.message);
+      return interaction.editReply({ content: `❌ domain92 failed to create any domains. Make sure \`python3 -m domain92\` and \`tesseract\` are installed on the server.` });
+    }
+
+    const lines = domains.map(d => `• \`${d}\``).join("\n");
+    const embed = new EmbedBuilder()
+      .setColor(0x57F287)
+      .setTitle(`✅ ${domains.length} New Link${domains.length !== 1 ? "s" : ""} Created`)
+      .setDescription(lines)
+      .setFooter({ text: "Add an A record pointing to your server IP in FreeDNS to activate" })
+      .setTimestamp();
+    return interaction.editReply({ embeds: [embed] });
   }
 
   // /uptime

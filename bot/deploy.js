@@ -204,6 +204,18 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   new SlashCommandBuilder()
+    .setName("makelink")
+    .setDescription("Auto-generate new FreeDNS subdomain links using domain92 (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addIntegerOption((o) =>
+      o.setName("number").setDescription("How many links to create (default 1, max 5)").setRequired(false)
+        .setMinValue(1).setMaxValue(5)
+    )
+    .addStringOption((o) =>
+      o.setName("subdomains").setDescription("Custom subdomain names, comma-separated (e.g. veil,proxy,access)").setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
     .setName("ai-scan")
     .setDescription("Manually trigger an AI scan of recent server messages (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
