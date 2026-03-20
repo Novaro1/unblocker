@@ -487,7 +487,7 @@
       <span id="mp-quality" class="loading">— select a song —</span>
     </div>
     <div id="mp-preview-note">
-      ⓘ Full songs via YouTube ·
+      ⓘ Powered by YouTube ·
       <a href="#" id="mp-yt-link">Open in YouTube</a>
     </div>
   </div>
@@ -642,7 +642,7 @@ function setQuality(state, label) {
 async function loadTrack(track) {
   currentTrack = track;
 
-  // Update artwork immediately
+  // Update UI immediately
   if (track.artwork) {
     elArt.src = track.artwork;
     elArt.style.display = "";
@@ -663,58 +663,32 @@ async function loadTrack(track) {
   elBarThumb.style.left = "0%";
   document.title        = `${track.title} — Veil Music`;
 
-  // Highlight active song in list
   document.querySelectorAll(".mp-song").forEach(el => {
     el.classList.toggle("active", el.dataset.id === String(track.id));
     el.classList.remove("paused");
   });
 
-  // Show loading state on play button
-  setQuality("loading", "⏳ Finding full song...");
+  setQuality("loading", "⏳ Loading...");
   elPlayPause.disabled = true;
-  audio.src = "";
+  audio.src = `/api/music/stream?id=${track.id}`;
 
-  try {
-    const q   = `${track.title} ${track.artist} official audio`;
-    const res = await fetch(`/api/music/yt-id?q=${encodeURIComponent(q)}`);
-    const { id } = await res.json();
+  elYtLink.textContent = "Open in YouTube";
+  elYtLink.onclick = () => {
+    const w = window.open("about:blank", "_blank");
+    if (w) w.location.href = location.origin + "?q=" + encodeURIComponent(`https://www.youtube.com/watch?v=${track.id}`);
+  };
 
-    if (id) {
-      track._ytId = id;
-      audio.src   = `/api/music/stream?id=${id}`;
-      setQuality("full", "● Full Song");
+  audio.oncanplay = () => {
+    setQuality("full", "● Full Song");
+    elPlayPause.disabled = false;
+    audio.oncanplay = null;
+  };
+  audio.onerror = () => {
+    setQuality("preview", "✕ Failed to load");
+    elPlayPause.disabled = false;
+    audio.onerror = null;
+  };
 
-      elYtLink.href    = "javascript:void(0)";
-      elYtLink.textContent = "Open in YouTube";
-      elYtLink.onclick = () => {
-        const w = window.open("about:blank", "_blank");
-        if (w) w.location.href = location.origin + "?q=" + encodeURIComponent(`https://www.youtube.com/watch?v=${id}`);
-      };
-    } else if (track.preview) {
-      audio.src = track.preview;
-      setQuality("preview", "● 30s Preview");
-      elYtLink.textContent = "Search YouTube";
-      elYtLink.onclick = () => {
-        const w = window.open("about:blank", "_blank");
-        if (w) w.location.href = location.origin + "?q=" + encodeURIComponent(`https://music.youtube.com/search?q=${encodeURIComponent(track.title + " " + track.artist)}`);
-      };
-    } else {
-      setQuality("preview", "✕ No audio available");
-      elPlayPause.disabled = false;
-      return;
-    }
-  } catch {
-    if (track.preview) {
-      audio.src = track.preview;
-      setQuality("preview", "● 30s Preview");
-    } else {
-      setQuality("preview", "✕ No audio available");
-      elPlayPause.disabled = false;
-      return;
-    }
-  }
-
-  elPlayPause.disabled = false;
   audio.currentTime = 0;
   audio.play().catch(() => {});
 }
@@ -841,7 +815,6 @@ function makeSongEl(track, isActive = false, inQueue = false) {
     <div class="mp-song-info">
       <div class="mp-song-title">${esc(track.title)}</div>
       <div class="mp-song-artist">${esc(track.artist)}${track.album ? ` · ${esc(track.album)}` : ""}</div>
-      ${!hasPreview ? '<span class="mp-no-preview">no preview</span>' : ""}
     </div>
     <div class="mp-song-actions">
       ${inQueue

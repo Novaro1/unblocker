@@ -180,97 +180,59 @@ fastify.get('/api/beta-features', (_req, reply) => {
   return reply.send(result);
 });
 
-// Music search — proxies iTunes API and rewrites CDN URLs to go through our server
-fastify.get('/api/music/search', async (req, reply) => {
-  const q     = String(req.query.q || "").trim();
-  const limit = Math.min(parseInt(req.query.limit) || 24, 50);
-  if (!q) return reply.send([]);
-  try {
-    const res  = await fetch(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=${limit}&country=US`
-    );
-    const data = await res.json();
-    reply.send((data.results || []).map(t => {
-      const rawArt     = (t.artworkUrl100 || "").replace("100x100bb", "600x600bb");
-      const rawPreview = t.previewUrl || null;
-      return {
-        id:       t.trackId,
-        title:    t.trackName      || "Unknown",
-        artist:   t.artistName     || "Unknown",
-        album:    t.collectionName || "",
-        artwork:  rawArt     ? `/api/music/artwork?url=${encodeURIComponent(rawArt)}`     : "",
-        preview:  rawPreview ? `/api/music/preview?url=${encodeURIComponent(rawPreview)}` : null,
-        duration: t.trackTimeMillis || 30000,
-      };
-    }));
-  } catch {
-    reply.status(500).send([]);
-  }
-});
-
-// Music artwork proxy — fetches from mzstatic.com through our server
-fastify.get('/api/music/artwork', async (req, reply) => {
-  const url = String(req.query.url || "");
-  if (!url.includes("mzstatic.com") && !url.includes("itunes.apple.com")) {
-    return reply.status(400).send("Invalid URL");
-  }
-  try {
-    const upstream = await fetch(url);
-    reply
-      .header("Content-Type",  upstream.headers.get("content-type") || "image/jpeg")
-      .header("Cache-Control", "public, max-age=86400")
-      .send(Buffer.from(await upstream.arrayBuffer()));
-  } catch {
-    reply.status(502).send("Failed to fetch artwork");
-  }
-});
-
-// Music preview proxy — streams iTunes audio through our server with range support
-fastify.get('/api/music/preview', async (req, reply) => {
-  const url = String(req.query.url || "");
-  if (!url.includes("audio-ssl.itunes.apple.com") && !url.includes("itunes.apple.com")) {
-    return reply.status(400).send("Invalid URL");
-  }
-  try {
-    const headers = {};
-    if (req.headers.range) headers["Range"] = req.headers.range;
-    const upstream = await fetch(url, { headers });
-    reply.status(upstream.status);
-    reply.header("Content-Type",  upstream.headers.get("content-type") || "audio/mpeg");
-    reply.header("Accept-Ranges", "bytes");
-    const ct = upstream.headers.get("content-length");
-    const cr = upstream.headers.get("content-range");
-    if (ct) reply.header("Content-Length", ct);
-    if (cr) reply.header("Content-Range",  cr);
-    reply.send(Buffer.from(await upstream.arrayBuffer()));
-  } catch {
-    reply.status(502).send("Failed to fetch preview");
-  }
-});
-
-// YouTube video ID lookup via public Invidious instances (no API key needed)
+// Music: search YouTube via Invidious (no API key needed)
 const INVIDIOUS_INSTANCES = [
   "https://iv.ggtyler.dev",
   "https://invidious.privacyredirect.com",
   "https://invidious.nikkosphere.com",
   "https://yt.drgnz.club",
 ];
-fastify.get("/api/music/yt-id", async (req, reply) => {
-  const q = String(req.query.q || "").trim();
-  if (!q) return reply.send({ id: null });
+
+async function invidiousSearch(q, limit) {
   for (const base of INVIDIOUS_INSTANCES) {
     try {
       const res = await fetch(
         `${base}/api/v1/search?q=${encodeURIComponent(q)}&type=video&page=1`,
-        { signal: AbortSignal.timeout(5000) }
+        { signal: AbortSignal.timeout(6000) }
       );
       if (!res.ok) continue;
       const data = await res.json();
-      const video = Array.isArray(data) && data[0];
-      if (video?.videoId) return reply.send({ id: video.videoId });
+      if (!Array.isArray(data)) continue;
+      return data.slice(0, limit).map(v => ({
+        id:       v.videoId,
+        title:    v.title       || "Unknown",
+        artist:   v.author      || "Unknown",
+        album:    "",
+        artwork:  `/api/music/thumb?id=${v.videoId}`,
+        duration: (v.lengthSeconds || 0) * 1000,
+      }));
     } catch {}
   }
-  return reply.send({ id: null });
+  return [];
+}
+
+fastify.get("/api/music/search", async (req, reply) => {
+  const q     = String(req.query.q || "").trim();
+  const limit = Math.min(parseInt(req.query.limit) || 24, 50);
+  if (!q) return reply.send([]);
+  const results = await invidiousSearch(q, limit);
+  reply.send(results);
+});
+
+// YouTube thumbnail proxy — serves via our domain to bypass school filters
+fastify.get("/api/music/thumb", async (req, reply) => {
+  const id = String(req.query.id || "");
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return reply.status(400).send("Invalid ID");
+  try {
+    const url      = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+    const upstream = await fetch(url);
+    reply
+      .header("Content-Type",  upstream.headers.get("content-type") || "image/jpeg")
+      .header("Cache-Control", "public, max-age=86400")
+      .send(Buffer.from(await upstream.arrayBuffer()));
+  } catch {
+    reply.status(502).send("Failed to fetch thumbnail");
+  }
 });
 
 // YouTube audio stream via ytdl-core — proxied so school filters can't block it
