@@ -205,14 +205,10 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("makelink")
-    .setDescription("Auto-generate new FreeDNS subdomain links using domain92 (Staff only)")
+    .setDescription("Auto-create a FreeDNS subdomain pointing to the proxy (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
-    .addIntegerOption((o) =>
-      o.setName("number").setDescription("How many links to create (default 1, max 5)").setRequired(false)
-        .setMinValue(1).setMaxValue(5)
-    )
     .addStringOption((o) =>
-      o.setName("subdomains").setDescription("Custom subdomain names, comma-separated (e.g. veil,proxy,access)").setRequired(false)
+      o.setName("subdomain").setDescription("Custom subdomain name (e.g. veil2024) — random if omitted").setRequired(false)
     ),
 
   new SlashCommandBuilder()

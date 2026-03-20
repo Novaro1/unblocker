@@ -1303,57 +1303,103 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /makelink
   if (commandName === "makelink") {
-    const count      = interaction.options.getInteger("number") ?? 1;
-    const subdomains = interaction.options.getString("subdomains") ?? null;
-    const serverIp   = process.env.SERVER_IP || "";
+    const subdomain = interaction.options.getString("subdomain");
+    const serverIp  = process.env.SERVER_IP || "";
+    const freednsUser = process.env.FREEDNS_USER || "";
+    const freednsPass = process.env.FREEDNS_PASS || "";
 
-    if (!serverIp) {
-      return interaction.reply({ content: "❌ `SERVER_IP` is not set in the bot `.env`.", ephemeral: true });
-    }
+    if (!serverIp)    return interaction.reply({ content: "❌ `SERVER_IP` is not set in the bot `.env`.", ephemeral: true });
+    if (!freednsUser) return interaction.reply({ content: "❌ `FREEDNS_USER` is not set in the bot `.env`.", ephemeral: true });
+    if (!freednsPass) return interaction.reply({ content: "❌ `FREEDNS_PASS` is not set in the bot `.env`.", ephemeral: true });
 
-    await interaction.reply({ content: `⏳ Generating ${count} link${count !== 1 ? "s" : ""} via domain92… this may take a minute.`, ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
 
-    const outfile = join(tmpdir(), `domain92-${Date.now()}.txt`);
-    const args = [
-      "-m", "domain92",
-      "--number", String(count),
-      "--ip", serverIp,
-      "--auto",
-      "--silent",
-      "--webhook", "none",
-      "--pages", "1-5",
-      "--outfile", outfile,
-    ];
-    if (subdomains) args.push("--subdomains", subdomains);
-
-    const env = { ...process.env, PATH: `${process.env.PATH}:/home/ubuntu/.local/bin` };
-    const result = await new Promise((resolve) => {
-      execFile("python3", args, { timeout: 120000, env }, (err, stdout, stderr) => {
-        resolve({ err, stdout, stderr });
-      });
-    });
-
-    let domains = [];
     try {
-      const { readFileSync: rfs, existsSync: efs } = await import("fs");
-      if (efs(outfile)) {
-        domains = rfs(outfile, "utf-8").split("\n").map(d => d.trim()).filter(Boolean);
+      // ── 1. Log in to FreeDNS ────────────────────────────────────────────────
+      const loginRes = await fetch("https://freedns.afraid.org/zc.php?step=2", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0" },
+        body: new URLSearchParams({ username: freednsUser, password: freednsPass, submit: "Login" }),
+        redirect: "manual",
+      });
+      const cookies = (loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean))
+        .map(c => c.split(";")[0]).join("; ");
+
+      if (!cookies.includes("dns_cookie")) {
+        return interaction.editReply({ content: "❌ FreeDNS login failed. Check `FREEDNS_USER` / `FREEDNS_PASS` in `.env`." });
       }
-    } catch {}
 
-    if (!domains.length) {
-      console.error("[makelink] domain92 error:", result.stderr || result.err?.message);
-      return interaction.editReply({ content: `❌ domain92 failed to create any domains. Make sure \`python3 -m domain92\` and \`tesseract\` are installed on the server.` });
+      // ── 2. Pick a random public domain from FreeDNS registry (page 1-3) ────
+      const pageNum = Math.floor(Math.random() * 3) + 1;
+      const regHtml = await fetch(`https://freedns.afraid.org/domain/registry/?page=${pageNum}&sort=2&q=`, {
+        headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" },
+      }).then(r => r.text());
+
+      const domainMatches = [...regHtml.matchAll(/<a href=\/subdomain\/edit\.php\?edit_domain_id=(\d+)>[\w.-]+<\/a>.+?<td>(public)<\/td>/g)];
+      if (!domainMatches.length) return interaction.editReply({ content: "❌ Could not fetch domain list from FreeDNS." });
+
+      // Pick a random domain from the results
+      const pick = domainMatches[Math.floor(Math.random() * domainMatches.length)];
+      const domainId = pick[1];
+
+      // Get the actual domain name
+      const domainNameMatch = regHtml.match(new RegExp(`edit_domain_id=${domainId}">([\\.\\w-]+)</a>`));
+      const domainName = domainNameMatch?.[1] ?? "unknown";
+
+      // ── 3. Get captcha ──────────────────────────────────────────────────────
+      const captchaRes = await fetch("https://freedns.afraid.org/subdomain/edit.php", {
+        headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" },
+      });
+      const captchaHtml = await captchaRes.text();
+      const captchaToken = captchaHtml.match(/name="captcha_token"\s+value="([^"]+)"/)?.[1] ?? "";
+
+      // ── 4. Create the subdomain ─────────────────────────────────────────────
+      const sub = subdomain || `veil${Math.floor(Math.random() * 9000) + 1000}`;
+      const createRes = await fetch("https://freedns.afraid.org/subdomain/save.php?step=2", {
+        method: "POST",
+        headers: {
+          Cookie: cookies,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0",
+          Referer: "https://freedns.afraid.org/subdomain/edit.php",
+        },
+        body: new URLSearchParams({
+          type: "A",
+          subdomain: sub,
+          domain_id: domainId,
+          address: serverIp,
+          send: "Save!",
+          captcha_token: captchaToken,
+          skip_duplicate: "0",
+        }),
+      });
+      const createHtml = await createRes.text();
+
+      const fullDomain = `${sub}.${domainName}`;
+      if (createHtml.includes("has been saved") || createHtml.includes("Successfully") || createRes.url.includes("subdomain")) {
+        const embed = new EmbedBuilder()
+          .setColor(0x57F287)
+          .setTitle("✅ Link Created")
+          .addFields(
+            { name: "URL", value: `https://${fullDomain}` },
+            { name: "Points to", value: serverIp },
+          )
+          .setFooter({ text: "DNS may take 1–5 minutes to propagate" })
+          .setTimestamp();
+        return interaction.editReply({ embeds: [embed] });
+      } else {
+        // Might have failed (captcha, duplicate, etc.) — still show the domain
+        const embed = new EmbedBuilder()
+          .setColor(0xFEE75C)
+          .setTitle("⚠️ Link May Have Been Created")
+          .setDescription(`Try: https://${fullDomain}\n\nIf it doesn't work, log into [FreeDNS](https://freedns.afraid.org) to verify.`)
+          .setTimestamp();
+        return interaction.editReply({ embeds: [embed] });
+      }
+    } catch (e) {
+      console.error("[makelink] error:", e);
+      return interaction.editReply({ content: `❌ Error: ${e.message}` });
     }
-
-    const lines = domains.map(d => `• \`${d}\``).join("\n");
-    const embed = new EmbedBuilder()
-      .setColor(0x57F287)
-      .setTitle(`✅ ${domains.length} New Link${domains.length !== 1 ? "s" : ""} Created`)
-      .setDescription(lines)
-      .setFooter({ text: "Add an A record pointing to your server IP in FreeDNS to activate" })
-      .setTimestamp();
-    return interaction.editReply({ embeds: [embed] });
   }
 
   // /uptime
