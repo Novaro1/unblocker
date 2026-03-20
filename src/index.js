@@ -179,7 +179,7 @@ fastify.get('/api/beta-features', (_req, reply) => {
   return reply.send(result);
 });
 
-// Music search — proxies iTunes Search API to avoid school filters blocking itunes.apple.com
+// Music search — proxies iTunes API and rewrites CDN URLs to go through our server
 fastify.get('/api/music/search', async (req, reply) => {
   const q     = String(req.query.q || "").trim();
   const limit = Math.min(parseInt(req.query.limit) || 24, 50);
@@ -189,17 +189,61 @@ fastify.get('/api/music/search', async (req, reply) => {
       `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=${limit}&country=US`
     );
     const data = await res.json();
-    reply.send((data.results || []).map(t => ({
-      id:       t.trackId,
-      title:    t.trackName    || "Unknown",
-      artist:   t.artistName   || "Unknown",
-      album:    t.collectionName || "",
-      artwork:  (t.artworkUrl100 || "").replace("100x100bb", "600x600bb"),
-      preview:  t.previewUrl   || null,
-      duration: t.trackTimeMillis || 30000,
-    })));
+    reply.send((data.results || []).map(t => {
+      const rawArt     = (t.artworkUrl100 || "").replace("100x100bb", "600x600bb");
+      const rawPreview = t.previewUrl || null;
+      return {
+        id:       t.trackId,
+        title:    t.trackName      || "Unknown",
+        artist:   t.artistName     || "Unknown",
+        album:    t.collectionName || "",
+        artwork:  rawArt     ? `/api/music/artwork?url=${encodeURIComponent(rawArt)}`     : "",
+        preview:  rawPreview ? `/api/music/preview?url=${encodeURIComponent(rawPreview)}` : null,
+        duration: t.trackTimeMillis || 30000,
+      };
+    }));
   } catch {
     reply.status(500).send([]);
+  }
+});
+
+// Music artwork proxy — fetches from mzstatic.com through our server
+fastify.get('/api/music/artwork', async (req, reply) => {
+  const url = String(req.query.url || "");
+  if (!url.includes("mzstatic.com") && !url.includes("itunes.apple.com")) {
+    return reply.status(400).send("Invalid URL");
+  }
+  try {
+    const upstream = await fetch(url);
+    reply
+      .header("Content-Type",  upstream.headers.get("content-type") || "image/jpeg")
+      .header("Cache-Control", "public, max-age=86400")
+      .send(Buffer.from(await upstream.arrayBuffer()));
+  } catch {
+    reply.status(502).send("Failed to fetch artwork");
+  }
+});
+
+// Music preview proxy — streams iTunes audio through our server with range support
+fastify.get('/api/music/preview', async (req, reply) => {
+  const url = String(req.query.url || "");
+  if (!url.includes("audio-ssl.itunes.apple.com") && !url.includes("itunes.apple.com")) {
+    return reply.status(400).send("Invalid URL");
+  }
+  try {
+    const headers = {};
+    if (req.headers.range) headers["Range"] = req.headers.range;
+    const upstream = await fetch(url, { headers });
+    reply.status(upstream.status);
+    reply.header("Content-Type",  upstream.headers.get("content-type") || "audio/mpeg");
+    reply.header("Accept-Ranges", "bytes");
+    const ct = upstream.headers.get("content-length");
+    const cr = upstream.headers.get("content-range");
+    if (ct) reply.header("Content-Length", ct);
+    if (cr) reply.header("Content-Range",  cr);
+    reply.send(Buffer.from(await upstream.arrayBuffer()));
+  } catch {
+    reply.status(502).send("Failed to fetch preview");
   }
 });
 
