@@ -35,6 +35,16 @@
     { name: "Chess",          url: "https://www.chess.com/play/online",                    emoji: "♟",  hue: 45  },
   ];
 
+  // ── Music apps ────────────────────────────────────────────────────────────
+  const MUSIC_APPS = [
+    { name: "Spotify",        emoji: "🎵", hue: 130, url: "https://open.spotify.com" },
+    { name: "YouTube Music",  emoji: "🎶", hue: 0,   url: "https://music.youtube.com" },
+    { name: "SoundCloud",     emoji: "🎧", hue: 25,  url: "https://soundcloud.com" },
+    { name: "Pandora",        emoji: "📻", hue: 210, url: "https://www.pandora.com" },
+    { name: "Apple Music",    emoji: "🍎", hue: 350, url: "https://music.apple.com" },
+    { name: "Amazon Music",   emoji: "🎤", hue: 200, url: "https://music.amazon.com" },
+  ];
+
   // ── Local (self-hosted) games ──────────────────────────────────────────────
   const LOCAL_GAMES = [
     { name: "Time Shooter 2",        emoji: "🔫", hue: 10,  url: "/games/200.html" },
@@ -149,6 +159,13 @@
     const grid = document.getElementById("gs-grid");
     if (!grid) return;
     grid.innerHTML = "";
+
+    // ── Music header + tiles ───────────────────────────────────────────────
+    const musicHeader = document.createElement("div");
+    musicHeader.className = "gs-section-header";
+    musicHeader.textContent = "🎵 Music";
+    grid.appendChild(musicHeader);
+    MUSIC_APPS.forEach(g => grid.appendChild(makeTile(g, false)));
 
     // ── Local games header + tiles ─────────────────────────────────────────
     const localHeader = document.createElement("div");
