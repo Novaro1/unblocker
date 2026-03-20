@@ -220,12 +220,18 @@ fastify.get("/api/music/thumb", async (req, reply) => {
 });
 
 // YouTube audio stream via yt-dlp — proxied so school filters can't block it
+const YTDLP_COOKIES = fileURLToPath(new URL("../youtube-cookies.txt", import.meta.url));
+
 function ytdlpGetUrl(id) {
   return new Promise((resolve, reject) => {
-    execFile("yt-dlp", [
+    const args = [
       "--no-playlist", "-f", "bestaudio[ext=webm]/bestaudio/best",
-      "--get-url", `https://www.youtube.com/watch?v=${id}`,
-    ], { timeout: 15000 }, (err, stdout) => {
+      "--get-url",
+      "--js-runtimes", "node:/usr/bin/node",
+    ];
+    if (existsSync(YTDLP_COOKIES)) args.push("--cookies", YTDLP_COOKIES);
+    args.push(`https://www.youtube.com/watch?v=${id}`);
+    execFile("yt-dlp", args, { timeout: 20000 }, (err, stdout) => {
       if (err) return reject(err);
       const url = stdout.trim().split("\n")[0];
       if (!url) return reject(new Error("No URL returned"));
