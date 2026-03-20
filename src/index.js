@@ -179,6 +179,30 @@ fastify.get('/api/beta-features', (_req, reply) => {
   return reply.send(result);
 });
 
+// Music search — proxies iTunes Search API to avoid school filters blocking itunes.apple.com
+fastify.get('/api/music/search', async (req, reply) => {
+  const q     = String(req.query.q || "").trim();
+  const limit = Math.min(parseInt(req.query.limit) || 24, 50);
+  if (!q) return reply.send([]);
+  try {
+    const res  = await fetch(
+      `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=${limit}&country=US`
+    );
+    const data = await res.json();
+    reply.send((data.results || []).map(t => ({
+      id:       t.trackId,
+      title:    t.trackName    || "Unknown",
+      artist:   t.artistName   || "Unknown",
+      album:    t.collectionName || "",
+      artwork:  (t.artworkUrl100 || "").replace("100x100bb", "600x600bb"),
+      preview:  t.previewUrl   || null,
+      duration: t.trackTimeMillis || 30000,
+    })));
+  } catch {
+    reply.status(500).send([]);
+  }
+});
+
 // GitHub push webhook → Discord announcements
 const GH_WEBHOOK_SECRET   = process.env.GH_WEBHOOK_SECRET   || "";
 const DISCORD_TOKEN        = process.env.DISCORD_TOKEN        || "";
