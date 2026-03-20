@@ -9,8 +9,8 @@ import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
 import { baremuxPath } from "@mercuryworkshop/bare-mux/node";
-import ytdl from "@distube/ytdl-core";
 import { YouTube } from "youtube-sr";
+import { execFile } from "node:child_process";
 
 const publicPath        = fileURLToPath(new URL("../public/", import.meta.url));
 const tokensPath        = fileURLToPath(new URL("../tokens.json", import.meta.url));
@@ -219,22 +219,31 @@ fastify.get("/api/music/thumb", async (req, reply) => {
   }
 });
 
-// YouTube audio stream via ytdl-core — proxied so school filters can't block it
+// YouTube audio stream via yt-dlp — proxied so school filters can't block it
+function ytdlpGetUrl(id) {
+  return new Promise((resolve, reject) => {
+    execFile("yt-dlp", [
+      "--no-playlist", "-f", "bestaudio[ext=webm]/bestaudio/best",
+      "--get-url", `https://www.youtube.com/watch?v=${id}`,
+    ], { timeout: 15000 }, (err, stdout) => {
+      if (err) return reject(err);
+      const url = stdout.trim().split("\n")[0];
+      if (!url) return reject(new Error("No URL returned"));
+      resolve(url);
+    });
+  });
+}
+
 fastify.get("/api/music/stream", async (req, reply) => {
   const id = String(req.query.id || "");
   if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return reply.status(400).send("Invalid ID");
   try {
-    const info    = await ytdl.getInfo(`https://www.youtube.com/watch?v=${id}`);
-    const formats = ytdl.filterFormats(info.formats, "audioonly");
-    const format  = formats
-      .filter(f => f.audioBitrate && f.url)
-      .sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
-    if (!format?.url) return reply.status(404).send("No audio format found");
+    const audioUrl = await ytdlpGetUrl(id);
 
     const upHeaders = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" };
     if (req.headers.range) upHeaders["Range"] = req.headers.range;
 
-    const upstream = await fetch(format.url, { headers: upHeaders });
+    const upstream = await fetch(audioUrl, { headers: upHeaders });
     reply.status(upstream.status);
     reply.header("Content-Type",  upstream.headers.get("content-type") || "audio/webm");
     reply.header("Accept-Ranges", "bytes");
