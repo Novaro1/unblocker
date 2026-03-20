@@ -10,6 +10,7 @@ import fastifyStatic from "@fastify/static";
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
 import { baremuxPath } from "@mercuryworkshop/bare-mux/node";
 import ytdl from "@distube/ytdl-core";
+import { YouTube } from "youtube-sr";
 
 const publicPath        = fileURLToPath(new URL("../public/", import.meta.url));
 const tokensPath        = fileURLToPath(new URL("../tokens.json", import.meta.url));
@@ -180,43 +181,26 @@ fastify.get('/api/beta-features', (_req, reply) => {
   return reply.send(result);
 });
 
-// Music: search YouTube via Invidious (no API key needed)
-const INVIDIOUS_INSTANCES = [
-  "https://iv.ggtyler.dev",
-  "https://invidious.privacyredirect.com",
-  "https://invidious.nikkosphere.com",
-  "https://yt.drgnz.club",
-];
-
-async function invidiousSearch(q, limit) {
-  for (const base of INVIDIOUS_INSTANCES) {
-    try {
-      const res = await fetch(
-        `${base}/api/v1/search?q=${encodeURIComponent(q)}&type=video&page=1`,
-        { signal: AbortSignal.timeout(6000) }
-      );
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (!Array.isArray(data)) continue;
-      return data.slice(0, limit).map(v => ({
-        id:       v.videoId,
-        title:    v.title       || "Unknown",
-        artist:   v.author      || "Unknown",
-        album:    "",
-        artwork:  `/api/music/thumb?id=${v.videoId}`,
-        duration: (v.lengthSeconds || 0) * 1000,
-      }));
-    } catch {}
-  }
-  return [];
-}
-
+// Music: search YouTube via youtube-sr (no API key needed)
 fastify.get("/api/music/search", async (req, reply) => {
   const q     = String(req.query.q || "").trim();
   const limit = Math.min(parseInt(req.query.limit) || 24, 50);
   if (!q) return reply.send([]);
-  const results = await invidiousSearch(q, limit);
-  reply.send(results);
+  try {
+    const videos = await YouTube.search(q, { limit, type: "video" });
+    const results = videos.map(v => ({
+      id:       v.id,
+      title:    v.title        || "Unknown",
+      artist:   v.channel?.name || "Unknown",
+      album:    "",
+      artwork:  `/api/music/thumb?id=${v.id}`,
+      duration: v.duration     || 0,
+    }));
+    reply.send(results);
+  } catch (err) {
+    console.error("[music/search]", err.message);
+    reply.send([]);
+  }
 });
 
 // YouTube thumbnail proxy — serves via our domain to bypass school filters
