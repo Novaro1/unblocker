@@ -1321,12 +1321,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       "--auto",
       "--silent",
       "--webhook", "none",
+      "--pages", "1-5",
       "--outfile", outfile,
     ];
     if (subdomains) args.push("--subdomains", subdomains);
 
+    const env = { ...process.env, PATH: `${process.env.PATH}:/home/ubuntu/.local/bin` };
     const result = await new Promise((resolve) => {
-      execFile("python3", args, { timeout: 120000 }, (err, stdout, stderr) => {
+      execFile("python3", args, { timeout: 120000, env }, (err, stdout, stderr) => {
         resolve({ err, stdout, stderr });
       });
     });
