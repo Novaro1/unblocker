@@ -716,18 +716,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
               headers: { Authorization: `Bearer ${mailToken}` },
             }).then(r => r.ok ? r.json() : null);
             const text = body?.text || body?.html || "";
-            console.log("[makelink/email] subject:", body?.subject, "text snippet:", text.slice(0, 400));
-            const match = text.match(/activate\.php\?([^"'\s<>]+)/);
-            if (match) { activationCode = match[1]; break; }
+            // Extract full activation URL from the email (may be http://)
+            const urlMatch = text.match(/https?:\/\/(?:www\.)?freedns\.afraid\.org\/signup\/activate\.php\?[^\s<>"']+/);
+            if (urlMatch) { activationCode = urlMatch[0]; break; }
           }
         } catch {}
       }
       if (!activationCode) return interaction.editReply({ content: "❌ Activation email never arrived. Try again." });
 
       await interaction.editReply({ content: `📧 Activation email received. Activating account…` });
-      // Decode HTML entities in activation code (e.g. &amp; → &)
-      const decodedCode = activationCode.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n));
-      const activateUrl = `https://freedns.afraid.org/signup/activate.php?${decodedCode}`;
+      const activateUrl = activationCode.replace(/&amp;/g, "&");
       console.log("[makelink/activate] URL:", activateUrl);
       const activateRes = await fetch(activateUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
       const activateHtml = await activateRes.text();
@@ -735,7 +733,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const activateFailed = /<title>\s*Problems!/i.test(activateHtml);
       if (activateFailed) {
         const bolds = [...activateHtml.matchAll(/<b[^>]*>([^<]{5,300})<\/b>/gi)].map(m => m[1].trim()).filter(t => !t.includes("<"));
-        return interaction.editReply({ content: `❌ Account activation failed: \`${bolds.slice(0,3).join(" | ") || "unknown"}\`\nActivation URL used: \`${decodedCode.slice(0,80)}\`\nRun \`/makelink\` again.` });
+        return interaction.editReply({ content: `❌ Account activation failed: \`${bolds.slice(0,3).join(" | ") || "unknown"}\`\nActivation URL used: \`${activateUrl.slice(0,80)}\`\nRun \`/makelink\` again.` });
       }
 
       await interaction.editReply({ content: `✅ Account activated! Logging in…` });
