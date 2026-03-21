@@ -17,8 +17,6 @@ import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
-import { execFile } from "child_process";
-import { tmpdir } from "os";
 import OpenAI from "openai";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -658,8 +656,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       });
       const signupHtml = await signupRes.text();
 
-      if (signupHtml.includes("error") || signupHtml.includes("invalid") || signupHtml.includes("captcha")) {
-        return interaction.editReply({ content: "❌ Signup failed — wrong CAPTCHA or username taken. Run `/makelink freedns` again." });
+      // FreeDNS stays on the signup URL if the submission failed; it redirects on success
+      const failedToSubmit = signupRes.url.includes("signup") &&
+        (signupHtml.includes("incorrect") || signupHtml.includes("already taken") ||
+         signupHtml.includes("invalid") || signupHtml.includes("Please try again"));
+      if (failedToSubmit) {
+        const errMatch = signupHtml.match(/<b[^>]*>([^<]{5,120})<\/b>/i);
+        const errMsg = errMatch ? errMatch[1].trim() : "Unknown error from FreeDNS";
+        return interaction.editReply({ content: `❌ Signup failed: ${errMsg}\nRun \`/makelink provider:FreeDNS\` again.` });
       }
 
       await interaction.editReply({ content: "✅ Signup submitted! Waiting for activation email (up to 3 min)…" });
