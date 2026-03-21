@@ -104,6 +104,12 @@
   }
 
   function navigateLocal(path) {
+    // If already inside a cloak iframe, navigate within it to stay cloaked
+    if (window.top !== window) {
+      window.location.href = location.origin + path;
+      return;
+    }
+
     const isAmbassador = !!JSON.parse(localStorage.getItem("veil_ambassador_v1") || "null");
     const blankCloakOn = isAmbassador && localStorage.getItem("veil_blank_cloak_auto") === "1";
 
@@ -115,7 +121,6 @@
     // Open with blank cloak applied
     const w = window.open("about:blank", "_blank");
     if (!w) return;
-    // getCloakInfo is defined in blank-cloak.js — call it if available, else fall back
     const info = (typeof getCloakInfo === "function") ? getCloakInfo() : { title: document.title, favicon: "/favicon.ico" };
 
     const iframe = w.document.createElement("iframe");
