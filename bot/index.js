@@ -397,7 +397,7 @@ async function freednsCreateSubdomain(cookies, sub, serverIp, targetDomain = nul
       { headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" } }
     ).then(r => r.text());
     const m = searchHtml.match(
-      new RegExp(`edit_domain_id=(\\d+)>${targetDomain.replace(/\./g, "\\.")}<\\/a>`)
+      new RegExp(`edit_domain_id=(\\d+)>(?:<[^>]+>)?${targetDomain.replace(/\./g, "\\.")}`)
     );
     if (!m) return null;
     domainId = m[1];
