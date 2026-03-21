@@ -1513,79 +1513,75 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     // ── FreeDNS ──────────────────────────────────────────────────────────────
     {
-      const FREEDNS_CREDS_FILE = join(__dirname, "../freedns-creds.json");
+      const FREEDNS_ACCOUNTS_FILE = join(__dirname, "../freedns-accounts.json");
 
-      // Load saved credentials (env vars take priority)
-      let fdUser = process.env.FREEDNS_USER || "";
-      let fdPass = process.env.FREEDNS_PASS || "";
-      let fdEmail = process.env.FREEDNS_EMAIL || "";
-      if (!fdUser && existsSync(FREEDNS_CREDS_FILE)) {
+      // Build account pool: env vars + accounts file (array of {username,password,email})
+      const accounts = [];
+      if (process.env.FREEDNS_USER && process.env.FREEDNS_PASS)
+        accounts.push({ username: process.env.FREEDNS_USER, password: process.env.FREEDNS_PASS, email: process.env.FREEDNS_EMAIL || process.env.FREEDNS_USER });
+      if (existsSync(FREEDNS_ACCOUNTS_FILE)) {
         try {
-          const saved = JSON.parse(readFileSync(FREEDNS_CREDS_FILE, "utf-8"));
-          fdUser = saved.username; fdPass = saved.password; fdEmail = saved.email || "";
+          const list = JSON.parse(readFileSync(FREEDNS_ACCOUNTS_FILE, "utf-8"));
+          if (Array.isArray(list)) list.forEach(a => { if (a.username && a.password) accounts.push(a); });
         } catch {}
       }
 
-      // If we have creds, log in and create subdomain directly
-      if (fdUser && fdPass) {
-        await interaction.deferReply({ ephemeral: true });
+      if (!accounts.length) {
+        return interaction.reply({
+          content: "❌ No FreeDNS accounts configured.\n\nCreate accounts at <https://freedns.afraid.org/signup/> then add them to `/var/www/unblocker/freedns-accounts.json` on the server:\n```json\n[\n  {\"username\":\"user1\",\"password\":\"pass1\",\"email\":\"email1\"},\n  {\"username\":\"user2\",\"password\":\"pass2\",\"email\":\"email2\"}\n]\n```\nEach free account supports 5 subdomains — add more accounts to scale.",
+          ephemeral: true,
+        });
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+
+      // If a filter was specified, find an unblocked domain first (do this once, before looping accounts)
+      let chosenDomain = targetDomain;
+      let filterName = filterKey;
+      if (filterKey && !chosenDomain) {
+        if (!existsSync(FREEDNS_FILE))
+          return interaction.editReply({ content: "❌ FreeDNS domain list not generated yet on the server." });
+        await interaction.editReply({ content: `🔍 Searching for a domain unblocked by **${filterKey}**…` });
+        const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
+        const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
+        const pool2 = readFileSync(FREEDNS_FILE, "utf-8").split("\n").map(d => d.trim()).filter(Boolean).sort(() => Math.random() - 0.5).slice(0, 30);
+        for (const domain of pool2) {
+          try {
+            let results = getCachedResults(domain);
+            if (!results) {
+              const data = await fetch(`https://live.glseries.net/api/v1/check?token=gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b&url=${encodeURIComponent(domain)}`).then(r => r.json());
+              if (!data.success) continue;
+              results = data.results; setCachedResults(domain, results);
+            }
+            const result = results.find(r => r.filter === filterKey);
+            if (result) filterName = result.name;
+            const category = result?.category || "";
+            const categoryOk = !skipUncategorized || !UNCATEGORIZED.test(category);
+            if (result && !result.blocked && !result.error && categoryOk) { chosenDomain = domain; break; }
+          } catch {}
+        }
+        if (!chosenDomain)
+          return interaction.editReply({ content: `❌ No unblocked domain found for **${filterName || filterKey}** after checking 30 domains. Try again.` });
+      }
+
+      // Try each account in the pool until one succeeds
+      let lastError = "All accounts failed";
+      for (const acct of accounts) {
         try {
-          // FreeDNS login uses email as the identifier
-          const loginWith = fdEmail || fdUser;
+          const loginWith = acct.email || acct.username;
           const loginRes = await fetch("https://freedns.afraid.org/zc.php?step=2", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0" },
-            body: new URLSearchParams({ username: loginWith, password: fdPass, action: "auth", submit: "Login" }),
+            body: new URLSearchParams({ username: loginWith, password: acct.password, action: "auth", submit: "Login" }),
             redirect: "manual",
           });
           const cookies = (loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean))
             .map(c => c.split(";")[0]).join("; ");
-
-          if (!cookies.includes("dns_cookie"))
-            return interaction.editReply({ content: "❌ FreeDNS login failed. Check stored credentials." });
-
-          // If a filter was specified, find an unblocked domain first
-          let chosenDomain = targetDomain;
-          let filterName = filterKey;
-          if (filterKey && !chosenDomain) {
-            if (!existsSync(FREEDNS_FILE))
-              return interaction.editReply({ content: "❌ FreeDNS domain list not generated yet on the server." });
-
-            await interaction.editReply({ content: `🔍 Searching for a domain unblocked by **${filterKey}**…` });
-            const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
-            const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
-            const pool = readFileSync(FREEDNS_FILE, "utf-8").split("\n").map(d => d.trim()).filter(Boolean)
-              .sort(() => Math.random() - 0.5).slice(0, 30);
-
-            for (const domain of pool) {
-              try {
-                let results = getCachedResults(domain);
-                if (!results) {
-                  const data = await fetch(
-                    `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
-                  ).then(r => r.json());
-                  if (!data.success) continue;
-                  results = data.results;
-                  setCachedResults(domain, results);
-                }
-                const result = results.find(r => r.filter === filterKey);
-                if (result) filterName = result.name;
-                const category = result?.category || "";
-                const categoryOk = !skipUncategorized || !UNCATEGORIZED.test(category);
-                if (result && !result.blocked && !result.error && categoryOk) {
-                  chosenDomain = domain;
-                  break;
-                }
-              } catch {}
-            }
-            if (!chosenDomain)
-              return interaction.editReply({ content: `❌ No unblocked domain found for **${filterName || filterKey}** after checking 30 domains. Try again.` });
-          }
+          if (!cookies.includes("dns_cookie")) { lastError = `Login failed for ${acct.username}`; continue; }
 
           const domainInfo = await freednsFindDomain(cookies, chosenDomain);
-          if (!domainInfo) return interaction.editReply({ content: chosenDomain ? `❌ Could not find \`${chosenDomain}\` in the FreeDNS public registry. The \`domain\` option only accepts FreeDNS shared domains (e.g. \`mooo.com\`, \`chickenkiller.com\`). Use \`/freedns\` to browse available domains.` : "❌ No public domains found. Try again." });
+          if (!domainInfo) { lastError = chosenDomain ? `Domain ${chosenDomain} not found in registry` : "No public domains found"; continue; }
 
-          // Try saving without CAPTCHA first — FreeDNS may not require it for logged-in users
           const saveResult = await freednsTrySave(cookies, null, null, sub, domainInfo.domainId, domainInfo.domainName, serverIp);
           if (saveResult.domain) {
             const embedFields = [{ name: "URL", value: `https://${saveResult.domain}` }, { name: "Points to", value: serverIp }];
@@ -1593,20 +1589,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
             return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x57F287).setTitle("✅ FreeDNS Link Created").addFields(...embedFields).setFooter({ text: "DNS may take 1–5 minutes to propagate" }).setTimestamp()] });
           }
 
-          if (!saveResult.needsCaptcha)
-            return interaction.editReply({ content: `❌ Subdomain creation failed: ${saveResult.error}` });
+          if (!saveResult.needsCaptcha) { lastError = saveResult.error || "Save failed"; continue; }
 
-          // CAPTCHA required — fetch image and ask user
+          // CAPTCHA required for this account — fetch image and ask user
           const captchaRes = await fetch("https://freedns.afraid.org/securimage/securimage_show.php", { headers: { "User-Agent": "Mozilla/5.0" } });
           const captchaSess = (captchaRes.headers.getSetCookie?.() ?? [captchaRes.headers.get("set-cookie")].filter(Boolean)).map(c => c.split(";")[0]).join("; ");
           const captchaImg = Buffer.from(await captchaRes.arrayBuffer());
           const dnsCookiePart = cookies.split("; ").find(c => c.startsWith("dns_cookie")) || "";
-
           pendingFreeDNS.set(interaction.user.id, {
             mode: "subdomain",
             phpsessid: captchaSess, dnsCookie: dnsCookiePart,
             domainId: domainInfo.domainId, domainName: domainInfo.domainName,
-            sub, serverIp, filterKey, filterName, fdUser,
+            sub, serverIp, filterKey, filterName, fdUser: acct.username,
             expiresAt: Date.now() + 15 * 60 * 1000,
           });
           const btn = new ActionRowBuilder().addComponents(
@@ -1618,16 +1612,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
             components: [btn],
           });
         } catch (e) {
+          lastError = e.message;
           console.error("[makelink/freedns] error:", e);
-          return interaction.editReply({ content: `❌ Error: ${e.message}` });
         }
       }
 
-      // No creds — auto-account creation is blocked on server IPs by FreeDNS
-      return interaction.reply({
-        content: "❌ No FreeDNS credentials configured.\n\nCreate a free account at <https://freedns.afraid.org/signup/> then set these env vars on the server and restart the bot:\n```\nFREEDNS_USER=your_username\nFREEDNS_PASS=your_password\nFREEDNS_EMAIL=your_email\n```",
-        ephemeral: true,
-      });
+      return interaction.editReply({ content: `❌ All FreeDNS accounts failed: ${lastError}. Add more accounts to \`freedns-accounts.json\`.` });
     }
   }
 
