@@ -915,9 +915,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         "• Tab cloak (Settings → Appearance) can help avoid teacher attention",
       link:
         "**Make Your Own Veil Link**\n" +
+        "The easiest way is to use the **FreeDNS Helper** browser extension — it auto-fills everything for you.\n\n" +
+        "**Get the extension:** https://veilub.mooo.com/extension\n\n" +
+        "Or manually:\n" +
         "1. Go to [freedns.afraid.org](https://freedns.afraid.org) → create a free account\n" +
         "2. Click **Subdomains** → **Add**\n" +
-        "3. Set Type: `A` | Enter any subdomain name | Pick a domain | Destination: your server IP (see #links for the current IP)\n" +
+        "3. Set Type: `A` | Enter any subdomain name | Pick a domain | Destination: `16.59.60.231`\n" +
         "4. Save — wait ~2 minutes for it to go live\n" +
         "5. Visit `https://yoursubdomain.domain.com`\n\n" +
         "Tip: Use `/freedns` to get random domain suggestions, or `/findlink` to find one already unblocked by your school filter.",
@@ -1548,7 +1551,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
             "2. Click **Auto-Fill Form** in the purple bar — it fills everything including a temp email",
             "3. Solve the CAPTCHA and submit",
             "4. Click **Activate Account** when the activation email arrives in the panel",
-            "   — the account is pushed to the server automatically",
           ].join("\n"),
         },
         {
@@ -1558,12 +1560,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
             "2. Go to **Subdomains → Add Subdomain**",
             "3. Click **Create Veil Subdomain** in the purple bar",
             "4. Pick a domain from the dropdown, click **Save**",
-            "   — the new URL is shown and copied automatically",
+            "   — the new URL is shown and ready to copy",
           ].join("\n"),
         },
         {
           name: "One-time Setup",
-          value: "Open the extension popup → **Server Settings** and enter:\n`URL`: `https://veilub.mooo.com`\n`API Key`: ask a staff member",
+          value: "Open the extension popup → **Server Settings** and enter the **Server IP**: `16.59.60.231`",
         }
       )
       .setFooter({ text: "FreeDNS Helper extension · Staff only" });
