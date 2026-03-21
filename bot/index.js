@@ -727,7 +727,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.editReply({ content: `📧 Activation email received. Activating account…` });
       const activateUrl = activationCode.replace(/&amp;/g, "&");
       console.log("[makelink/activate] URL:", activateUrl);
-      const activateRes = await fetch(activateUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
+      const activateRes = await fetch(activateUrl, { headers: { "User-Agent": "Mozilla/5.0", Cookie: sessionCookies } });
       const activateHtml = await activateRes.text();
       console.log("[makelink/activate] status:", activateRes.status, "title:", activateHtml.match(/<title>([^<]+)/i)?.[1]);
       const activateFailed = /<title>\s*Problems!/i.test(activateHtml);
