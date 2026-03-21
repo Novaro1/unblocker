@@ -650,9 +650,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }),
       });
       const signupHtml = await signupRes.text();
-      const signupSnippet = signupHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-      const errPart = signupSnippet.slice(signupSnippet.indexOf("Sign Up!"), signupSnippet.indexOf("Sign Up!") + 600);
-      console.log("[makelink/freedns] signup url:", signupRes.url, "| after header:", errPart || signupSnippet.slice(0, 600));
 
       // FreeDNS stays on the signup URL if the submission failed; it redirects on success
       const failedToSubmit = signupRes.url.includes("signup") &&
@@ -704,10 +701,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       });
       const allCookies = loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean);
       const cookies = allCookies.map(c => c.split(";")[0]).join("; ");
-      console.log("[makelink/freedns] login status:", loginRes.status, "cookies:", cookies);
 
       const result = await freednsCreateSubdomain(cookies, sub, serverIp);
-      console.log("[makelink/freedns] subdomain result:", result);
       if (!result) return interaction.editReply({ content: "❌ Login or subdomain creation failed after activation." });
 
       const embed = new EmbedBuilder()
