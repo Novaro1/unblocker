@@ -1573,7 +1573,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 let results = getCachedResults(domain);
                 if (!results) {
                   const data = await fetch(
-                    `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
+                    `https://api.glseries.net/freedns/check?domain=${encodeURIComponent(domain)}`,
+                    { headers: { Authorization: `Bearer ${GL_TOKEN}` } }
                   ).then(r => r.json());
                   if (!data.success) continue;
                   results = data.results;
