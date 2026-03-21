@@ -1533,12 +1533,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setDescription("Subdomain creation is done through the **FreeDNS Helper** browser extension — it works directly in your browser so there are no IP blocks or CAPTCHA issues.")
       .addFields(
         {
-          name: "Install the Extension",
+          name: "Download & Install",
           value: [
-            "1. Open Chrome and go to `chrome://extensions`",
-            "2. Enable **Developer mode** (top-right toggle)",
-            "3. Click **Load unpacked**",
-            "4. Select the `freedns-extension` folder from the Veil repo",
+            "1. Go to **https://veilub.mooo.com/extension** and click **Download Extension**",
+            "2. Unzip the downloaded file",
+            "3. Open Chrome → `chrome://extensions` → enable **Developer mode**",
+            "4. Click **Load unpacked** and select the unzipped folder",
           ].join("\n"),
         },
         {
