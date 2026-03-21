@@ -646,8 +646,11 @@ function setPlayState(playing) {
 
 // ── Audio events ──────────────────────────────────────────────────────────────
 audio.addEventListener("timeupdate", () => {
-  if (!audio.duration || isNaN(audio.duration)) return;
-  const pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
+  const dur = (audio.duration && isFinite(audio.duration))
+    ? audio.duration
+    : (currentTrack?.duration / 1000 || 0);
+  if (!dur) return;
+  const pct = Math.min(100, (audio.currentTime / dur) * 100);
   elBarFill.style.width  = pct + "%";
   elBarThumb.style.left  = pct + "%";
   elTime.textContent = fmt(audio.currentTime * 1000);
@@ -673,9 +676,12 @@ audio.volume = 0.8;
 
 // ── Progress bar seek ─────────────────────────────────────────────────────────
 elBarOuter.addEventListener("click", (e) => {
-  if (!audio.duration) return;
+  const dur = (audio.duration && isFinite(audio.duration))
+    ? audio.duration
+    : (currentTrack?.duration / 1000 || 0);
+  if (!dur) return;
   const rect = elBarOuter.getBoundingClientRect();
-  audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
+  audio.currentTime = ((e.clientX - rect.left) / rect.width) * dur;
 });
 
 // ── Volume ─────────────────────────────────────────────────────────────────────

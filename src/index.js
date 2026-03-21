@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { Readable } from "node:stream";
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "url";
@@ -293,7 +294,7 @@ fastify.get("/api/music/related", async (req, reply) => {
   }
 });
 
-// SoundCloud audio stream via yt-dlp — proxied so school filters can't block it
+// SoundCloud audio stream — resolves direct URL for seek support, proxied through our server
 fastify.get("/api/music/stream", async (req, reply) => {
   const id = String(req.query.id || "").trim();
   let scUrl;
@@ -301,6 +302,37 @@ fastify.get("/api/music/stream", async (req, reply) => {
   catch { return reply.status(400).send("Invalid ID"); }
   if (!scUrl.startsWith("https://soundcloud.com/")) return reply.status(400).send("Invalid URL");
 
+  // Resolve the direct progressive MP3 URL so the browser can seek via range requests
+  const directUrl = await new Promise((resolve) => {
+    execFile(
+      "yt-dlp",
+      ["--no-playlist", "-f", "http_mp3_1_0/bestaudio[ext=mp3]/bestaudio", "--get-url", scUrl],
+      { timeout: 15000 },
+      (err, stdout) => resolve(err ? null : stdout.trim().split("\n")[0] || null)
+    );
+  });
+
+  if (directUrl) {
+    // Proxy with range header forwarding so the browser can seek
+    const upstreamHeaders = {};
+    if (req.headers.range) upstreamHeaders["range"] = req.headers.range;
+    try {
+      const upstream = await fetch(directUrl, { headers: upstreamHeaders });
+      reply.code(upstream.status);
+      reply.header("Content-Type",  upstream.headers.get("content-type")  || "audio/mpeg");
+      reply.header("Accept-Ranges", "bytes");
+      reply.header("Cache-Control", "no-cache");
+      const cl = upstream.headers.get("content-length");
+      const cr = upstream.headers.get("content-range");
+      if (cl) reply.header("Content-Length", cl);
+      if (cr) reply.header("Content-Range",  cr);
+      return reply.send(Readable.fromWeb(upstream.body));
+    } catch (err) {
+      console.error("[music/stream] proxy error:", err.message);
+    }
+  }
+
+  // Fallback: pipe yt-dlp stdout (no seeking, but always works)
   reply.header("Content-Type", "audio/mpeg");
   const child = spawn("yt-dlp", ["--no-playlist", "-f", "hls_mp3_1_0/bestaudio", "-o", "-", scUrl]);
   child.stderr.on("data", d => console.error("[music/stream]", d.toString().trim()));
