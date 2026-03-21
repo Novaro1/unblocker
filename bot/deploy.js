@@ -205,41 +205,8 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("makelink")
-    .setDescription("Auto-create a FreeDNS subdomain pointing to the proxy (Staff only)")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
-    .addStringOption((o) =>
-      o.setName("subdomain").setDescription("Custom subdomain name (e.g. veil2024) — random if omitted").setRequired(false)
-    )
-    .addStringOption((o) =>
-      o.setName("filter").setDescription("Only use a domain unblocked by this content filter").setRequired(false)
-        .addChoices(
-          { name: "GoGuardian",     value: "goguardian"    },
-          { name: "Securly",        value: "securly"       },
-          { name: "Lightspeed",     value: "lightspeed"    },
-          { name: "Cisco Umbrella", value: "cisco"         },
-          { name: "iBoss",          value: "iboss"         },
-          { name: "Barracuda",      value: "barracuda"     },
-          { name: "DNSFilter",      value: "dnsfilter"     },
-          { name: "FortiGuard",     value: "fortiguard"    },
-          { name: "Linewize",       value: "linewize"      },
-          { name: "Blocksi Web",    value: "blocksiweb"    },
-          { name: "Blocksi AI",     value: "blocksiai"     },
-          { name: "Deledao",        value: "deledao"       },
-          { name: "AristotleK12",   value: "aristotle"     },
-          { name: "Senso Cloud",    value: "senso"         },
-          { name: "Palo Alto",      value: "paloalto"      },
-          { name: "LanSchool",      value: "lanschool"     },
-          { name: "Qustodio",       value: "qustodio"      },
-          { name: "Sophos",         value: "sophos"        },
-          { name: "ContentKeeper",  value: "contentkeeper" },
-        )
-    )
-    .addStringOption((o) =>
-      o.setName("domain").setDescription("FreeDNS shared domain to use (e.g. mooo.com, chickenkiller.com) — use /freedns to find options").setRequired(false)
-    )
-    .addBooleanOption((o) =>
-      o.setName("skip_uncategorized").setDescription("Skip domains with no known category (default: true)").setRequired(false)
-    ),
+    .setDescription("Instructions for creating a FreeDNS subdomain via the browser extension (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   new SlashCommandBuilder()
     .setName("ai-scan")

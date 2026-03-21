@@ -447,9 +447,143 @@ function escHtml(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
+// ── SUBDOMAIN PAGE — auto-fill subdomain creation form ────────────────────────
+function injectSubdomainBar() {
+  injectStyles();
+  if (document.getElementById("fdh-sub-bar")) return;
+
+  // Only inject on the add/edit form, not the list page
+  const hasForm = document.querySelector('input[name="subdomain"]');
+  if (!hasForm) return;
+
+  const bar = document.createElement("div");
+  bar.id = "fdh-sub-bar";
+  // Reuse the same bar style as the signup bar
+  bar.id = "fdh-bar";
+  bar.innerHTML = `
+    <span class="fdh-title">FreeDNS Helper</span>
+    <button class="fdh-btn fdh-btn-green" id="fdh-sub-btn">Create Veil Subdomain</button>
+    <span id="fdh-status">Click to auto-fill a random Veil subdomain pointing to the proxy.</span>
+    <div id="fdh-sub-result" style="display:none;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="fdh-label">URL:</span>
+      <input class="fdh-field" id="fdh-sub-url" readonly style="max-width:280px">
+      <button class="fdh-btn fdh-btn-sm fdh-btn-primary" id="fdh-sub-copy">Copy</button>
+    </div>
+  `;
+  document.body.prepend(bar);
+  document.body.style.paddingTop = "52px";
+
+  document.getElementById("fdh-sub-btn").addEventListener("click", async () => {
+    const btn      = document.getElementById("fdh-sub-btn");
+    const statusEl = document.getElementById("fdh-status");
+    btn.disabled = true;
+    btn.textContent = "Filling…";
+    statusEl.className = "";
+
+    const { serverIp } = await new Promise(r => chrome.storage.local.get("serverIp", r));
+    if (!serverIp) {
+      statusEl.className = "err";
+      statusEl.textContent = "⚠ Server IP not set — add it in the extension popup under Server Settings.";
+      btn.disabled = false; btn.textContent = "Create Veil Subdomain";
+      return;
+    }
+
+    // Generate subdomain name
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    const rand6 = Array.from({ length: 6 }, () => chars[randNum(chars.length)]).join("");
+    const subName = `veil${rand6}`;
+
+    // Fill subdomain field
+    setField('input[name="subdomain"]', subName);
+
+    // Set type to A record
+    const typeSelect = document.querySelector('select[name="type"]');
+    if (typeSelect) {
+      const aOpt = [...typeSelect.options].find(o => o.value === "A" || o.text === "A");
+      if (aOpt) typeSelect.value = aOpt.value;
+      typeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    // Fill destination IP
+    setField('input[name="address"]', serverIp);
+    setField('input[name="destination"]', serverIp);
+
+    // Pick the first public shared domain in the dropdown if nothing is selected
+    const domainSelect = document.querySelector('select[name="domain_id"]');
+    let domainName = "";
+    if (domainSelect && (!domainSelect.value || domainSelect.value === "0")) {
+      const firstOpt = [...domainSelect.options].find(o => o.value && o.value !== "0");
+      if (firstOpt) { domainSelect.value = firstOpt.value; domainName = firstOpt.text.trim(); }
+    } else if (domainSelect) {
+      domainName = domainSelect.options[domainSelect.selectedIndex]?.text?.trim() || "";
+    }
+
+    // Clean up domain name (FreeDNS often shows "domain.com (n users)" etc.)
+    domainName = domainName.replace(/\s*\(.*\)/, "").trim();
+    const fullUrl = domainName ? `https://${subName}.${domainName}` : "";
+
+    statusEl.textContent = fullUrl
+      ? `Filled! Pick your domain below if needed, then click Save. URL will be: ${fullUrl}`
+      : "Filled! Pick a domain from the dropdown below, then click Save.";
+
+    if (fullUrl) {
+      const resultRow = document.getElementById("fdh-sub-result");
+      const urlInput  = document.getElementById("fdh-sub-url");
+      resultRow.style.display = "flex";
+      urlInput.value = fullUrl;
+      document.getElementById("fdh-sub-copy").onclick = () => {
+        navigator.clipboard.writeText(fullUrl);
+        document.getElementById("fdh-sub-copy").textContent = "Copied!";
+        setTimeout(() => { document.getElementById("fdh-sub-copy").textContent = "Copy"; }, 1500);
+      };
+    }
+
+    // Watch for domain dropdown change to update the URL preview
+    if (domainSelect) {
+      domainSelect.addEventListener("change", () => {
+        const opt  = domainSelect.options[domainSelect.selectedIndex];
+        const name = (opt?.text || "").replace(/\s*\(.*\)/, "").trim();
+        const url  = name ? `https://${subName}.${name}` : "";
+        if (url && document.getElementById("fdh-sub-url")) {
+          document.getElementById("fdh-sub-url").value = url;
+          document.getElementById("fdh-sub-result").style.display = "flex";
+          document.getElementById("fdh-sub-copy").onclick = () => {
+            navigator.clipboard.writeText(url);
+            document.getElementById("fdh-sub-copy").textContent = "Copied!";
+            setTimeout(() => { document.getElementById("fdh-sub-copy").textContent = "Copy"; }, 1500);
+          };
+        }
+      });
+    }
+
+    btn.disabled = false;
+    btn.textContent = "↻ Regenerate";
+  });
+}
+
+// Detect successful subdomain save and show the URL
+function injectSaveSuccessBanner() {
+  injectStyles();
+  // FreeDNS shows the subdomain in a table after saving — try to extract it
+  const bodyText = document.body.innerText;
+  if (!bodyText.includes("has been") && !bodyText.includes("saved") && !bodyText.includes("subdomain")) return;
+
+  chrome.storage.local.get("lastSubdomain", ({ lastSubdomain }) => {
+    if (!lastSubdomain) return;
+    const banner = document.createElement("div");
+    banner.style.cssText = "position:fixed;top:0;left:0;right:0;background:#22c55e;color:#fff;font-family:sans-serif;font-size:13px;font-weight:600;padding:10px 16px;z-index:2147483647;text-align:center;";
+    banner.innerHTML = `FreeDNS Helper — Subdomain created: <code style="background:rgba(0,0,0,0.15);padding:1px 6px;border-radius:3px">${escHtml(lastSubdomain)}</code>
+      <button onclick="navigator.clipboard.writeText('${escHtml(lastSubdomain)}');this.textContent='Copied!'" style="margin-left:10px;background:rgba(0,0,0,0.2);border:none;color:#fff;padding:3px 10px;border-radius:4px;cursor:pointer;font-weight:600">Copy URL</button>`;
+    document.body.prepend(banner);
+    chrome.storage.local.remove("lastSubdomain");
+  });
+}
+
 // ── Route ─────────────────────────────────────────────────────────────────────
-const isSignup  = location.href.includes("/signup");
+const path      = location.pathname;
+const isSignup  = path.includes("/signup");
 const isSuccess = document.body?.textContent?.includes("The process has begun");
+const isSubdomain = path.includes("/subdomain/edit.php") || path.includes("/subdomain/add");
 
 if (isSignup && !isSuccess) {
   injectFillBar();
@@ -464,3 +598,5 @@ if (isSignup && !isSuccess) {
 }
 
 if (isSuccess) injectInboxPanel();
+
+if (isSubdomain) injectSubdomainBar();

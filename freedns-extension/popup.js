@@ -260,9 +260,10 @@ generate();
 loadAccounts(renderList);
 
 // Load saved server settings into fields
-chrome.storage.local.get(["serverUrl", "apiKey"], ({ serverUrl, apiKey }) => {
+chrome.storage.local.get(["serverUrl", "apiKey", "serverIp"], ({ serverUrl, apiKey, serverIp }) => {
   if (serverUrl) document.getElementById("cfg-server").value = serverUrl;
   if (apiKey)    document.getElementById("cfg-key").value    = apiKey;
+  if (serverIp)  document.getElementById("cfg-ip").value     = serverIp;
 });
 
 // Restore pending verify state if popup was closed mid-flow
@@ -353,7 +354,8 @@ document.getElementById("btn-clear").addEventListener("click", () => {
 document.getElementById("btn-save-cfg").addEventListener("click", () => {
   const serverUrl = document.getElementById("cfg-server").value.trim();
   const apiKey    = document.getElementById("cfg-key").value.trim();
-  chrome.storage.local.set({ serverUrl, apiKey }, () => toast("Settings saved!"));
+  const serverIp  = document.getElementById("cfg-ip").value.trim();
+  chrome.storage.local.set({ serverUrl, apiKey, serverIp }, () => toast("Settings saved!"));
 });
 
 document.querySelectorAll(".copy-btn").forEach(btn => {
