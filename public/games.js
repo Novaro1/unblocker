@@ -254,11 +254,6 @@
 
   toggle?.addEventListener("click", () => setCollapsed(!grid.classList.contains("collapsed")));
 
-  // ── Edit button → open Google Sheet ──────────────────────────────────────
-  document.getElementById("gs-edit")?.addEventListener("click", () => {
-    if (SHEET_URL) window.open(SHEET_URL, "_blank");
-  });
-
   // ── Init ───────────────────────────────────────────────────────────────────
   renderGames();
   setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
