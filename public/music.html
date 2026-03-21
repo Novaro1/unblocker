@@ -778,7 +778,7 @@ async function triggerAutoplay() {
 
   try {
     const res = await fetch(
-      `/api/music/related?title=${encodeURIComponent(currentTrack.title)}&artist=${encodeURIComponent(currentTrack.artist)}`
+      `/api/music/related?sourceUrl=${encodeURIComponent(currentTrack.sourceUrl)}`
     );
     const tracks = await res.json();
     let added = 0;

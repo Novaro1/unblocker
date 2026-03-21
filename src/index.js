@@ -247,74 +247,50 @@ fastify.get("/api/music/thumb", async (req, reply) => {
   }
 });
 
-// Music: AI-powered related tracks for autoplay
+// Music: related tracks for autoplay — uses SoundCloud's native related API (free)
 fastify.get("/api/music/related", async (req, reply) => {
-  const title  = String(req.query.title  || "").trim().slice(0, 100);
-  const artist = String(req.query.artist || "").trim().slice(0, 100);
-  if (!title && !artist) return reply.send([]);
+  const sourceUrl = String(req.query.sourceUrl || "").trim();
+  if (!sourceUrl.startsWith("https://soundcloud.com/")) return reply.send([]);
 
-  let queries = [];
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  try {
+    const client = await getSCClient();
+    // Resolve the track to get its numeric ID
+    const info = await client.getSongInfo(sourceUrl);
+    const trackId = info?.id;
+    if (!trackId) return reply.send([]);
 
-  if (apiKey) {
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 150,
-          messages: [{
-            role: "user",
-            content: `I'm listening to "${title}" by ${artist}. Give me 4 SoundCloud search queries to find similar songs with a similar vibe, genre, or mood. Reply with only the 4 queries, one per line, no numbering or extra text.`,
-          }],
-        }),
-      });
-      const data = await res.json();
-      queries = (data.content?.[0]?.text || "")
-        .split("\n").map(q => q.trim()).filter(Boolean).slice(0, 4);
-    } catch (err) {
-      console.error("[music/related] Claude API error:", err.message);
-    }
+    // Hit SoundCloud's related tracks endpoint directly
+    const scKey = client.createAPIKey ? await client.createAPIKey() : scClient.options?.clientID;
+    // Extract client_id from the scraper's internal store
+    const Store = (await import("soundcloud-scraper")).default.Store;
+    const clientId = Store.get("CLIENT_ID");
+
+    const res = await fetch(
+      `https://api-v2.soundcloud.com/tracks/${trackId}/related?limit=20&client_id=${clientId}`
+    );
+    if (!res.ok) return reply.send([]);
+
+    const data = await res.json();
+    const tracks = (data.collection || [])
+      .filter(t => t.kind === "track" && t.streamable)
+      .slice(0, 12)
+      .map(t => ({
+        id:        Buffer.from(t.permalink_url).toString("base64url"),
+        title:     t.title                 || "Unknown",
+        artist:    t.user?.username        || "Unknown",
+        album:     "",
+        artwork:   t.artwork_url
+          ? `/api/music/thumb?url=${Buffer.from(t.artwork_url.replace("-large", "-t300x300")).toString("base64url")}`
+          : "",
+        duration:  t.duration             || 0,
+        sourceUrl: t.permalink_url,
+      }));
+
+    reply.send(tracks);
+  } catch (err) {
+    console.error("[music/related]", err.message);
+    reply.send([]);
   }
-
-  if (!queries.length) {
-    // Fallback: artist + genre-hint searches
-    queries = [artist, `${artist} mix`, title.split(/\s+/).slice(0, 3).join(" ")].filter(Boolean);
-  }
-
-  const client = await getSCClient();
-  const seen = new Set();
-  const tracks = [];
-
-  for (const q of queries) {
-    if (tracks.length >= 12) break;
-    try {
-      const found = await client.search(q, "track");
-      const items = found.filter(r => r.type === "track").slice(0, 4);
-      const infos = await Promise.all(items.map(t => client.getSongInfo(t.url).catch(() => null)));
-      for (const s of infos) {
-        if (!s?.url || seen.has(s.url)) continue;
-        seen.add(s.url);
-        tracks.push({
-          id:        Buffer.from(s.url).toString("base64url"),
-          title:     s.title        || "Unknown",
-          artist:    s.author?.name || "Unknown",
-          album:     "",
-          artwork:   `/api/music/thumb?url=${Buffer.from(s.thumbnail || "").toString("base64url")}`,
-          duration:  s.duration     || 0,
-          sourceUrl: s.url,
-        });
-        if (tracks.length >= 12) break;
-      }
-    } catch {}
-  }
-
-  reply.send(tracks);
 });
 
 // SoundCloud audio stream via yt-dlp — proxied so school filters can't block it
