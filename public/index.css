@@ -1143,6 +1143,29 @@ body.no-vignette::before  { content: none; }
   margin-bottom: 0.2rem;
 }
 
+/* Veil Music featured tile — spans full width, horizontal layout */
+.gs-featured {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--accent) 12%, rgba(14,14,30,0.7));
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.gs-featured:hover {
+  background: color-mix(in srgb, var(--accent) 20%, rgba(14,14,30,0.7));
+}
+.gs-featured .gs-tile-icon {
+  font-size: 1.6rem !important;
+}
+.gs-featured .ql-tile-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text, #fff);
+  white-space: nowrap;
+}
+
 /* Game tiles reuse .ql-tile base but with emoji icon sizing */
 .gs-tile-icon {
   font-size: 1.45rem;
