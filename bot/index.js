@@ -1569,7 +1569,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
       )
       .setFooter({ text: "FreeDNS Helper extension · Staff only" });
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return interaction.reply({ embeds: [embed] });
   }
 
   // /makelink-status
