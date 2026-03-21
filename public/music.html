@@ -798,8 +798,8 @@ async function triggerAutoplay() {
     if (added) {
       elQueueCount.textContent = `(${queue.length})`;
       if (activeTab === "queue") renderQueue();
-      // If queue was empty, start playing the first new track
-      if (qIdx === -1 || (qIdx >= queue.length - added && !isPlaying)) {
+      // If nothing is playing, start the first new autoplay track
+      if (!isPlaying) {
         qIdx = queue.length - added;
         loadTrack(queue[qIdx]);
         renderQueue();

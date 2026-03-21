@@ -189,10 +189,11 @@ fastify.get('/api/beta-features', (_req, reply) => {
 
 // SoundCloud client — lazily initialized with a fresh client_id
 let scClient = null;
+let scClientId = null;
 async function getSCClient() {
   if (scClient) return scClient;
-  const key = await SoundCloud.keygen();
-  scClient = new SoundCloud.Client(key);
+  scClientId = await SoundCloud.keygen();
+  scClient = new SoundCloud.Client(scClientId);
   return scClient;
 }
 
@@ -218,7 +219,7 @@ fastify.get("/api/music/search", async (req, reply) => {
     reply.send(results);
   } catch (err) {
     console.error("[music/search]", err.message);
-    scClient = null; // reset client on error so keygen retries
+    scClient = null; scClientId = null; // reset on error so keygen retries
     reply.send([]);
   }
 });
@@ -261,13 +262,8 @@ fastify.get("/api/music/related", async (req, reply) => {
     if (!trackId) return reply.send([]);
 
     // Hit SoundCloud's related tracks endpoint directly
-    const scKey = client.createAPIKey ? await client.createAPIKey() : scClient.options?.clientID;
-    // Extract client_id from the scraper's internal store
-    const Store = (await import("soundcloud-scraper")).default.Store;
-    const clientId = Store.get("CLIENT_ID");
-
     const res = await fetch(
-      `https://api-v2.soundcloud.com/tracks/${trackId}/related?limit=20&client_id=${clientId}`
+      `https://api-v2.soundcloud.com/tracks/${trackId}/related?limit=20&client_id=${scClientId}`
     );
     if (!res.ok) return reply.send([]);
 
