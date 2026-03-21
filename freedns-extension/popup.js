@@ -313,6 +313,28 @@ document.getElementById("btn-check").addEventListener("click", () => {
   pollTimer = setInterval(checkInbox, 6000);
 });
 
+document.getElementById("btn-push-all").addEventListener("click", async () => {
+  const statusEl = document.getElementById("push-status");
+  statusEl.style.display = "block";
+  loadAccounts(async accounts => {
+    if (!accounts.length) { statusEl.textContent = "No saved accounts to push."; return; }
+    statusEl.textContent = `Pushing ${accounts.length} account(s)…`;
+    let pushed = 0, skipped = 0, failed = 0;
+    for (const acct of accounts) {
+      try {
+        const d = await pushAccountToServer(acct);
+        if (d.skipped) skipped++; else pushed++;
+      } catch { failed++; }
+    }
+    const parts = [];
+    if (pushed)  parts.push(`${pushed} added`);
+    if (skipped) parts.push(`${skipped} already on server`);
+    if (failed)  parts.push(`${failed} failed`);
+    statusEl.textContent = parts.join(", ") + (failed ? " — check server settings" : " ✓");
+    if (pushed) toast(`${pushed} account(s) pushed to server!`);
+  });
+});
+
 document.getElementById("btn-export").addEventListener("click", () => {
   loadAccounts(accounts => {
     if (!accounts.length) { toast("Nothing to export.", "#f59e0b"); return; }
