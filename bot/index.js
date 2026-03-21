@@ -31,7 +31,7 @@ const FINDLINK_CACHE_FILE = join(__dirname, "../findlink-cache.json");
 // ── /findlink domain result cache ───────────────────────────────────────────
 function loadFindlinkCache() {
   if (!existsSync(FINDLINK_CACHE_FILE)) return {};
-  return JSON.parse(readFileSync(FINDLINK_CACHE_FILE, "utf-8"));
+  try { return JSON.parse(readFileSync(FINDLINK_CACHE_FILE, "utf-8")); } catch { return {}; }
 }
 
 function saveFindlinkCache(cache) {
@@ -60,7 +60,7 @@ function setCachedResults(domain, results) {
 // ── /findlink usage tracking ────────────────────────────────────────────────
 function loadFindlinkUsage() {
   if (!existsSync(FINDLINK_USAGE_FILE)) return {};
-  return JSON.parse(readFileSync(FINDLINK_USAGE_FILE, "utf-8"));
+  try { return JSON.parse(readFileSync(FINDLINK_USAGE_FILE, "utf-8")); } catch { return {}; }
 }
 
 function saveFindlinkUsage(data) {
@@ -85,7 +85,7 @@ function incrementFindlinkUses(userId) {
 // ── Persistent config (live message IDs) ──────────────────────────────────
 function loadConfig() {
   if (!existsSync(CONFIG_FILE)) return {};
-  return JSON.parse(readFileSync(CONFIG_FILE, "utf-8"));
+  try { return JSON.parse(readFileSync(CONFIG_FILE, "utf-8")); } catch { return {}; }
 }
 
 function saveConfig(cfg) {
@@ -95,7 +95,7 @@ function saveConfig(cfg) {
 // ── Ambassador token storage ────────────────────────────────────────────────
 function loadTokens() {
   if (!existsSync(TOKENS_FILE)) return [];
-  return JSON.parse(readFileSync(TOKENS_FILE, "utf-8"));
+  try { return JSON.parse(readFileSync(TOKENS_FILE, "utf-8")); } catch { return []; }
 }
 
 function saveTokens(tokens) {
@@ -105,7 +105,7 @@ function saveTokens(tokens) {
 // ── Beta feature storage ────────────────────────────────────────────────────
 function loadBetaFeatures() {
   if (!existsSync(BETA_FEATURES_FILE)) return [];
-  return JSON.parse(readFileSync(BETA_FEATURES_FILE, "utf-8"));
+  try { return JSON.parse(readFileSync(BETA_FEATURES_FILE, "utf-8")); } catch { return []; }
 }
 
 function saveBetaFeatures(features) {
@@ -115,7 +115,7 @@ function saveBetaFeatures(features) {
 // ── Link storage ───────────────────────────────────────────────────────────
 function loadLinks() {
   if (!existsSync(LINKS_FILE)) return [];
-  return JSON.parse(readFileSync(LINKS_FILE, "utf-8"));
+  try { return JSON.parse(readFileSync(LINKS_FILE, "utf-8")); } catch { return []; }
 }
 
 function saveLinks(links) {

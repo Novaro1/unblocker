@@ -29,6 +29,10 @@ function rateLimit(req, reply, { max, windowMs }) {
   const now = Date.now();
   const entry = rateLimitStore.get(ip);
   if (!entry || now > entry.resetAt) {
+    // Evict expired entries to prevent unbounded memory growth
+    if (rateLimitStore.size > 10000) {
+      for (const [k, v] of rateLimitStore) { if (now > v.resetAt) rateLimitStore.delete(k); }
+    }
     rateLimitStore.set(ip, { count: 1, resetAt: now + windowMs });
     return false; // not limited
   }
@@ -201,7 +205,7 @@ fastify.get("/api/music/search", async (req, reply) => {
     const found   = await client.search(q, "track");
     const tracks  = found.filter(r => r.type === "track").slice(0, limit);
     const infos   = await Promise.all(tracks.map(t => client.getSongInfo(t.url).catch(() => null)));
-    const results = infos.filter(Boolean).map(s => ({
+    const results = infos.filter(s => s?.url).map(s => ({
       id:        Buffer.from(s.url).toString("base64url"),
       title:     s.title     || "Unknown",
       artist:    s.author?.name || "Unknown",
@@ -254,6 +258,7 @@ fastify.get("/api/music/stream", async (req, reply) => {
   reply.header("Content-Type", "audio/mpeg");
   const child = spawn("yt-dlp", ["--no-playlist", "-f", "hls_mp3_1_0/bestaudio", "-o", "-", scUrl]);
   child.stderr.on("data", d => console.error("[music/stream]", d.toString().trim()));
+  child.on("error", err => console.error("[music/stream] spawn error:", err.message));
   return reply.send(child.stdout);
 });
 
@@ -307,14 +312,16 @@ fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply
     }],
   });
 
-  await fetch(`https://discord.com/api/v10/channels/${ANNOUNCEMENTS_CHANNEL_ID}/messages`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bot ${DISCORD_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body,
-  });
+  try {
+    const res = await fetch(`https://discord.com/api/v10/channels/${ANNOUNCEMENTS_CHANNEL_ID}/messages`, {
+      method: "POST",
+      headers: { "Authorization": `Bot ${DISCORD_TOKEN}`, "Content-Type": "application/json" },
+      body,
+    });
+    if (!res.ok) console.error(`[github-webhook] Discord API error: ${res.status}`);
+  } catch (e) {
+    console.error(`[github-webhook] Discord fetch failed: ${e.message}`);
+  }
 
   return reply.code(200).send("ok");
 });

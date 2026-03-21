@@ -596,8 +596,8 @@ function setPlayState(playing) {
 
 // ── Audio events ──────────────────────────────────────────────────────────────
 audio.addEventListener("timeupdate", () => {
-  if (!audio.duration) return;
-  const pct = (audio.currentTime / audio.duration) * 100;
+  if (!audio.duration || isNaN(audio.duration)) return;
+  const pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
   elBarFill.style.width  = pct + "%";
   elBarThumb.style.left  = pct + "%";
   elTime.textContent = fmt(audio.currentTime * 1000);
