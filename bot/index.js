@@ -759,7 +759,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
 
       const result = await freednsCreateSubdomain(cookies, sub, serverIp, chosenDomain);
-      if (!result) return interaction.editReply({ content: "❌ Login or subdomain creation failed after activation." });
+      if (!result) return interaction.editReply({ content: chosenDomain ? `❌ Could not find \`${chosenDomain}\` in the FreeDNS public registry. The \`domain\` option only accepts FreeDNS shared domains (e.g. \`mooo.com\`, \`chickenkiller.com\`). Use \`/freedns\` to browse available domains.` : "❌ Subdomain creation failed after activation." });
 
       const embedFields = [
         { name: "URL", value: `https://${result}` },
@@ -1593,7 +1593,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           }
 
           const fullDomain = await freednsCreateSubdomain(cookies, sub, serverIp, chosenDomain);
-          if (!fullDomain) return interaction.editReply({ content: `❌ Could not find domain \`${chosenDomain || "random"}\` in FreeDNS registry.` });
+          if (!fullDomain) return interaction.editReply({ content: `❌ Could not find \`${chosenDomain}\` in the FreeDNS public registry. The \`domain\` option only accepts FreeDNS shared domains (e.g. \`mooo.com\`, \`chickenkiller.com\`). Use \`/freedns\` to browse available domains.` });
 
           const embedFields = [
             { name: "URL", value: `https://${fullDomain}` },

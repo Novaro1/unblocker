@@ -235,7 +235,7 @@ const commands = [
         )
     )
     .addStringOption((o) =>
-      o.setName("domain").setDescription("Use a specific FreeDNS base domain (e.g. mooo.com)").setRequired(false)
+      o.setName("domain").setDescription("FreeDNS shared domain to use (e.g. mooo.com, chickenkiller.com) — use /freedns to find options").setRequired(false)
     )
     .addBooleanOption((o) =>
       o.setName("skip_uncategorized").setDescription("Skip domains with no known category (default: true)").setRequired(false)
