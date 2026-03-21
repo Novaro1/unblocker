@@ -205,8 +205,15 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("makelink")
-    .setDescription("Auto-create a FreeDNS subdomain pointing to the proxy (Staff only)")
+    .setDescription("Auto-create a proxy subdomain (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addStringOption((o) =>
+      o.setName("provider").setDescription("DNS provider to use").setRequired(false)
+        .addChoices(
+          { name: "DuckDNS (instant, needs token)", value: "duckdns" },
+          { name: "FreeDNS (more domains, one-time CAPTCHA)", value: "freedns" },
+        )
+    )
     .addStringOption((o) =>
       o.setName("subdomain").setDescription("Custom subdomain name (e.g. veil2024) — random if omitted").setRequired(false)
     ),
