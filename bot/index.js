@@ -727,14 +727,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!activationCode) return interaction.editReply({ content: "❌ Activation email never arrived. Try again." });
 
       await interaction.editReply({ content: `📧 Activation email received. Activating account…` });
-      const activateRes = await fetch(`https://freedns.afraid.org/signup/activate.php?${activationCode}`, {
-        headers: { "User-Agent": "Mozilla/5.0" },
-      });
+      // Decode HTML entities in activation code (e.g. &amp; → &)
+      const decodedCode = activationCode.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n));
+      const activateUrl = `https://freedns.afraid.org/signup/activate.php?${decodedCode}`;
+      console.log("[makelink/activate] URL:", activateUrl);
+      const activateRes = await fetch(activateUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
       const activateHtml = await activateRes.text();
-      const activateFailed = /<title>\s*Problems!/i.test(activateHtml) || activateHtml.toLowerCase().includes("invalid") || activateHtml.toLowerCase().includes("already activated");
+      console.log("[makelink/activate] status:", activateRes.status, "title:", activateHtml.match(/<title>([^<]+)/i)?.[1]);
+      const activateFailed = /<title>\s*Problems!/i.test(activateHtml);
       if (activateFailed) {
-        const errM = activateHtml.match(/<b[^>]*>([^<]{5,200})<\/b>/i);
-        return interaction.editReply({ content: `❌ Account activation failed: ${errM ? errM[1].trim() : "unknown error"}. Run \`/makelink\` again.` });
+        const bolds = [...activateHtml.matchAll(/<b[^>]*>([^<]{5,300})<\/b>/gi)].map(m => m[1].trim()).filter(t => !t.includes("<"));
+        return interaction.editReply({ content: `❌ Account activation failed: \`${bolds.slice(0,3).join(" | ") || "unknown"}\`\nActivation URL used: \`${decodedCode.slice(0,80)}\`\nRun \`/makelink\` again.` });
       }
 
       await interaction.editReply({ content: `✅ Account activated! Logging in…` });
