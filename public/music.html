@@ -404,6 +404,50 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* Autoplay button */
+    #mp-autoplay.active {
+      color: var(--accent);
+    }
+    #mp-autoplay.active svg {
+      filter: drop-shadow(0 0 4px var(--accent));
+    }
+    #mp-autoplay.fetching svg {
+      animation: spin 1s linear infinite;
+    }
+
+    /* Autoplay badge on queue tracks */
+    .mp-autoplay-badge {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(99,102,241,0.15);
+      border-radius: 4px;
+      padding: 1px 4px;
+      margin-left: 5px;
+      vertical-align: middle;
+      letter-spacing: 0.03em;
+    }
+
+    /* Autoplay divider in queue */
+    .mp-autoplay-divider {
+      grid-column: 1/-1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px 4px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      opacity: 0.8;
+    }
+    .mp-autoplay-divider::before, .mp-autoplay-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(99,102,241,0.2);
+    }
+
     /* Quality badge */
     #mp-quality {
       font-size: 11px;
@@ -476,6 +520,9 @@
       <button class="mp-btn" id="mp-repeat" title="Repeat">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       </button>
+      <button class="mp-btn" id="mp-autoplay" title="Autoplay: AI finds similar songs when queue ends">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.4L19 9l-4.5 3.3 1.7 5.4L12 14.4l-4.2 3.3 1.7-5.4L5 9l5.2-1.6z" opacity=".6"/><path d="M19 2l.9 2.6L22 5.5l-2.1 1.5.8 2.5-2-1.5-2 1.5.8-2.5-2.1-1.5 2.1-.9z" opacity=".8"/><path d="M5 15l.7 2L7 17.7l-1.6 1.2.6 2-1.5-1.1-1.5 1.1.6-2L2 17.7l1.6-.7z"/></svg>
+      </button>
     </div>
 
     <div id="mp-vol-row">
@@ -544,6 +591,8 @@ let qIdx     = -1;  // current position in queue
 let isPlaying = false;
 let shuffle  = false;
 let repeat   = "off"; // off | all | one
+let autoplay = false;
+let autoplayFetching = false;
 let activeTab = "results";
 let currentTrack = null;
 
@@ -570,6 +619,7 @@ const elNext       = document.getElementById("mp-next");
 const elShuffle    = document.getElementById("mp-shuffle");
 const elRepeat     = document.getElementById("mp-repeat");
 const elVol        = document.getElementById("mp-vol");
+const elAutoplay   = document.getElementById("mp-autoplay");
 const elSearch     = document.getElementById("mp-search");
 const elSearchBtn  = document.getElementById("mp-search-btn");
 const elLoading    = document.getElementById("mp-loading");
@@ -701,15 +751,60 @@ elPlayPause.addEventListener("click", () => {
 });
 
 function playNext() {
-  if (!queue.length) return;
+  if (!queue.length) {
+    if (autoplay && currentTrack && !autoplayFetching) triggerAutoplay();
+    return;
+  }
   if (shuffle) {
     qIdx = Math.floor(Math.random() * queue.length);
   } else {
     qIdx = (qIdx + 1) % queue.length;
-    if (qIdx === 0 && repeat === "off") { audio.pause(); return; }
+    if (qIdx === 0 && repeat === "off") {
+      if (autoplay && currentTrack && !autoplayFetching) triggerAutoplay();
+      else audio.pause();
+      return;
+    }
   }
   loadTrack(queue[qIdx]);
   renderQueue();
+  // Pre-fetch more tracks when approaching the end of the queue
+  if (autoplay && !autoplayFetching && qIdx >= queue.length - 2) triggerAutoplay();
+}
+
+async function triggerAutoplay() {
+  if (autoplayFetching || !currentTrack) return;
+  autoplayFetching = true;
+  elAutoplay.classList.add("fetching");
+
+  try {
+    const res = await fetch(
+      `/api/music/related?title=${encodeURIComponent(currentTrack.title)}&artist=${encodeURIComponent(currentTrack.artist)}`
+    );
+    const tracks = await res.json();
+    let added = 0;
+    tracks.forEach(t => {
+      if (!queue.find(q => q.id === t.id) && t.id !== currentTrack.id) {
+        t._autoplay = true;
+        queue.push(t);
+        added++;
+      }
+    });
+    if (added) {
+      elQueueCount.textContent = `(${queue.length})`;
+      if (activeTab === "queue") renderQueue();
+      // If queue was empty, start playing the first new track
+      if (qIdx === -1 || (qIdx >= queue.length - added && !isPlaying)) {
+        qIdx = queue.length - added;
+        loadTrack(queue[qIdx]);
+        renderQueue();
+      }
+    }
+  } catch (err) {
+    console.error("[autoplay]", err);
+  }
+
+  autoplayFetching = false;
+  elAutoplay.classList.remove("fetching");
 }
 
 function playPrev() {
@@ -747,6 +842,18 @@ elRepeat.addEventListener("click", () => {
     b.style.cssText = "position:absolute;top:2px;right:2px;font-size:8px;color:var(--accent);font-weight:700;";
     b.textContent = "1";
     elRepeat.appendChild(b);
+  }
+});
+
+elAutoplay.addEventListener("click", () => {
+  autoplay = !autoplay;
+  elAutoplay.classList.toggle("active", autoplay);
+  elAutoplay.title = autoplay
+    ? "Autoplay ON — AI is finding similar songs"
+    : "Autoplay: AI finds similar songs when queue ends";
+  // If turning on and queue is already on last song, fetch immediately
+  if (autoplay && currentTrack && !autoplayFetching && qIdx >= queue.length - 2) {
+    triggerAutoplay();
   }
 });
 
@@ -790,7 +897,15 @@ function renderQueue() {
     elQueueList.innerHTML = `<div id="mp-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:var(--sub);text-align:center;padding:40px"><div style="font-size:52px;opacity:.4">📋</div><p style="font-size:14px">Queue is empty.<br>Add songs from search results.</p></div>`;
     return;
   }
+  let shownDivider = false;
   queue.forEach((track, i) => {
+    if (track._autoplay && !shownDivider) {
+      shownDivider = true;
+      const div = document.createElement("div");
+      div.className = "mp-autoplay-divider";
+      div.textContent = "✦ AI Suggestions";
+      elQueueList.appendChild(div);
+    }
     const el = makeSongEl(track, i === qIdx, true);
     el.addEventListener("click", () => { qIdx = i; loadTrack(track); renderQueue(); });
     elQueueList.appendChild(el);
@@ -814,7 +929,7 @@ function makeSongEl(track, isActive = false, inQueue = false) {
     ${artEl}
     <div class="mp-song-info">
       <div class="mp-song-title">${esc(track.title)}</div>
-      <div class="mp-song-artist">${esc(track.artist)}${track.album ? ` · ${esc(track.album)}` : ""}</div>
+      <div class="mp-song-artist">${esc(track.artist)}${track.album ? ` · ${esc(track.album)}` : ""}${track._autoplay ? `<span class="mp-autoplay-badge">✦ AI</span>` : ""}</div>
     </div>
     <div class="mp-song-actions">
       ${inQueue
