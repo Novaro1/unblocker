@@ -724,41 +724,60 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       if (!activationCode) return interaction.editReply({ content: "❌ Activation email never arrived. Try again." });
 
-      await interaction.editReply({ content: `📧 Activation email received. Activating account…` });
+      // Server IP is blocked from activating — show the link and ask user to click it
       const activateUrl = activationCode.replace(/&amp;/g, "&");
-      console.log("[makelink/activate] URL:", activateUrl);
-      const activateRes = await fetch(activateUrl, { headers: { "User-Agent": "Mozilla/5.0", Cookie: sessionCookies } });
-      const activateHtml = await activateRes.text();
-      console.log("[makelink/activate] status:", activateRes.status, "title:", activateHtml.match(/<title>([^<]+)/i)?.[1]);
-      const activateFailed = /<title>\s*Problems!/i.test(activateHtml);
-      if (activateFailed) {
-        const bolds = [...activateHtml.matchAll(/<b[^>]*>([^<]{5,300})<\/b>/gi)].map(m => m[1].trim()).filter(t => !t.includes("<"));
-        return interaction.editReply({ content: `❌ Account activation failed: \`${bolds.slice(0,3).join(" | ") || "unknown"}\`\nActivation URL used: \`${activateUrl.slice(0,80)}\`\nRun \`/makelink\` again.` });
-      }
-
-      await interaction.editReply({ content: `✅ Account activated! Logging in…` });
-
-      // Save credentials for future use (email is the login identifier on FreeDNS)
       const FREEDNS_CREDS_FILE = join(__dirname, "../freedns-creds.json");
       writeFileSync(FREEDNS_CREDS_FILE, JSON.stringify({ username: fdUser, password: fdPass, email }, null, 2));
 
-      // Log in
-      const loginRes = await fetch("https://freedns.afraid.org/zc.php?step=2", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0" },
-        body: new URLSearchParams({ username: email, password: fdPass, action: "auth", submit: "Login" }),
-        redirect: "manual",
+      pendingFreeDNS.set(interaction.user.id, {
+        mode: "activate",
+        fdUser, fdPass, email,
+        sub, serverIp, targetDomain, filterKey, skipUncategorized,
+        expiresAt: Date.now() + 15 * 60 * 1000,
       });
-      const allCookies = loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean);
-      const cookies = allCookies.map(c => c.split(";")[0]).join("; ");
-      if (!cookies.includes("dns_cookie")) {
-        return interaction.editReply({ content: `❌ Login failed after activation (status ${loginRes.status}). FreeDNS may have rejected the account. Run \`/makelink\` again.` });
-      }
 
-      // If a filter was specified, find an unblocked domain first
-      let chosenDomain = targetDomain;
-      let filterName = filterKey;
-      if (filterKey && !chosenDomain) {
+      const activateBtn = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("freedns_activated_btn").setLabel("✅ I've activated my account").setStyle(ButtonStyle.Success),
+      );
+      return interaction.editReply({
+        content: `📧 **Activation required!**\nFreeDNS sent an activation email to \`${email}\`. Click the link below to activate, then press the button:\n\n${activateUrl}\n\n*(Link expires in ~15 min)*`,
+        components: [activateBtn],
+      });
+
+      // (post-activation flow moved to freedns_activated_btn handler)
+    } catch (e) {
+      console.error("[makelink/freedns modal] error:", e);
+      return interaction.editReply({ content: `❌ Error: ${e.message}` });
+    }
+  }
+});
+
+// ── FreeDNS "I've activated" button ────────────────────────────────────────
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isButton() || interaction.customId !== "freedns_activated_btn") return;
+  const pending = pendingFreeDNS.get(interaction.user.id);
+  if (!pending || pending.mode !== "activate") return interaction.reply({ content: "❌ Session expired. Run `/makelink` again.", ephemeral: true });
+
+  await interaction.deferUpdate();
+  const { fdUser, fdPass, email, sub, serverIp, targetDomain, filterKey, skipUncategorized } = pending;
+  pendingFreeDNS.delete(interaction.user.id);
+
+  try {
+    const loginRes = await fetch("https://freedns.afraid.org/zc.php?step=2", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0" },
+      body: new URLSearchParams({ username: email, password: fdPass, action: "auth", submit: "Login" }),
+      redirect: "manual",
+    });
+    const allCookies2 = loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean);
+    const cookies = allCookies2.map(c => c.split(";")[0]).join("; ");
+    if (!cookies.includes("dns_cookie"))
+      return interaction.editReply({ content: "❌ Login failed — account may not be activated yet. Please click the link first, then press the button." });
+
+    // If a filter was specified, find an unblocked domain first
+    let chosenDomain = targetDomain;
+    let filterName = filterKey;
+    if (filterKey && !chosenDomain) {
         const FREEDNS_FILE = join(__dirname, "../freedns-domains.txt");
         if (!existsSync(FREEDNS_FILE))
           return interaction.editReply({ content: "❌ FreeDNS domain list not generated yet on the server." });
@@ -823,10 +842,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         components: [btn2],
       });
     } catch (e) {
-      console.error("[makelink/freedns modal] error:", e);
+      console.error("[makelink/freedns activated] error:", e);
       return interaction.editReply({ content: `❌ Error: ${e.message}` });
     }
-  }
 });
 
 // ── Slash commands ─────────────────────────────────────────────────────────
