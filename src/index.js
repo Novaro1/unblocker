@@ -438,6 +438,25 @@ fastify.options("/api/freedns-account", (req, reply) => {
        .code(204).send();
 });
 
+// ── GET /extension — install page ─────────────────────────────────────────────
+fastify.get("/extension", (_req, reply) => {
+  return reply.type("text/html").sendFile("extension.html");
+});
+
+// ── GET /extension.zip — stream the extension folder as a zip ─────────────────
+fastify.get("/extension.zip", (_req, reply) => {
+  const projectRoot = fileURLToPath(new URL("..", import.meta.url));
+  reply
+    .header("Content-Type", "application/zip")
+    .header("Content-Disposition", 'attachment; filename="freedns-extension.zip"');
+  const zip = spawn("zip", ["-r", "-", "freedns-extension"], { cwd: projectRoot });
+  zip.on("error", e => {
+    console.error("[extension.zip] spawn error:", e.message);
+    if (!reply.sent) reply.code(500).send("zip unavailable");
+  });
+  zip.stdout.pipe(reply.raw);
+});
+
 fastify.setNotFoundHandler((_req, reply) => {
   return reply.code(404).type("text/html").sendFile("404.html");
 });

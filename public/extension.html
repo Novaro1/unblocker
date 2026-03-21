@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreeDNS Helper — Veil Extension</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0a0b0f;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 20px 80px;
+    }
+
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 48px; }
+    .logo svg { flex-shrink: 0; }
+    .logo-text { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+    .logo-sub  { font-size: 13px; color: #64748b; }
+
+    .card {
+      background: #111318;
+      border: 1px solid #1e2230;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 620px;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+      letter-spacing: -0.4px;
+    }
+    .tagline {
+      color: #64748b;
+      font-size: 15px;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #6366f1;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 13px 24px;
+      border-radius: 10px;
+      text-decoration: none;
+      transition: filter 0.15s, transform 0.1s;
+      margin-bottom: 28px;
+    }
+    .download-btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+    .download-btn:active { transform: translateY(0); }
+
+    .steps { counter-reset: step; display: flex; flex-direction: column; gap: 0; }
+    .step {
+      display: flex;
+      gap: 16px;
+      padding: 16px 0;
+      border-bottom: 1px solid #1a1d2a;
+    }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      counter-increment: step;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #1e2130;
+      border: 1.5px solid #2d3148;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: #a5b4fc;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-body { flex: 1; }
+    .step-title { font-size: 14px; font-weight: 600; color: #e2e8f0; margin-bottom: 4px; }
+    .step-desc  { font-size: 13px; color: #64748b; line-height: 1.55; }
+    .step-desc code {
+      background: #1a1d2a;
+      border: 1px solid #2d3148;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #a5b4fc;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #475569;
+      margin-bottom: 16px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+    @media (max-width: 500px) { .feature-grid { grid-template-columns: 1fr; } }
+
+    .feature {
+      background: #0f1117;
+      border: 1px solid #1e2230;
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .feature-icon { font-size: 20px; margin-bottom: 8px; }
+    .feature-title { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 4px; }
+    .feature-desc  { font-size: 12px; color: #64748b; line-height: 1.5; }
+
+    .note {
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-left: 3px solid #6366f1;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 20px;
+      line-height: 1.55;
+    }
+    .note strong { color: #e2e8f0; }
+
+    footer {
+      margin-top: 40px;
+      font-size: 12px;
+      color: #334155;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="logo">
+  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="32" height="32" rx="8" fill="#6366f1"/>
+    <path d="M8 10h16M8 16h10M8 22h13" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>
+  <div>
+    <div class="logo-text">Veil</div>
+    <div class="logo-sub">Browser Extension</div>
+  </div>
+</div>
+
+<!-- Main card -->
+<div class="card">
+  <h1>FreeDNS Helper</h1>
+  <p class="tagline">Create FreeDNS subdomains for Veil directly from your browser — no server-side logins, no IP blocks, no CAPTCHA issues.</p>
+
+  <a class="download-btn" href="/extension.zip" download="freedns-extension.zip">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    Download Extension
+  </a>
+
+  <div class="section-title">Install in Chrome</div>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <div class="step-title">Download &amp; unzip</div>
+        <div class="step-desc">Click the button above to download <code>freedns-extension.zip</code>, then unzip it to a folder on your computer.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <div class="step-title">Open Chrome Extensions</div>
+        <div class="step-desc">Go to <code>chrome://extensions</code> in your address bar and enable <strong>Developer mode</strong> using the toggle in the top-right corner.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <div class="step-title">Load unpacked</div>
+        <div class="step-desc">Click <strong>Load unpacked</strong> and select the unzipped <code>freedns-extension</code> folder. The extension icon will appear in your toolbar.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <div class="step-title">Configure settings</div>
+        <div class="step-desc">Click the extension icon → <strong>Server Settings</strong> and enter:<br>
+          URL: <code>https://veilub.mooo.com</code><br>
+          Server IP: <code>16.59.60.231</code><br>
+          API Key: ask a Veil staff member
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Staff only.</strong> This extension pushes new FreeDNS accounts and subdomains directly to the Veil proxy server. You need an API key from a staff member to use it.
+  </div>
+</div>
+
+<!-- Features card -->
+<div class="card">
+  <div class="section-title">What it does</div>
+  <div class="feature-grid">
+    <div class="feature">
+      <div class="feature-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="feature-title">Account Creation</div>
+      <div class="feature-desc">Auto-fills the FreeDNS signup form with generated credentials and a real temp email inbox.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+      </div>
+      <div class="feature-title">Email Verification</div>
+      <div class="feature-desc">Polls the temp inbox automatically and shows a one-click activate button when the email arrives.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      </div>
+      <div class="feature-title">Subdomain Creation</div>
+      <div class="feature-desc">Auto-fills the FreeDNS subdomain form with a random Veil name and the proxy IP on any Add Subdomain page.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </div>
+      <div class="feature-title">Auto Server Push</div>
+      <div class="feature-desc">Activated accounts are pushed to the Veil server automatically — ready for <code>/makelink</code> immediately.</div>
+    </div>
+  </div>
+</div>
+
+<footer>Veil · Staff extension · Not for public distribution</footer>
+
+</body>
+</html>
