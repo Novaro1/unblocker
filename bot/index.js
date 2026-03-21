@@ -428,7 +428,9 @@ async function freednsDoSave(allCookies, captchaCode, sub, domainId, domainName,
     }),
   });
   const saveHtml = await saveRes.text();
-  if (saveHtml.includes("incorrect") || saveHtml.includes("Problems!") || saveHtml.includes("error")) return null;
+  // FreeDNS returns a "Problems!" title page on any error (wrong captcha, not logged in, etc.)
+  // Check only for the specific title — the word "error" appears on success pages too
+  if (/<title>\s*Problems!/i.test(saveHtml)) return null;
   return `${sub}.${domainName}`;
 }
 
