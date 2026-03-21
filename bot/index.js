@@ -386,21 +386,38 @@ const pendingVerify = new Map();
 // ── Pending FreeDNS signups (userId -> { sessionCookies, mailToken, fdUser, fdPass, sub, serverIp }) ──
 const pendingFreeDNS = new Map();
 
-// ── FreeDNS: create a subdomain on a random public domain ──────────────────
-async function freednsCreateSubdomain(cookies, sub, serverIp) {
-  const pageNum = Math.floor(Math.random() * 3) + 1;
-  const regHtml = await fetch(`https://freedns.afraid.org/domain/registry/?page=${pageNum}&sort=2&q=`, {
-    headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" },
-  }).then(r => r.text());
+// ── FreeDNS: create a subdomain, optionally on a specific base domain ───────
+async function freednsCreateSubdomain(cookies, sub, serverIp, targetDomain = null) {
+  let domainId, domainName;
 
-  const domainMatches = [...regHtml.matchAll(
-    /<a href=\/subdomain\/edit\.php\?edit_domain_id=(\d+)>([\w.-]+)<\/a>(?:(?!<tr).)*?<td>public<\/td>/gs
-  )];
-  if (!domainMatches.length) return null;
+  if (targetDomain) {
+    // Search registry for the specific domain
+    const searchHtml = await fetch(
+      `https://freedns.afraid.org/domain/registry/?page=1&sort=2&q=${encodeURIComponent(targetDomain)}`,
+      { headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" } }
+    ).then(r => r.text());
+    const m = searchHtml.match(
+      new RegExp(`edit_domain_id=(\\d+)>${targetDomain.replace(/\./g, "\\.")}<\\/a>`)
+    );
+    if (!m) return null;
+    domainId = m[1];
+    domainName = targetDomain;
+  } else {
+    // Pick a random public domain from a random registry page
+    const pageNum = Math.floor(Math.random() * 3) + 1;
+    const regHtml = await fetch(`https://freedns.afraid.org/domain/registry/?page=${pageNum}&sort=2&q=`, {
+      headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" },
+    }).then(r => r.text());
 
-  const pick = domainMatches[Math.floor(Math.random() * domainMatches.length)];
-  const domainId = pick[1];
-  const domainName = pick[2];
+    const domainMatches = [...regHtml.matchAll(
+      /<a href=\/subdomain\/edit\.php\?edit_domain_id=(\d+)>([\w.-]+)<\/a>(?:(?!<tr).)*?<td>public<\/td>/gs
+    )];
+    if (!domainMatches.length) return null;
+
+    const pick = domainMatches[Math.floor(Math.random() * domainMatches.length)];
+    domainId = pick[1];
+    domainName = pick[2];
+  }
 
   await fetch("https://freedns.afraid.org/subdomain/save.php?step=2", {
     method: "POST",
@@ -633,7 +650,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     await interaction.deferReply({ ephemeral: true });
     const captchaCode = interaction.fields.getTextInputValue("captcha_code").trim();
-    const { sessionCookies, mailToken, fdUser, fdPass, email, sub, serverIp } = pending;
+    const { sessionCookies, mailToken, fdUser, fdPass, email, sub, serverIp, targetDomain, filterKey } = pending;
     pendingFreeDNS.delete(interaction.user.id);
 
     try {
@@ -658,7 +675,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (failedToSubmit) {
         const errMatch = signupHtml.match(/<b[^>]*>([^<]{5,120})<\/b>/i);
         const errMsg = errMatch ? errMatch[1].trim() : "Unknown error from FreeDNS";
-        return interaction.editReply({ content: `❌ Signup failed: ${errMsg}\nRun \`/makelink provider:FreeDNS\` again.` });
+        return interaction.editReply({ content: `❌ Signup failed: ${errMsg}\nRun \`/makelink\` again.` });
       }
 
       await interaction.editReply({ content: `✅ Signup submitted to FreeDNS with \`${email}\`! Waiting for activation email (up to 3 min)…` });
@@ -682,7 +699,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           }
         } catch {}
       }
-      if (!activationCode) return interaction.editReply({ content: "❌ Activation email never arrived. Try again or use DuckDNS." });
+      if (!activationCode) return interaction.editReply({ content: "❌ Activation email never arrived. Try again." });
 
       await fetch(`https://freedns.afraid.org/signup/activate.php?${activationCode}`, {
         headers: { "User-Agent": "Mozilla/5.0" },
@@ -692,7 +709,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const FREEDNS_CREDS_FILE = join(__dirname, "../freedns-creds.json");
       writeFileSync(FREEDNS_CREDS_FILE, JSON.stringify({ username: fdUser, password: fdPass, email }, null, 2));
 
-      // Log in and create subdomain
+      // Log in
       const loginRes = await fetch("https://freedns.afraid.org/zc.php?step=2", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0" },
@@ -702,17 +719,59 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const allCookies = loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean);
       const cookies = allCookies.map(c => c.split(";")[0]).join("; ");
 
-      const result = await freednsCreateSubdomain(cookies, sub, serverIp);
+      // If a filter was specified, find an unblocked domain first
+      let chosenDomain = targetDomain;
+      let filterName = filterKey;
+      if (filterKey && !chosenDomain) {
+        const FREEDNS_FILE = join(__dirname, "../freedns-domains.txt");
+        if (!existsSync(FREEDNS_FILE))
+          return interaction.editReply({ content: "❌ FreeDNS domain list not generated yet on the server." });
+
+        await interaction.editReply({ content: `🔍 Searching for a domain unblocked by **${filterKey}**…` });
+        const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
+        const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
+        const pool = readFileSync(FREEDNS_FILE, "utf-8").split("\n").map(d => d.trim()).filter(Boolean)
+          .sort(() => Math.random() - 0.5).slice(0, 30);
+
+        for (const domain of pool) {
+          try {
+            let results = getCachedResults(domain);
+            if (!results) {
+              const data = await fetch(
+                `https://api.glseries.net/freedns/check?domain=${encodeURIComponent(domain)}`,
+                { headers: { Authorization: `Bearer ${GL_TOKEN}` } }
+              ).then(r => r.json());
+              if (!data.success) continue;
+              results = data.results;
+              setCachedResults(domain, results);
+            }
+            const result = results.find(r => r.filter === filterKey);
+            if (result) filterName = result.name;
+            const category = result?.category || "";
+            if (result && !result.blocked && !result.error && !UNCATEGORIZED.test(category)) {
+              chosenDomain = domain;
+              break;
+            }
+          } catch {}
+        }
+        if (!chosenDomain)
+          return interaction.editReply({ content: `❌ No unblocked domain found for **${filterName || filterKey}** after checking 30 domains. Try again.` });
+      }
+
+      const result = await freednsCreateSubdomain(cookies, sub, serverIp, chosenDomain);
       if (!result) return interaction.editReply({ content: "❌ Login or subdomain creation failed after activation." });
+
+      const embedFields = [
+        { name: "URL", value: `https://${result}` },
+        { name: "Points to", value: serverIp },
+        { name: "Account", value: `\`${fdUser}\` (saved for future use)` },
+      ];
+      if (filterKey) embedFields.push({ name: "Unblocked by", value: filterName || filterKey });
 
       const embed = new EmbedBuilder()
         .setColor(0x57F287)
         .setTitle("✅ FreeDNS Link Created")
-        .addFields(
-          { name: "URL", value: `https://${result}` },
-          { name: "Points to", value: serverIp },
-          { name: "Account", value: `\`${fdUser}\` (saved for future use)` },
-        )
+        .addFields(...embedFields)
         .setFooter({ text: "DNS may take 1–5 minutes to propagate" })
         .setTimestamp();
       return interaction.editReply({ embeds: [embed] });
@@ -1451,11 +1510,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /makelink
   if (commandName === "makelink") {
-    const subdomain = interaction.options.getString("subdomain");
-    const serverIp  = process.env.SERVER_IP || "";
-    const chars     = "abcdefghijklmnopqrstuvwxyz0123456789";
-    const randStr   = (n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-    const sub       = subdomain || `veil${randStr(6)}`;
+    const subdomain   = interaction.options.getString("subdomain");
+    const filterKey   = interaction.options.getString("filter");
+    const targetDomain = interaction.options.getString("domain")?.toLowerCase().trim() || null;
+    const serverIp    = process.env.SERVER_IP || "";
+    const chars       = "abcdefghijklmnopqrstuvwxyz0123456789";
+    const randStr     = (n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    const sub         = subdomain || `veil${randStr(6)}`;
 
     if (!serverIp) return interaction.reply({ content: "❌ `SERVER_IP` is not set in the bot `.env`.", ephemeral: true });
 
@@ -1492,12 +1553,55 @@ client.on(Events.InteractionCreate, async (interaction) => {
           if (!cookies.includes("dns_cookie"))
             return interaction.editReply({ content: "❌ FreeDNS login failed. Check stored credentials." });
 
-          const fullDomain = await freednsCreateSubdomain(cookies, sub, serverIp);
-          if (!fullDomain) return interaction.editReply({ content: "❌ Could not fetch domain list from FreeDNS." });
+          // If a filter was specified, find an unblocked domain first
+          let chosenDomain = targetDomain;
+          let filterName = filterKey;
+          if (filterKey && !chosenDomain) {
+            if (!existsSync(FREEDNS_FILE))
+              return interaction.editReply({ content: "❌ FreeDNS domain list not generated yet on the server." });
+
+            await interaction.editReply({ content: `🔍 Searching for a domain unblocked by **${filterKey}**…` });
+            const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
+            const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
+            const pool = readFileSync(FREEDNS_FILE, "utf-8").split("\n").map(d => d.trim()).filter(Boolean)
+              .sort(() => Math.random() - 0.5).slice(0, 30);
+
+            for (const domain of pool) {
+              try {
+                let results = getCachedResults(domain);
+                if (!results) {
+                  const data = await fetch(
+                    `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
+                  ).then(r => r.json());
+                  if (!data.success) continue;
+                  results = data.results;
+                  setCachedResults(domain, results);
+                }
+                const result = results.find(r => r.filter === filterKey);
+                if (result) filterName = result.name;
+                const category = result?.category || "";
+                if (result && !result.blocked && !result.error && !UNCATEGORIZED.test(category)) {
+                  chosenDomain = domain;
+                  break;
+                }
+              } catch {}
+            }
+            if (!chosenDomain)
+              return interaction.editReply({ content: `❌ No unblocked domain found for **${filterName || filterKey}** after checking 30 domains. Try again.` });
+          }
+
+          const fullDomain = await freednsCreateSubdomain(cookies, sub, serverIp, chosenDomain);
+          if (!fullDomain) return interaction.editReply({ content: `❌ Could not find domain \`${chosenDomain || "random"}\` in FreeDNS registry.` });
+
+          const embedFields = [
+            { name: "URL", value: `https://${fullDomain}` },
+            { name: "Points to", value: serverIp },
+          ];
+          if (filterKey) embedFields.push({ name: "Unblocked by", value: filterName || filterKey });
 
           return interaction.editReply({ embeds: [
             new EmbedBuilder().setColor(0x57F287).setTitle("✅ FreeDNS Link Created")
-              .addFields({ name: "URL", value: `https://${fullDomain}` }, { name: "Points to", value: serverIp })
+              .addFields(...embedFields)
               .setFooter({ text: "DNS may take 1–5 minutes to propagate" }).setTimestamp(),
           ]});
         } catch (e) {
@@ -1549,7 +1653,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         // Store pending state (15 min expiry)
         pendingFreeDNS.set(interaction.user.id, {
           sessionCookies, mailToken, fdUser: newFdUser, fdPass: newFdPass,
-          email, sub, serverIp,
+          email, sub, serverIp, targetDomain, filterKey,
           expiresAt: Date.now() + 15 * 60 * 1000,
         });
 
