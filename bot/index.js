@@ -1452,7 +1452,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   // /makelink
   if (commandName === "makelink") {
     const subdomain = interaction.options.getString("subdomain");
-    const provider  = interaction.options.getString("provider") ?? "duckdns";
     const serverIp  = process.env.SERVER_IP || "";
     const chars     = "abcdefghijklmnopqrstuvwxyz0123456789";
     const randStr   = (n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
@@ -1460,31 +1459,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (!serverIp) return interaction.reply({ content: "❌ `SERVER_IP` is not set in the bot `.env`.", ephemeral: true });
 
-    // ── DuckDNS ──────────────────────────────────────────────────────────────
-    if (provider === "duckdns") {
-      const duckToken = process.env.DUCKDNS_TOKEN || "";
-      if (!duckToken) return interaction.reply({
-        content: "❌ `DUCKDNS_TOKEN` is not set.\n\n**One-time setup:**\n1. Go to <https://www.duckdns.org> and sign in with Google/GitHub\n2. Copy your **token** from the top of the page\n3. Add `DUCKDNS_TOKEN=your_token_here` to the bot `.env` and run `pm2 restart bot`",
-        ephemeral: true,
-      });
-
-      await interaction.deferReply({ ephemeral: true });
-      try {
-        const res = await fetch(`https://www.duckdns.org/update?domains=${sub}&token=${duckToken}&ip=${serverIp}&verbose=true`).then(r => r.text());
-        if (!res.startsWith("OK")) return interaction.editReply({ content: `❌ DuckDNS returned: \`${res.slice(0, 200)}\`` });
-
-        return interaction.editReply({ embeds: [
-          new EmbedBuilder().setColor(0x57F287).setTitle("✅ Link Created")
-            .addFields({ name: "URL", value: `https://${sub}.duckdns.org` }, { name: "Points to", value: serverIp })
-            .setFooter({ text: "DNS may take 1–2 minutes to propagate" }).setTimestamp(),
-        ]});
-      } catch (e) {
-        return interaction.editReply({ content: `❌ Error: ${e.message}` });
-      }
-    }
-
     // ── FreeDNS ──────────────────────────────────────────────────────────────
-    if (provider === "freedns") {
+    {
       const FREEDNS_CREDS_FILE = join(__dirname, "../freedns-creds.json");
 
       // Load saved credentials (env vars take priority)
