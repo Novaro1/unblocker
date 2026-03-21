@@ -692,15 +692,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }),
       });
       const signupHtml = await signupRes.text();
+      console.log("[makelink/signup] final URL:", signupRes.url, "title:", signupHtml.match(/<title>([^<]+)/i)?.[1]);
 
-      // FreeDNS stays on the signup URL if the submission failed; it redirects on success
-      const failedToSubmit = signupRes.url.includes("signup") &&
-        (signupHtml.includes("incorrect") || signupHtml.includes("already taken") ||
-         signupHtml.includes("invalid") || signupHtml.includes("Please try again"));
-      if (failedToSubmit) {
-        const errMatch = signupHtml.match(/<b[^>]*>([^<]{5,120})<\/b>/i);
-        const errMsg = errMatch ? errMatch[1].trim() : "Unknown error from FreeDNS";
-        return interaction.editReply({ content: `❌ Signup failed: ${errMsg}\nRun \`/makelink\` again.` });
+      // FreeDNS returns Problems! title on any signup error
+      if (/<title>\s*Problems!/i.test(signupHtml)) {
+        const bolds = [...signupHtml.matchAll(/<b[^>]*>([^<]{5,200})<\/b>/gi)].map(m => m[1].trim()).filter(t => !t.includes("<"));
+        return interaction.editReply({ content: `❌ Signup failed: \`${bolds.slice(0,3).join(" | ") || "unknown"}\`\nRun \`/makelink\` again.` });
       }
 
       await interaction.editReply({ content: `✅ Signup submitted to FreeDNS with \`${email}\`! Waiting for activation email (up to 3 min)…` });
