@@ -675,6 +675,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // Unknown pending mode
     return interaction.editReply({ content: "❌ Session expired. Run `/makelink` again." });
   }
+
+  // /addfreedns modal
+  if (interaction.customId === "addfreedns_modal") {
+    const username = interaction.fields.getTextInputValue("fdns_username").trim();
+    const password = interaction.fields.getTextInputValue("fdns_password").trim();
+    const email    = interaction.fields.getTextInputValue("fdns_email").trim() || null;
+
+    const FREEDNS_ACCOUNTS_FILE = join(__dirname, "../freedns-accounts.json");
+    let list = [];
+    if (existsSync(FREEDNS_ACCOUNTS_FILE)) {
+      try { list = JSON.parse(readFileSync(FREEDNS_ACCOUNTS_FILE, "utf-8")); } catch {}
+      if (!Array.isArray(list)) list = [];
+    }
+
+    if (list.some(a => a.username === username))
+      return interaction.reply({ content: `❌ Account \`${username}\` is already in the pool.`, ephemeral: true });
+
+    const entry = { username, password };
+    if (email) entry.email = email;
+    list.push(entry);
+    writeFileSync(FREEDNS_ACCOUNTS_FILE, JSON.stringify(list, null, 2));
+
+    return interaction.reply({
+      content: `✅ Added \`${username}\` to the FreeDNS account pool (${list.length} account${list.length !== 1 ? "s" : ""} total).`,
+      ephemeral: true,
+    });
+  }
 });
 
 // ── FreeDNS "I've activated" button ────────────────────────────────────────
@@ -1619,6 +1646,54 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       return interaction.editReply({ content: `❌ All FreeDNS accounts failed: ${lastError}. Add more accounts to \`freedns-accounts.json\`.` });
     }
+  }
+
+  // /makelink-status
+  if (commandName === "makelink-status") {
+    const FREEDNS_ACCOUNTS_FILE = join(__dirname, "../freedns-accounts.json");
+    const accounts = [];
+    if (process.env.FREEDNS_USER && process.env.FREEDNS_PASS)
+      accounts.push({ username: process.env.FREEDNS_USER });
+    if (existsSync(FREEDNS_ACCOUNTS_FILE)) {
+      try {
+        const list = JSON.parse(readFileSync(FREEDNS_ACCOUNTS_FILE, "utf-8"));
+        if (Array.isArray(list)) list.forEach(a => { if (a.username && a.password) accounts.push({ username: a.username }); });
+      } catch {}
+    }
+    const count = accounts.length;
+    const embed = new EmbedBuilder()
+      .setColor(count ? 0x57F287 : 0xED4245)
+      .setTitle("FreeDNS Account Pool")
+      .addFields(
+        { name: "Accounts configured", value: String(count), inline: true },
+        { name: "Max subdomains", value: count ? `~${count * 5} (${count} × 5)` : "0", inline: true },
+      )
+      .setDescription(
+        count
+          ? `Accounts: ${accounts.map(a => `\`${a.username}\``).join(", ")}\n\nEach free FreeDNS account supports **5 subdomains**. Use \`/addfreedns\` to add more accounts.`
+          : "No accounts configured. Use `/addfreedns` to add one, or edit `freedns-accounts.json` on the server."
+      )
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed], ephemeral: true });
+  }
+
+  // /addfreedns
+  if (commandName === "addfreedns") {
+    const modal = new ModalBuilder()
+      .setCustomId("addfreedns_modal")
+      .setTitle("Add FreeDNS Account");
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("fdns_username").setLabel("FreeDNS username").setStyle(TextInputStyle.Short).setRequired(true)
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("fdns_password").setLabel("FreeDNS password").setStyle(TextInputStyle.Short).setRequired(true)
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("fdns_email").setLabel("Email (used for login, if different)").setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder("Leave blank if same as username")
+      ),
+    );
+    return interaction.showModal(modal);
   }
 
   // /uptime

@@ -247,6 +247,16 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   new SlashCommandBuilder()
+    .setName("makelink-status")
+    .setDescription("Show how many FreeDNS accounts are configured and their subdomain capacity (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+  new SlashCommandBuilder()
+    .setName("addfreedns")
+    .setDescription("Add a FreeDNS account to the subdomain creation pool (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+  new SlashCommandBuilder()
     .setName("findlink")
     .setDescription("Find a FreeDNS domain that is unblocked by a specific school content filter")
     .addStringOption((o) =>
