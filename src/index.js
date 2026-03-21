@@ -10,7 +10,8 @@ import fastifyStatic from "@fastify/static";
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
 import { baremuxPath } from "@mercuryworkshop/bare-mux/node";
 import { YouTube } from "youtube-sr";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import SoundCloud from "soundcloud-scraper";
 
 const publicPath        = fileURLToPath(new URL("../public/", import.meta.url));
 const tokensPath        = fileURLToPath(new URL("../tokens.json", import.meta.url));
@@ -181,35 +182,58 @@ fastify.get('/api/beta-features', (_req, reply) => {
   return reply.send(result);
 });
 
-// Music: search YouTube via youtube-sr (no API key needed)
+// SoundCloud client — lazily initialized with a fresh client_id
+let scClient = null;
+async function getSCClient() {
+  if (scClient) return scClient;
+  const key = await SoundCloud.keygen();
+  scClient = new SoundCloud.Client(key);
+  return scClient;
+}
+
+// Music: search SoundCloud (no API key, no bot detection)
 fastify.get("/api/music/search", async (req, reply) => {
   const q     = String(req.query.q || "").trim();
   const limit = Math.min(parseInt(req.query.limit) || 24, 50);
   if (!q) return reply.send([]);
   try {
-    const videos = await YouTube.search(q, { limit, type: "video" });
-    const results = videos.map(v => ({
-      id:       v.id,
-      title:    v.title        || "Unknown",
-      artist:   v.channel?.name || "Unknown",
-      album:    "",
-      artwork:  `/api/music/thumb?id=${v.id}`,
-      duration: v.duration     || 0,
+    const client  = await getSCClient();
+    const found   = await client.search(q, "track");
+    const tracks  = found.filter(r => r.type === "track").slice(0, limit);
+    const infos   = await Promise.all(tracks.map(t => client.getSongInfo(t.url).catch(() => null)));
+    const results = infos.filter(Boolean).map(s => ({
+      id:        Buffer.from(s.url).toString("base64url"),
+      title:     s.title     || "Unknown",
+      artist:    s.author?.name || "Unknown",
+      album:     "",
+      artwork:   `/api/music/thumb?url=${Buffer.from(s.thumbnail || "").toString("base64url")}`,
+      duration:  s.duration  || 0,
+      sourceUrl: s.url,
     }));
     reply.send(results);
   } catch (err) {
     console.error("[music/search]", err.message);
+    scClient = null; // reset client on error so keygen retries
     reply.send([]);
   }
 });
 
-// YouTube thumbnail proxy — serves via our domain to bypass school filters
+// Artwork proxy — serves SoundCloud thumbnails via our domain to bypass school filters
 fastify.get("/api/music/thumb", async (req, reply) => {
-  const id = String(req.query.id || "");
-  if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return reply.status(400).send("Invalid ID");
+  let artworkUrl;
+  if (req.query.url) {
+    try { artworkUrl = Buffer.from(String(req.query.url), "base64url").toString(); }
+    catch { return reply.status(400).send("Invalid URL"); }
+    if (!artworkUrl.startsWith("https://i1.sndcdn.com/") && !artworkUrl.startsWith("https://i2.sndcdn.com/"))
+      return reply.status(400).send("Invalid artwork URL");
+  } else {
+    // Legacy: YouTube thumbnail by video ID
+    const id = String(req.query.id || "");
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return reply.status(400).send("Invalid ID");
+    artworkUrl = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+  }
   try {
-    const url      = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
-    const upstream = await fetch(url);
+    const upstream = await fetch(artworkUrl);
     reply
       .header("Content-Type",  upstream.headers.get("content-type") || "image/jpeg")
       .header("Cache-Control", "public, max-age=86400")
@@ -219,49 +243,18 @@ fastify.get("/api/music/thumb", async (req, reply) => {
   }
 });
 
-// YouTube audio stream via yt-dlp — proxied so school filters can't block it
-const YTDLP_COOKIES = fileURLToPath(new URL("../youtube-cookies.txt", import.meta.url));
-
-function ytdlpGetUrl(id) {
-  return new Promise((resolve, reject) => {
-    const args = [
-      "--no-playlist", "-f", "bestaudio[ext=webm]/bestaudio/best",
-      "--get-url",
-      "--js-runtimes", "node:/usr/bin/node",
-    ];
-    if (existsSync(YTDLP_COOKIES)) args.push("--cookies", YTDLP_COOKIES);
-    args.push(`https://www.youtube.com/watch?v=${id}`);
-    execFile("yt-dlp", args, { timeout: 20000 }, (err, stdout) => {
-      if (err) return reject(err);
-      const url = stdout.trim().split("\n")[0];
-      if (!url) return reject(new Error("No URL returned"));
-      resolve(url);
-    });
-  });
-}
-
+// SoundCloud audio stream via yt-dlp — proxied so school filters can't block it
 fastify.get("/api/music/stream", async (req, reply) => {
-  const id = String(req.query.id || "");
-  if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return reply.status(400).send("Invalid ID");
-  try {
-    const audioUrl = await ytdlpGetUrl(id);
+  const id = String(req.query.id || "").trim();
+  let scUrl;
+  try { scUrl = Buffer.from(id, "base64url").toString(); }
+  catch { return reply.status(400).send("Invalid ID"); }
+  if (!scUrl.startsWith("https://soundcloud.com/")) return reply.status(400).send("Invalid URL");
 
-    const upHeaders = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" };
-    if (req.headers.range) upHeaders["Range"] = req.headers.range;
-
-    const upstream = await fetch(audioUrl, { headers: upHeaders });
-    reply.status(upstream.status);
-    reply.header("Content-Type",  upstream.headers.get("content-type") || "audio/webm");
-    reply.header("Accept-Ranges", "bytes");
-    const cl = upstream.headers.get("content-length");
-    const cr = upstream.headers.get("content-range");
-    if (cl) reply.header("Content-Length", cl);
-    if (cr) reply.header("Content-Range",  cr);
-    return reply.send(Buffer.from(await upstream.arrayBuffer()));
-  } catch (err) {
-    console.error("[music/stream]", err.message);
-    return reply.status(502).send("Stream failed");
-  }
+  reply.header("Content-Type", "audio/mpeg");
+  const child = spawn("yt-dlp", ["--no-playlist", "-f", "hls_mp3_1_0/bestaudio", "-o", "-", scUrl]);
+  child.stderr.on("data", d => console.error("[music/stream]", d.toString().trim()));
+  return reply.send(child.stdout);
 });
 
 // GitHub push webhook → Discord announcements

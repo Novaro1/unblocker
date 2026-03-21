@@ -672,10 +672,10 @@ async function loadTrack(track) {
   elPlayPause.disabled = true;
   audio.src = `/api/music/stream?id=${track.id}`;
 
-  elYtLink.textContent = "Open in YouTube";
+  elYtLink.textContent = "Open in SoundCloud";
   elYtLink.onclick = () => {
     const w = window.open("about:blank", "_blank");
-    if (w) w.location.href = location.origin + "?q=" + encodeURIComponent(`https://www.youtube.com/watch?v=${track.id}`);
+    if (w) w.location.href = location.origin + "?q=" + encodeURIComponent(track.sourceUrl || "https://soundcloud.com");
   };
 
   audio.oncanplay = () => {

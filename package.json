@@ -11,12 +11,15 @@
     "dev": "node --watch src/index.js"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "@fastify/static": "^8.0.0",
     "@mercuryworkshop/bare-as-module3": "^2.2.5",
     "@mercuryworkshop/bare-mux": "^2.0.0",
     "@mercuryworkshop/scramjet": "https://github.com/MercuryWorkshop/scramjet/releases/download/latest/mercuryworkshop-scramjet-2.0.0-alpha.tgz",
     "@mercuryworkshop/wisp-js": "^0.4.1",
     "@tomphttp/bare-server-node": "^2.0.6",
-    "fastify": "^5.0.0"
+    "fastify": "^5.0.0",
+    "soundcloud-scraper": "^5.0.3",
+    "youtube-sr": "^4.3.12"
   }
 }
