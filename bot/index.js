@@ -522,9 +522,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setCustomId("captcha_code")
           .setLabel("Type the text from the image above")
           .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMinLength(4)
-          .setMaxLength(8)
+          .setRequired(true).setMinLength(4).setMaxLength(8)
           .setPlaceholder("e.g. XKQFT"),
       ),
     );
@@ -655,6 +653,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }),
       });
       const signupHtml = await signupRes.text();
+      const signupSnippet = signupHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 300);
+      console.log("[makelink/freedns] signup url:", signupRes.url, "| snippet:", signupSnippet);
 
       // FreeDNS stays on the signup URL if the submission failed; it redirects on success
       const failedToSubmit = signupRes.url.includes("signup") &&
@@ -666,7 +666,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.editReply({ content: `❌ Signup failed: ${errMsg}\nRun \`/makelink provider:FreeDNS\` again.` });
       }
 
-      await interaction.editReply({ content: "✅ Signup submitted! Waiting for activation email (up to 3 min)…" });
+      await interaction.editReply({ content: `✅ Signup submitted to FreeDNS with \`${email}\`! Waiting for activation email (up to 3 min)…` });
 
       // Poll mail.tm for activation email
       let activationCode = null;
@@ -1529,22 +1529,29 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       // No creds — need to create account. Start by fetching CAPTCHA.
       try {
-        // Create a mail.tm inbox
+        // Create a mail.tm inbox — try all available domains until one works
         const domainsRes = await fetch("https://api.mail.tm/domains").then(r => r.json());
-        const mailDomain = domainsRes?.["hydra:member"]?.[0]?.domain;
-        if (!mailDomain) return interaction.reply({ content: "❌ mail.tm unavailable. Try again later.", ephemeral: true });
+        const mailDomains = (domainsRes?.["hydra:member"] ?? []).map(d => d.domain).filter(Boolean);
+        if (!mailDomains.length) return interaction.reply({ content: "❌ mail.tm unavailable. Try again later.", ephemeral: true });
 
         const mailUser = randStr(12);
         const mailPass = randStr(16);
-        const email    = `${mailUser}@${mailDomain}`;
-        await fetch("https://api.mail.tm/accounts", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: email, password: mailPass }),
-        });
-        const { token: mailToken } = await fetch("https://api.mail.tm/token", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: email, password: mailPass }),
-        }).then(r => r.json());
+        let email = null, mailToken = null;
+
+        for (const domain of mailDomains) {
+          const candidate = `${mailUser}@${domain}`;
+          const accRes = await fetch("https://api.mail.tm/accounts", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ address: candidate, password: mailPass }),
+          }).then(r => r.json());
+          if (accRes?.address) {
+            const tokRes = await fetch("https://api.mail.tm/token", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ address: candidate, password: mailPass }),
+            }).then(r => r.json());
+            if (tokRes?.token) { email = candidate; mailToken = tokRes.token; break; }
+          }
+        }
         if (!mailToken) return interaction.reply({ content: "❌ Could not create temp inbox. Try again.", ephemeral: true });
 
         // Fetch the CAPTCHA image — this sets the PHPSESSID that ties the image to the answer
