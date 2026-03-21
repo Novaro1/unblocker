@@ -1547,15 +1547,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }).then(r => r.json());
         if (!mailToken) return interaction.reply({ content: "❌ Could not create temp inbox. Try again.", ephemeral: true });
 
-        // Fetch FreeDNS signup page (establishes a session for the captcha)
-        const signupPageRes = await fetch("https://freedns.afraid.org/signup/", { headers: { "User-Agent": "Mozilla/5.0" } });
-        const sessionCookies = (signupPageRes.headers.getSetCookie?.() ?? [signupPageRes.headers.get("set-cookie")].filter(Boolean))
+        // Fetch the CAPTCHA image — this sets the PHPSESSID that ties the image to the answer
+        const captchaRes = await fetch("https://freedns.afraid.org/securimage/securimage_show.php", {
+          headers: { "User-Agent": "Mozilla/5.0" },
+        });
+        const sessionCookies = (captchaRes.headers.getSetCookie?.() ?? [captchaRes.headers.get("set-cookie")].filter(Boolean))
           .map(c => c.split(";")[0]).join("; ");
-
-        // Fetch captcha image with the same session
-        const captchaImg = await fetch("https://freedns.afraid.org/securimage/securimage_show.php", {
-          headers: { Cookie: sessionCookies, "User-Agent": "Mozilla/5.0" },
-        }).then(r => r.arrayBuffer());
+        const captchaImg = await captchaRes.arrayBuffer();
 
         const newFdUser = `veil${randStr(10)}`;
         const newFdPass = randStr(20);
