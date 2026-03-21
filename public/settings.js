@@ -1,11 +1,11 @@
 "use strict";
 
-// ── Settings Panel ─────────────────────────────────────────────────────────
-(function () {
-
-// SVG icon snippets (Lucide, MIT)
+// SVG icon snippets (Lucide, MIT) — module-level so both IIFEs can access them
 const LOCK_SVG = '<svg class="icon icon-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+
+// ── Settings Panel ─────────────────────────────────────────────────────────
+(function () {
 
   const SETTINGS_KEY = "veil_settings_v1";
 
