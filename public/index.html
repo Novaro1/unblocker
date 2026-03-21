@@ -57,7 +57,7 @@
       </button>
 
       <!-- Ambassador star — shown on home screen when verified -->
-      <div id="ambassador-home-star" style="display:none;" title="Ambassador">⭐</div>
+      <div id="ambassador-home-star" style="display:none;" title="Ambassador"><svg class="icon icon-star" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
 
       <!-- Settings gear — top-right corner of home screen -->
       <button class="settings-gear" id="btn-settings-home" title="Settings" aria-label="Open settings">
@@ -310,10 +310,10 @@
               <option value="desmos">Desmos</option>
               <option value="khan">Khan Academy</option>
               <option value="custom">Custom…</option>
-              <option value="youtube"  disabled id="cloak-opt-youtube">🔒 YouTube</option>
-              <option value="spotify"  disabled id="cloak-opt-spotify">🔒 Spotify</option>
-              <option value="discord"  disabled id="cloak-opt-discord">🔒 Discord</option>
-              <option value="roblox"   disabled id="cloak-opt-roblox" >🔒 Roblox</option>
+              <option value="youtube"  disabled id="cloak-opt-youtube">YouTube (Ambassador)</option>
+              <option value="spotify"  disabled id="cloak-opt-spotify">Spotify (Ambassador)</option>
+              <option value="discord"  disabled id="cloak-opt-discord">Discord (Ambassador)</option>
+              <option value="roblox"   disabled id="cloak-opt-roblox" >Roblox (Ambassador)</option>
             </select>
           </div>
 
@@ -370,11 +370,11 @@
 
         <!-- about:blank Cloak -->
         <section class="settings-section">
-          <div class="settings-section-title">about:blank Cloak <span id="blank-cloak-lock" class="ambassador-only-badge">⭐ Ambassador</span></div>
+          <div class="settings-section-title">about:blank Cloak <span id="blank-cloak-lock" class="ambassador-only-badge"><svg class="icon icon-star" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Ambassador</span></div>
           <p class="settings-section-desc">Opens Veil inside an about:blank tab so the URL bar shows nothing suspicious.</p>
           <div class="settings-row">
             <span class="settings-label">Open now</span>
-            <button class="settings-btn" id="blank-cloak-btn" disabled>🔒 Ambassador</button>
+            <button class="settings-btn" id="blank-cloak-btn" disabled><svg class="icon icon-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Ambassador</button>
           </div>
           <div class="settings-row">
             <span class="settings-label">Auto-open on load</span>
@@ -399,9 +399,9 @@
               <button class="theme-swatch"        data-theme="ocean"   title="Ocean"></button>
               <button class="theme-swatch"        data-theme="void"    title="Void"></button>
               <button class="theme-swatch"        data-theme="chrome"  title="Chrome"></button>
-              <button class="theme-swatch theme-swatch--locked" data-theme="aura"    id="aura-swatch"    title="Aura (Ambassador only)"    disabled>🔒</button>
-              <button class="theme-swatch theme-swatch--locked" data-theme="crimson" id="crimson-swatch" title="Crimson (Ambassador only)" disabled>🔒</button>
-              <button class="theme-swatch theme-swatch--locked" data-theme="gold"    id="gold-swatch"    title="Gold (Ambassador only)"    disabled>🔒</button>
+              <button class="theme-swatch theme-swatch--locked" data-theme="aura"    id="aura-swatch"    title="Aura (Ambassador only)"    disabled><svg class="icon icon-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
+              <button class="theme-swatch theme-swatch--locked" data-theme="crimson" id="crimson-swatch" title="Crimson (Ambassador only)" disabled><svg class="icon icon-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
+              <button class="theme-swatch theme-swatch--locked" data-theme="gold"    id="gold-swatch"    title="Gold (Ambassador only)"    disabled><svg class="icon icon-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
             </div>
           </div>
 
@@ -468,8 +468,8 @@
               <button class="bg-swatch"        data-gradient="forest" title="Forest"></button>
               <button class="bg-swatch"        data-gradient="ocean"  title="Ocean"></button>
               <button class="bg-swatch"        data-gradient="dusk"   title="Dusk"></button>
-              <button class="bg-swatch bg-swatch--locked" data-gradient="blaze" id="grad-blaze" title="Blaze (Ambassador only)" disabled>🔒</button>
-              <button class="bg-swatch bg-swatch--locked" data-gradient="neon"  id="grad-neon"  title="Neon (Ambassador only)"  disabled>🔒</button>
+              <button class="bg-swatch bg-swatch--locked" data-gradient="blaze" id="grad-blaze" title="Blaze (Ambassador only)" disabled><svg class="icon icon-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
+              <button class="bg-swatch bg-swatch--locked" data-gradient="neon"  id="grad-neon"  title="Neon (Ambassador only)"  disabled><svg class="icon icon-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
             </div>
           </div>
         </section>
@@ -480,7 +480,7 @@
           <p class="settings-section-desc">Advertise Veil in Discord and get approved by staff to unlock exclusive features.</p>
 
           <div id="ambassador-verified" style="display:none;">
-            <div class="ambassador-badge">⭐ Ambassador — <span id="ambassador-name"></span></div>
+            <div class="ambassador-badge"><svg class="icon icon-star" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Ambassador — <span id="ambassador-name"></span></div>
           </div>
 
           <div id="ambassador-form">

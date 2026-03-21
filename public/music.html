@@ -484,7 +484,7 @@
     </a>
 
     <div id="mp-art-wrap">
-      <div id="mp-art-placeholder">🎵</div>
+      <div id="mp-art-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:64px;height:64px;opacity:0.4"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
       <img id="mp-art" src="" alt="" style="display:none">
     </div>
 
@@ -542,7 +542,7 @@
   <!-- ── Right: Search + Queue ──────────────────────── -->
   <div id="mp-right">
     <div id="mp-header">
-      <h1>🎵 Veil Music</h1>
+      <h1><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;vertical-align:-3px;margin-right:6px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Veil Music</h1>
       <div id="mp-search-wrap">
         <input id="mp-search" type="text" placeholder="Search songs, artists, albums...">
         <button id="mp-search-btn">Search</button>
@@ -559,7 +559,7 @@
 
       <div id="mp-results-panel">
         <div id="mp-empty">
-          <div class="mp-empty-icon">🎶</div>
+          <div class="mp-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
           <p>Search for your favorite songs, artists, or albums.<br>30-second previews powered by Apple Music.</p>
         </div>
         <div id="mp-results-list"></div>
@@ -568,7 +568,7 @@
       <div id="mp-queue-panel" style="display:none">
         <div id="mp-queue-empty" style="display:none">
           <div id="mp-empty">
-            <div class="mp-empty-icon">📋</div>
+            <div class="mp-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
             <p>Your queue is empty.<br>Add songs from the search results.</p>
           </div>
         </div>
@@ -900,7 +900,7 @@ function removeFromQueue(id) {
 function renderQueue() {
   elQueueList.innerHTML = "";
   if (!queue.length) {
-    elQueueList.innerHTML = `<div id="mp-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:var(--sub);text-align:center;padding:40px"><div style="font-size:52px;opacity:.4">📋</div><p style="font-size:14px">Queue is empty.<br>Add songs from search results.</p></div>`;
+    elQueueList.innerHTML = `<div id="mp-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:var(--sub);text-align:center;padding:40px"><div style="width:52px;height:52px;opacity:.4;margin:0 auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><p style="font-size:14px">Queue is empty.<br>Add songs from search results.</p></div>`;
     return;
   }
   let shownDivider = false;
@@ -926,7 +926,7 @@ function makeSongEl(track, isActive = false, inQueue = false) {
 
   const artEl = track.artwork
     ? `<img class="mp-song-art" src="${track.artwork.replace("600x600bb","60x60bb")}" alt="" loading="lazy">`
-    : `<div class="mp-song-art-placeholder">🎵</div>`;
+    : `<div class="mp-song-art-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;opacity:0.4"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`;
 
   const hasPreview = !!track.preview;
 
@@ -994,7 +994,7 @@ async function doSearch(q) {
   elSearchBtn.disabled     = false;
 
   if (!results.length) {
-    elEmpty.innerHTML = `<div class="mp-empty-icon">🔍</div><p>No results for "<strong>${esc(q)}</strong>".<br>Try a different search.</p>`;
+    elEmpty.innerHTML = `<div class="mp-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div><p>No results for "<strong>${esc(q)}</strong>".<br>Try a different search.</p>`;
     elEmpty.style.display = "flex";
     return;
   }

@@ -244,7 +244,7 @@
     <div style="font-size:22px;color:#d93025;font-weight:500;">Gmail</div>
     <div style="flex:1;max-width:720px;">
       <div style="display:flex;align-items:center;background:#eaf1fb;border-radius:24px;padding:8px 16px;gap:8px;">
-        <span style="color:#5f6368;font-size:18px;">🔍</span>
+        <span style="color:#5f6368"><svg style="width:18px;height:18px;vertical-align:-3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
         <input type="text" placeholder="Search mail" style="border:none;background:transparent;outline:none;font-size:16px;color:#202124;flex:1;" value="" />
       </div>
     </div>
@@ -263,7 +263,7 @@
         <span style="margin-left:auto;font-size:13px;font-weight:700;color:#202124;">3</span>
       </div>
       <div style="display:flex;align-items:center;gap:10px;padding:6px 16px 6px 24px;cursor:pointer;">
-        <span>⭐</span><span style="font-size:14px;color:#444;">Starred</span>
+        <span><svg style="width:16px;height:16px;vertical-align:-2px" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span><span style="font-size:14px;color:#444;">Starred</span>
       </div>
       <div style="display:flex;align-items:center;gap:10px;padding:6px 16px 6px 24px;cursor:pointer;">
         <span>🕐</span><span style="font-size:14px;color:#444;">Snoozed</span>
@@ -272,7 +272,7 @@
         <span>📤</span><span style="font-size:14px;color:#444;">Sent</span>
       </div>
       <div style="display:flex;align-items:center;gap:10px;padding:6px 16px 6px 24px;cursor:pointer;">
-        <span>📋</span><span style="font-size:14px;color:#444;">Drafts</span>
+        <span><svg style="width:16px;height:16px;vertical-align:-2px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span><span style="font-size:14px;color:#444;">Drafts</span>
       </div>
     </div>
     <!-- Email list -->
@@ -280,7 +280,7 @@
       <!-- Email row 1 (unread) -->
       <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f0f0f0;cursor:pointer;background:#fff;font-weight:700;" onmouseover="this.style.background='#f2f6fc'" onmouseout="this.style.background='#fff'">
         <input type="checkbox" style="flex-shrink:0;" />
-        <span style="flex-shrink:0;font-size:16px;">⭐</span>
+        <span style="flex-shrink:0"><svg style="width:16px;height:16px;vertical-align:-2px" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
         <span style="width:160px;flex-shrink:0;font-size:14px;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Mrs. Johnson</span>
         <span style="flex:1;font-size:14px;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Re: Chapter 5 Questions – <span style="font-weight:400;color:#5f6368;">Hi! Great questions about the green light symbolism…</span></span>
         <span style="flex-shrink:0;font-size:12px;color:#5f6368;">9:47 AM</span>
@@ -323,7 +323,7 @@
     <div style="font-size:20px;font-weight:700;color:#fff;letter-spacing:-0.5px;">Khan Academy</div>
     <div style="flex:1;max-width:480px;">
       <div style="display:flex;align-items:center;background:rgba(255,255,255,0.15);border-radius:4px;padding:6px 12px;gap:8px;">
-        <span style="color:rgba(255,255,255,0.7);font-size:14px;">🔍</span>
+        <span style="color:rgba(255,255,255,0.7)"><svg style="width:14px;height:14px;vertical-align:-2px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
         <input type="text" placeholder="Search" style="border:none;background:transparent;outline:none;font-size:14px;color:#fff;flex:1;" />
       </div>
     </div>
@@ -392,7 +392,7 @@
     <div style="width:280px;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;flex-shrink:0;">
       <div style="padding:8px;border-bottom:1px solid #e0e0e0;flex-shrink:0;">
         <div style="display:flex;align-items:center;background:#f5f5f5;border-radius:4px;padding:6px 10px;gap:8px;">
-          <span style="color:#999;font-size:13px;">🔍</span>
+          <span style="color:#999"><svg style="width:13px;height:13px;vertical-align:-2px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
           <input type="text" placeholder="Search…" style="border:none;background:transparent;outline:none;font-size:13px;flex:1;" />
         </div>
       </div>

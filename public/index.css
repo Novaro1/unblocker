@@ -645,6 +645,19 @@ main:has(.search-bar:focus-within) {
 .partners-empty a { color: var(--accent-light); text-decoration: none; }
 .partners-empty a:hover { text-decoration: underline; }
 
+/* ── Icon utility (Lucide SVG icons) ──────────────────────────────────────── */
+.icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+}
+.icon-star { color: #f59e0b; }
+.icon-lock { opacity: 0.7; }
+.theme-swatch--locked .icon,
+.bg-swatch--locked .icon { width: 12px; height: 12px; vertical-align: 0; }
+
 footer {
   margin-top: auto; text-align: center; padding: 1.5rem 1rem;
   color: var(--muted); font-size: 0.78rem; position: relative; z-index: 1;

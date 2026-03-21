@@ -3,6 +3,10 @@
 // ── Settings Panel ─────────────────────────────────────────────────────────
 (function () {
 
+// SVG icon snippets (Lucide, MIT)
+const LOCK_SVG = '<svg class="icon icon-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+
   const SETTINGS_KEY = "veil_settings_v1";
 
   const CLOAK_PRESETS = {
@@ -366,7 +370,7 @@
         const el = document.getElementById(`cloak-opt-${c}`);
         if (!el) return;
         el.disabled     = false;
-        el.textContent  = el.textContent.replace("🔒 ", "⭐ ");
+        el.innerHTML = el.textContent.replace(" (Ambassador)", "");
       });
 
       // Unlock exclusive gradient swatches
@@ -397,7 +401,7 @@
         const el = document.querySelector(`.theme-swatch[data-theme="${t}"]`);
         if (!el) return;
         el.disabled    = true;
-        el.textContent = "🔒";
+        el.innerHTML   = LOCK_SVG;
         el.title       = `${t.charAt(0).toUpperCase() + t.slice(1)} (Ambassador only)`;
         el.classList.add("theme-swatch--locked");
       });
@@ -407,7 +411,7 @@
         const el = document.getElementById(`cloak-opt-${c}`);
         if (!el) return;
         el.disabled    = true;
-        el.textContent = el.textContent.replace("⭐ ", "🔒 ");
+        el.innerHTML   = el.textContent.trim() + " (Ambassador)";
       });
 
       // Re-lock exclusive gradient swatches
@@ -415,7 +419,7 @@
         const el = document.querySelector(`.bg-swatch[data-gradient="${g}"]`);
         if (!el) return;
         el.disabled    = true;
-        el.textContent = "🔒";
+        el.innerHTML   = LOCK_SVG;
         el.title       = `${g.charAt(0).toUpperCase() + g.slice(1)} (Ambassador only)`;
         el.classList.add("bg-swatch--locked");
       });
@@ -424,7 +428,7 @@
       const blankBtn  = document.getElementById("blank-cloak-btn");
       const blankAuto = document.getElementById("blank-cloak-auto");
       const blankLock = document.getElementById("blank-cloak-lock");
-      if (blankBtn)  { blankBtn.disabled = true; blankBtn.textContent = "🔒 Ambassador"; }
+      if (blankBtn)  { blankBtn.disabled = true; blankBtn.innerHTML = LOCK_SVG + " Ambassador"; }
       if (blankAuto) blankAuto.disabled = true;
       if (blankLock) blankLock.style.display = "";
 
@@ -498,7 +502,7 @@
       const el = document.querySelector(`.theme-swatch[data-theme="${key}"]`);
       if (!el) return;
       el.disabled    = !unlocked;
-      el.textContent = unlocked ? "" : "🔒";
+      el.innerHTML   = unlocked ? "" : LOCK_SVG;
       el.title       = unlocked
         ? `${label} (Early Access — ${daysLeft}d left)`
         : `${label} (Ambassador only — ${daysLeft} days left in early access)`;
@@ -507,7 +511,7 @@
       const el = document.querySelector(`.bg-swatch[data-gradient="${key}"]`);
       if (!el) return;
       el.disabled    = !unlocked;
-      el.textContent = unlocked ? "" : "🔒";
+      el.innerHTML   = unlocked ? "" : LOCK_SVG;
       el.title       = unlocked
         ? `${label} (Early Access — ${daysLeft}d left)`
         : `${label} (Ambassador only — ${daysLeft} days left in early access)`;
@@ -516,7 +520,7 @@
       const el = document.getElementById(`cloak-opt-${key}`);
       if (!el) return;
       el.disabled    = !unlocked;
-      el.textContent = `${unlocked ? "⭐" : "🔒"} ${label}`;
+      el.innerHTML   = `${unlocked ? STAR_SVG : LOCK_SVG} ${label}`;
     }
   }
 
