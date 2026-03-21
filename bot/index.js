@@ -716,6 +716,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
               headers: { Authorization: `Bearer ${mailToken}` },
             }).then(r => r.ok ? r.json() : null);
             const text = body?.text || body?.html || "";
+            console.log("[makelink/email] subject:", body?.subject, "text snippet:", text.slice(0, 400));
             const match = text.match(/activate\.php\?([^"'\s<>]+)/);
             if (match) { activationCode = match[1]; break; }
           }
