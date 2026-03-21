@@ -101,19 +101,6 @@ function extractActivationUrl(text) {
   return m ? m[0] : null;
 }
 
-// ── Push to server ────────────────────────────────────────────────────────────
-async function pushAccountToServer(account) {
-  const { serverUrl, apiKey } = await new Promise(r => chrome.storage.local.get(["serverUrl","apiKey"], r));
-  const base = (serverUrl || "").replace(/\/$/, "");
-  if (!base || !apiKey) return { skipped: true, reason: "not configured" };
-  const r = await fetch(`${base}/api/freedns-account`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key: apiKey, username: account.username, password: account.password, email: account.email }),
-  });
-  return r.json();
-}
-
 // ── Styles ────────────────────────────────────────────────────────────────────
 function injectStyles() {
   if (document.getElementById("fdh-styles")) return;
@@ -393,17 +380,7 @@ function handleActivation(url, creds) {
       }
     });
 
-    // Push to server
-    pushAccountToServer(creds)
-      .then(d => {
-        if (textEl) textEl.textContent = d.skipped
-          ? "Ready! Account already on server."
-          : `Ready! Added to server (pool: ${d.poolSize}).`;
-      })
-      .catch(e => {
-        if (textEl) textEl.textContent = `Activation found! (Server push failed: ${e.message} — use Push All in popup)`;
-      });
-
+    if (textEl) textEl.textContent = "Account activated! Credentials saved locally.";
     chrome.storage.local.remove("pendingVerify");
   }
 }

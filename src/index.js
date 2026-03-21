@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
-import { readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "url";
 import { hostname } from "node:os";
@@ -398,44 +398,6 @@ fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply
   }
 
   return reply.code(200).send("ok");
-});
-
-// ── POST /api/freedns-account — add account to pool (extension calls this) ───
-const freednsAccountsPath = fileURLToPath(new URL("../freedns-accounts.json", import.meta.url));
-const FREEDNS_API_KEY = process.env.FREEDNS_API_KEY || "";
-
-fastify.post("/api/freedns-account", async (req, reply) => {
-  reply.header("Access-Control-Allow-Origin", "*");
-  if (!FREEDNS_API_KEY)
-    return reply.code(503).send({ error: "FREEDNS_API_KEY not set on server" });
-
-  const { key, username, password, email } = req.body ?? {};
-  if (!key || key !== FREEDNS_API_KEY)
-    return reply.code(401).send({ error: "Invalid API key" });
-  if (!username || !password)
-    return reply.code(400).send({ error: "username and password required" });
-
-  let list = [];
-  if (existsSync(freednsAccountsPath)) {
-    try { list = JSON.parse(readFileSync(freednsAccountsPath, "utf-8")); } catch {}
-    if (!Array.isArray(list)) list = [];
-  }
-  if (list.some(a => a.username === username))
-    return reply.send({ ok: true, skipped: true, message: "Account already in pool" });
-
-  const entry = { username, password };
-  if (email) entry.email = email;
-  list.push(entry);
-  writeFileSync(freednsAccountsPath, JSON.stringify(list, null, 2));
-  console.log(`[freedns-account] Added ${username} (pool size: ${list.length})`);
-  return reply.send({ ok: true, poolSize: list.length });
-});
-
-fastify.options("/api/freedns-account", (req, reply) => {
-  reply.header("Access-Control-Allow-Origin", "*")
-       .header("Access-Control-Allow-Methods", "POST, OPTIONS")
-       .header("Access-Control-Allow-Headers", "Content-Type")
-       .code(204).send();
 });
 
 // ── GET /extension — install page ─────────────────────────────────────────────

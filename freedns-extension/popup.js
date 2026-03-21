@@ -64,21 +64,6 @@ function extractActivationUrl(text) {
   return m ? m[0] : null;
 }
 
-// ── Push account to Veil server ───────────────────────────────────────────────
-async function pushAccountToServer(account) {
-  const { serverUrl, apiKey } = await new Promise(r => chrome.storage.local.get(["serverUrl","apiKey"], r));
-  const base = (serverUrl || "").replace(/\/$/, "");
-  if (!base || !apiKey) throw new Error("Server URL or API key not set — configure in extension settings");
-  const r = await fetch(`${base}/api/freedns-account`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key: apiKey, username: account.username, password: account.password, email: account.email }),
-  });
-  const d = await r.json();
-  if (!d.ok) throw new Error(d.error || "Server returned error");
-  return d;
-}
-
 // ── State ─────────────────────────────────────────────────────────────────────
 
 let current = { username: "", password: "", email: "", sid_token: "", firstName: "", lastName: "" };
@@ -189,10 +174,6 @@ async function checkInbox() {
             saveAccounts(acc, () => renderList(acc));
           }
         });
-        // Push to server automatically
-        pushAccountToServer({ username, password, email })
-          .then(d => toast(d.skipped ? "Already on server" : `Added to server! Pool: ${d.poolSize}`))
-          .catch(e => toast(`Saved locally. Server push failed: ${e.message}`, "#f59e0b"));
         chrome.storage.local.remove("pendingVerify");
       }
     } else {
@@ -259,11 +240,9 @@ async function generate() {
 generate();
 loadAccounts(renderList);
 
-// Load saved server settings into fields
-chrome.storage.local.get(["serverUrl", "apiKey", "serverIp"], ({ serverUrl, apiKey, serverIp }) => {
-  if (serverUrl) document.getElementById("cfg-server").value = serverUrl;
-  if (apiKey)    document.getElementById("cfg-key").value    = apiKey;
-  if (serverIp)  document.getElementById("cfg-ip").value     = serverIp;
+// Load saved server IP into field
+chrome.storage.local.get("serverIp", ({ serverIp }) => {
+  if (serverIp) document.getElementById("cfg-ip").value = serverIp;
 });
 
 // Restore pending verify state if popup was closed mid-flow
@@ -314,28 +293,6 @@ document.getElementById("btn-check").addEventListener("click", () => {
   pollTimer = setInterval(checkInbox, 6000);
 });
 
-document.getElementById("btn-push-all").addEventListener("click", async () => {
-  const statusEl = document.getElementById("push-status");
-  statusEl.style.display = "block";
-  loadAccounts(async accounts => {
-    if (!accounts.length) { statusEl.textContent = "No saved accounts to push."; return; }
-    statusEl.textContent = `Pushing ${accounts.length} account(s)…`;
-    let pushed = 0, skipped = 0, failed = 0;
-    for (const acct of accounts) {
-      try {
-        const d = await pushAccountToServer(acct);
-        if (d.skipped) skipped++; else pushed++;
-      } catch { failed++; }
-    }
-    const parts = [];
-    if (pushed)  parts.push(`${pushed} added`);
-    if (skipped) parts.push(`${skipped} already on server`);
-    if (failed)  parts.push(`${failed} failed`);
-    statusEl.textContent = parts.join(", ") + (failed ? " — check server settings" : " ✓");
-    if (pushed) toast(`${pushed} account(s) pushed to server!`);
-  });
-});
-
 document.getElementById("btn-export").addEventListener("click", () => {
   loadAccounts(accounts => {
     if (!accounts.length) { toast("Nothing to export.", "#f59e0b"); return; }
@@ -352,10 +309,8 @@ document.getElementById("btn-clear").addEventListener("click", () => {
 });
 
 document.getElementById("btn-save-cfg").addEventListener("click", () => {
-  const serverUrl = document.getElementById("cfg-server").value.trim();
-  const apiKey    = document.getElementById("cfg-key").value.trim();
-  const serverIp  = document.getElementById("cfg-ip").value.trim();
-  chrome.storage.local.set({ serverUrl, apiKey, serverIp }, () => toast("Settings saved!"));
+  const serverIp = document.getElementById("cfg-ip").value.trim();
+  chrome.storage.local.set({ serverIp }, () => toast("Settings saved!"));
 });
 
 document.querySelectorAll(".copy-btn").forEach(btn => {
