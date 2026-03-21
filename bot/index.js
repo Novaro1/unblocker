@@ -650,7 +650,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     await interaction.deferReply({ ephemeral: true });
     const captchaCode = interaction.fields.getTextInputValue("captcha_code").trim();
-    const { sessionCookies, mailToken, fdUser, fdPass, email, sub, serverIp, targetDomain, filterKey } = pending;
+    const { sessionCookies, mailToken, fdUser, fdPass, email, sub, serverIp, targetDomain, filterKey, skipUncategorized } = pending;
     pendingFreeDNS.delete(interaction.user.id);
 
     try {
@@ -748,7 +748,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const result = results.find(r => r.filter === filterKey);
             if (result) filterName = result.name;
             const category = result?.category || "";
-            if (result && !result.blocked && !result.error && !UNCATEGORIZED.test(category)) {
+            const categoryOk = !skipUncategorized || !UNCATEGORIZED.test(category);
+            if (result && !result.blocked && !result.error && categoryOk) {
               chosenDomain = domain;
               break;
             }
@@ -1510,9 +1511,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /makelink
   if (commandName === "makelink") {
-    const subdomain   = interaction.options.getString("subdomain");
-    const filterKey   = interaction.options.getString("filter");
-    const targetDomain = interaction.options.getString("domain")?.toLowerCase().trim() || null;
+    const subdomain        = interaction.options.getString("subdomain");
+    const filterKey        = interaction.options.getString("filter");
+    const targetDomain     = interaction.options.getString("domain")?.toLowerCase().trim() || null;
+    const skipUncategorized = interaction.options.getBoolean("skip_uncategorized") ?? true;
     const serverIp    = process.env.SERVER_IP || "";
     const chars       = "abcdefghijklmnopqrstuvwxyz0123456789";
     const randStr     = (n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
@@ -1580,7 +1582,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 const result = results.find(r => r.filter === filterKey);
                 if (result) filterName = result.name;
                 const category = result?.category || "";
-                if (result && !result.blocked && !result.error && !UNCATEGORIZED.test(category)) {
+                const categoryOk = !skipUncategorized || !UNCATEGORIZED.test(category);
+                if (result && !result.blocked && !result.error && categoryOk) {
                   chosenDomain = domain;
                   break;
                 }
@@ -1653,7 +1656,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         // Store pending state (15 min expiry)
         pendingFreeDNS.set(interaction.user.id, {
           sessionCookies, mailToken, fdUser: newFdUser, fdPass: newFdPass,
-          email, sub, serverIp, targetDomain, filterKey,
+          email, sub, serverIp, targetDomain, filterKey, skipUncategorized,
           expiresAt: Date.now() + 15 * 60 * 1000,
         });
 

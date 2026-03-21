@@ -236,6 +236,9 @@ const commands = [
     )
     .addStringOption((o) =>
       o.setName("domain").setDescription("Use a specific FreeDNS base domain (e.g. mooo.com)").setRequired(false)
+    )
+    .addBooleanOption((o) =>
+      o.setName("skip_uncategorized").setDescription("Skip domains with no known category (default: true)").setRequired(false)
     ),
 
   new SlashCommandBuilder()
