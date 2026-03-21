@@ -162,7 +162,7 @@ const {
 
 // Public commands that must be used in #bot-commands
 const PUBLIC_COMMANDS = new Set([
-  "links", "status", "faq", "serverinfo", "uptime",
+  "links", "status", "serverinfo", "uptime",
   "leaderboard", "beta-status", "freedns", "findlink",
 ]);
 
