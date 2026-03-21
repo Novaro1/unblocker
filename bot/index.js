@@ -705,10 +705,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         body: new URLSearchParams({ username: fdUser, password: fdPass, submit: "Login" }),
         redirect: "manual",
       });
-      const cookies = (loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean))
-        .map(c => c.split(";")[0]).join("; ");
+      const allCookies = loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean);
+      const cookies = allCookies.map(c => c.split(";")[0]).join("; ");
+      console.log("[makelink/freedns] login status:", loginRes.status, "cookies:", cookies);
 
       const result = await freednsCreateSubdomain(cookies, sub, serverIp);
+      console.log("[makelink/freedns] subdomain result:", result);
       if (!result) return interaction.editReply({ content: "❌ Login or subdomain creation failed after activation." });
 
       const embed = new EmbedBuilder()
