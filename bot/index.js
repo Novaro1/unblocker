@@ -1568,7 +1568,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const captchaImg = await captchaRes.arrayBuffer();
 
         const newFdUser = `veil${randStr(10)}`;
-        const newFdPass = randStr(20);
+        const newFdPass = randStr(14);
 
         // Store pending state (15 min expiry)
         pendingFreeDNS.set(interaction.user.id, {
