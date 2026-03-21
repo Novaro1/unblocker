@@ -386,12 +386,9 @@ const pendingVerify = new Map();
 // ── Pending FreeDNS signups (userId -> { sessionCookies, mailToken, fdUser, fdPass, sub, serverIp }) ──
 const pendingFreeDNS = new Map();
 
-// ── FreeDNS: create a subdomain, optionally on a specific base domain ───────
-async function freednsCreateSubdomain(cookies, sub, serverIp, targetDomain = null) {
-  let domainId, domainName;
-
+// ── FreeDNS: find a domain from the registry ────────────────────────────────
+async function freednsFindDomain(cookies, targetDomain) {
   if (targetDomain) {
-    // Search registry for the specific domain
     const searchHtml = await fetch(
       `https://freedns.afraid.org/domain/registry/?page=1&sort=2&q=${encodeURIComponent(targetDomain)}`,
       { headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" } }
@@ -400,37 +397,38 @@ async function freednsCreateSubdomain(cookies, sub, serverIp, targetDomain = nul
       new RegExp(`edit_domain_id=(\\d+)>(?:<[^>]+>)?${targetDomain.replace(/\./g, "\\.")}`)
     );
     if (!m) return null;
-    domainId = m[1];
-    domainName = targetDomain;
-  } else {
-    // Pick a random public domain from a random registry page
-    const pageNum = Math.floor(Math.random() * 3) + 1;
-    const regHtml = await fetch(`https://freedns.afraid.org/domain/registry/?page=${pageNum}&sort=2&q=`, {
-      headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" },
-    }).then(r => r.text());
-
-    const domainMatches = [...regHtml.matchAll(
-      /<a href=\/subdomain\/edit\.php\?edit_domain_id=(\d+)>([\w.-]+)<\/a>(?:(?!<tr).)*?<td>public<\/td>/gs
-    )];
-    if (!domainMatches.length) return null;
-
-    const pick = domainMatches[Math.floor(Math.random() * domainMatches.length)];
-    domainId = pick[1];
-    domainName = pick[2];
+    return { domainId: m[1], domainName: targetDomain };
   }
 
-  await fetch("https://freedns.afraid.org/subdomain/save.php?step=2", {
+  // Pick a random public domain from a random registry page
+  const pageNum = Math.floor(Math.random() * 3) + 1;
+  const regHtml = await fetch(`https://freedns.afraid.org/domain/registry/?page=${pageNum}&sort=2&q=`, {
+    headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" },
+  }).then(r => r.text());
+  const domainMatches = [...regHtml.matchAll(
+    /<a href=\/subdomain\/edit\.php\?edit_domain_id=(\d+)>([\w.-]+)<\/a>(?:(?!<tr).)*?<td>public<\/td>/gs
+  )];
+  if (!domainMatches.length) return null;
+  const pick = domainMatches[Math.floor(Math.random() * domainMatches.length)];
+  return { domainId: pick[1], domainName: pick[2] };
+}
+
+// ── FreeDNS: save a subdomain record (requires CAPTCHA code + combined cookies) ──
+async function freednsDoSave(allCookies, captchaCode, sub, domainId, domainName, serverIp) {
+  const saveRes = await fetch("https://freedns.afraid.org/subdomain/save.php?step=2", {
     method: "POST",
     headers: {
-      Cookie: cookies, "Content-Type": "application/x-www-form-urlencoded",
+      Cookie: allCookies, "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent": "Mozilla/5.0", Referer: "https://freedns.afraid.org/subdomain/edit.php",
     },
     body: new URLSearchParams({
       type: "A", subdomain: sub, domain_id: domainId,
       address: serverIp, send: "Save!", skip_duplicate: "0",
+      captcha_code: captchaCode,
     }),
   });
-
+  const saveHtml = await saveRes.text();
+  if (saveHtml.includes("incorrect") || saveHtml.includes("Problems!") || saveHtml.includes("error")) return null;
   return `${sub}.${domainName}`;
 }
 
@@ -650,8 +648,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     await interaction.deferReply({ ephemeral: true });
     const captchaCode = interaction.fields.getTextInputValue("captcha_code").trim();
-    const { sessionCookies, mailToken, fdUser, fdPass, email, sub, serverIp, targetDomain, filterKey, skipUncategorized } = pending;
     pendingFreeDNS.delete(interaction.user.id);
+
+    // ── Subdomain-only CAPTCHA (existing account already logged in) ──────────
+    if (pending.mode === "subdomain") {
+      const { phpsessid, dnsCookie, domainId, domainName, sub, serverIp, filterKey, filterName, fdUser } = pending;
+      try {
+        const allCookies = [phpsessid, dnsCookie].filter(Boolean).join("; ");
+        const fullDomain = await freednsDoSave(allCookies, captchaCode, sub, domainId, domainName, serverIp);
+        if (!fullDomain) return interaction.editReply({ content: "❌ CAPTCHA incorrect or subdomain creation failed. Run `/makelink` again." });
+        const embedFields = [
+          { name: "URL", value: `https://${fullDomain}` },
+          { name: "Points to", value: serverIp },
+        ];
+        if (fdUser) embedFields.push({ name: "Account", value: `\`${fdUser}\`` });
+        if (filterKey) embedFields.push({ name: "Unblocked by", value: filterName || filterKey });
+        return interaction.editReply({ embeds: [
+          new EmbedBuilder().setColor(0x57F287).setTitle("✅ FreeDNS Link Created")
+            .addFields(...embedFields)
+            .setFooter({ text: "DNS may take 1–5 minutes to propagate" }).setTimestamp(),
+        ]});
+      } catch (e) {
+        console.error("[makelink/subdomain captcha] error:", e);
+        return interaction.editReply({ content: `❌ Error: ${e.message}` });
+      }
+    }
+
+    const { sessionCookies, mailToken, fdUser, fdPass, email, sub, serverIp, targetDomain, filterKey, skipUncategorized } = pending;
 
     try {
       // Submit signup
@@ -758,23 +781,34 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return interaction.editReply({ content: `❌ No unblocked domain found for **${filterName || filterKey}** after checking 30 domains. Try again.` });
       }
 
-      const result = await freednsCreateSubdomain(cookies, sub, serverIp, chosenDomain);
-      if (!result) return interaction.editReply({ content: chosenDomain ? `❌ Could not find \`${chosenDomain}\` in the FreeDNS public registry. The \`domain\` option only accepts FreeDNS shared domains (e.g. \`mooo.com\`, \`chickenkiller.com\`). Use \`/freedns\` to browse available domains.` : "❌ Subdomain creation failed after activation." });
+      // FreeDNS also requires CAPTCHA for subdomain creation — fetch a new image
+      const domainInfo = await freednsFindDomain(cookies, chosenDomain);
+      if (!domainInfo) return interaction.editReply({ content: chosenDomain ? `❌ Could not find \`${chosenDomain}\` in the FreeDNS public registry. The \`domain\` option only accepts FreeDNS shared domains (e.g. \`mooo.com\`, \`chickenkiller.com\`). Use \`/freedns\` to browse available domains.` : "❌ No public domains found. Try again." });
 
-      const embedFields = [
-        { name: "URL", value: `https://${result}` },
-        { name: "Points to", value: serverIp },
-        { name: "Account", value: `\`${fdUser}\` (saved for future use)` },
-      ];
-      if (filterKey) embedFields.push({ name: "Unblocked by", value: filterName || filterKey });
+      const captchaRes2 = await fetch("https://freedns.afraid.org/securimage/securimage_show.php", { headers: { "User-Agent": "Mozilla/5.0" } });
+      const captchaSess2 = (captchaRes2.headers.getSetCookie?.() ?? [captchaRes2.headers.get("set-cookie")].filter(Boolean)).map(c => c.split(";")[0]).join("; ");
+      const captchaImg2 = Buffer.from(await captchaRes2.arrayBuffer());
+      const dnsCookiePart = cookies.split("; ").find(c => c.startsWith("dns_cookie")) || "";
 
-      const embed = new EmbedBuilder()
-        .setColor(0x57F287)
-        .setTitle("✅ FreeDNS Link Created")
-        .addFields(...embedFields)
-        .setFooter({ text: "DNS may take 1–5 minutes to propagate" })
-        .setTimestamp();
-      return interaction.editReply({ embeds: [embed] });
+      pendingFreeDNS.set(interaction.user.id, {
+        mode: "subdomain",
+        phpsessid: captchaSess2,
+        dnsCookie: dnsCookiePart,
+        domainId: domainInfo.domainId,
+        domainName: domainInfo.domainName,
+        sub, serverIp, filterKey, filterName,
+        fdUser,
+        expiresAt: Date.now() + 15 * 60 * 1000,
+      });
+
+      const btn2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("freedns_captcha_btn").setLabel("Enter CAPTCHA Code").setStyle(ButtonStyle.Primary),
+      );
+      return interaction.editReply({
+        content: `✅ Account \`${fdUser}\` activated! One more CAPTCHA to create the subdomain:`,
+        files: [{ attachment: captchaImg2, name: "captcha.png" }],
+        components: [btn2],
+      });
     } catch (e) {
       console.error("[makelink/freedns modal] error:", e);
       return interaction.editReply({ content: `❌ Error: ${e.message}` });
@@ -1592,20 +1626,34 @@ client.on(Events.InteractionCreate, async (interaction) => {
               return interaction.editReply({ content: `❌ No unblocked domain found for **${filterName || filterKey}** after checking 30 domains. Try again.` });
           }
 
-          const fullDomain = await freednsCreateSubdomain(cookies, sub, serverIp, chosenDomain);
-          if (!fullDomain) return interaction.editReply({ content: `❌ Could not find \`${chosenDomain}\` in the FreeDNS public registry. The \`domain\` option only accepts FreeDNS shared domains (e.g. \`mooo.com\`, \`chickenkiller.com\`). Use \`/freedns\` to browse available domains.` });
+          // FreeDNS requires CAPTCHA even for logged-in users creating subdomains
+          const domainInfo = await freednsFindDomain(cookies, chosenDomain);
+          if (!domainInfo) return interaction.editReply({ content: chosenDomain ? `❌ Could not find \`${chosenDomain}\` in the FreeDNS public registry. The \`domain\` option only accepts FreeDNS shared domains (e.g. \`mooo.com\`, \`chickenkiller.com\`). Use \`/freedns\` to browse available domains.` : "❌ No public domains found. Try again." });
 
-          const embedFields = [
-            { name: "URL", value: `https://${fullDomain}` },
-            { name: "Points to", value: serverIp },
-          ];
-          if (filterKey) embedFields.push({ name: "Unblocked by", value: filterName || filterKey });
+          const captchaRes = await fetch("https://freedns.afraid.org/securimage/securimage_show.php", { headers: { "User-Agent": "Mozilla/5.0" } });
+          const captchaSess = (captchaRes.headers.getSetCookie?.() ?? [captchaRes.headers.get("set-cookie")].filter(Boolean)).map(c => c.split(";")[0]).join("; ");
+          const captchaImg = Buffer.from(await captchaRes.arrayBuffer());
+          const dnsCookiePart = cookies.split("; ").find(c => c.startsWith("dns_cookie")) || "";
 
-          return interaction.editReply({ embeds: [
-            new EmbedBuilder().setColor(0x57F287).setTitle("✅ FreeDNS Link Created")
-              .addFields(...embedFields)
-              .setFooter({ text: "DNS may take 1–5 minutes to propagate" }).setTimestamp(),
-          ]});
+          pendingFreeDNS.set(interaction.user.id, {
+            mode: "subdomain",
+            phpsessid: captchaSess,
+            dnsCookie: dnsCookiePart,
+            domainId: domainInfo.domainId,
+            domainName: domainInfo.domainName,
+            sub, serverIp, filterKey, filterName,
+            fdUser,
+            expiresAt: Date.now() + 15 * 60 * 1000,
+          });
+
+          const btn = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("freedns_captcha_btn").setLabel("Enter CAPTCHA Code").setStyle(ButtonStyle.Primary),
+          );
+          return interaction.editReply({
+            content: "**FreeDNS — Subdomain Creation**\nSolve this CAPTCHA to create the subdomain:",
+            files: [{ attachment: captchaImg, name: "captcha.png" }],
+            components: [btn],
+          });
         } catch (e) {
           console.error("[makelink/freedns] error:", e);
           return interaction.editReply({ content: `❌ Error: ${e.message}` });
