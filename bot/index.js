@@ -694,15 +694,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
         headers: { "User-Agent": "Mozilla/5.0" },
       });
 
-      // Save credentials for future use
+      // Save credentials for future use (email is the login identifier on FreeDNS)
       const FREEDNS_CREDS_FILE = join(__dirname, "../freedns-creds.json");
-      writeFileSync(FREEDNS_CREDS_FILE, JSON.stringify({ username: fdUser, password: fdPass }, null, 2));
+      writeFileSync(FREEDNS_CREDS_FILE, JSON.stringify({ username: fdUser, password: fdPass, email }, null, 2));
 
       // Log in and create subdomain
       const loginRes = await fetch("https://freedns.afraid.org/zc.php?step=2", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0" },
-        body: new URLSearchParams({ username: fdUser, password: fdPass, submit: "Login" }),
+        body: new URLSearchParams({ username: email, password: fdPass, action: "auth", submit: "Login" }),
         redirect: "manual",
       });
       const allCookies = loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean);
@@ -1498,18 +1498,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
       // Load saved credentials (env vars take priority)
       let fdUser = process.env.FREEDNS_USER || "";
       let fdPass = process.env.FREEDNS_PASS || "";
+      let fdEmail = process.env.FREEDNS_EMAIL || "";
       if (!fdUser && existsSync(FREEDNS_CREDS_FILE)) {
-        try { ({ username: fdUser, password: fdPass } = JSON.parse(readFileSync(FREEDNS_CREDS_FILE, "utf-8"))); } catch {}
+        try {
+          const saved = JSON.parse(readFileSync(FREEDNS_CREDS_FILE, "utf-8"));
+          fdUser = saved.username; fdPass = saved.password; fdEmail = saved.email || "";
+        } catch {}
       }
 
       // If we have creds, log in and create subdomain directly
       if (fdUser && fdPass) {
         await interaction.deferReply({ ephemeral: true });
         try {
+          // FreeDNS login uses email as the identifier
+          const loginWith = fdEmail || fdUser;
           const loginRes = await fetch("https://freedns.afraid.org/zc.php?step=2", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0" },
-            body: new URLSearchParams({ username: fdUser, password: fdPass, submit: "Login" }),
+            body: new URLSearchParams({ username: loginWith, password: fdPass, action: "auth", submit: "Login" }),
             redirect: "manual",
           });
           const cookies = (loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean))
