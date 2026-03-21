@@ -653,8 +653,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }),
       });
       const signupHtml = await signupRes.text();
-      const signupSnippet = signupHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 300);
-      console.log("[makelink/freedns] signup url:", signupRes.url, "| snippet:", signupSnippet);
+      const signupSnippet = signupHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+      const errPart = signupSnippet.slice(signupSnippet.indexOf("Sign Up!"), signupSnippet.indexOf("Sign Up!") + 600);
+      console.log("[makelink/freedns] signup url:", signupRes.url, "| after header:", errPart || signupSnippet.slice(0, 600));
 
       // FreeDNS stays on the signup URL if the submission failed; it redirects on success
       const failedToSubmit = signupRes.url.includes("signup") &&
