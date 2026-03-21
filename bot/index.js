@@ -726,9 +726,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       if (!activationCode) return interaction.editReply({ content: "❌ Activation email never arrived. Try again." });
 
-      await fetch(`https://freedns.afraid.org/signup/activate.php?${activationCode}`, {
+      await interaction.editReply({ content: `📧 Activation email received. Activating account…` });
+      const activateRes = await fetch(`https://freedns.afraid.org/signup/activate.php?${activationCode}`, {
         headers: { "User-Agent": "Mozilla/5.0" },
       });
+      const activateHtml = await activateRes.text();
+      const activateFailed = /<title>\s*Problems!/i.test(activateHtml) || activateHtml.toLowerCase().includes("invalid") || activateHtml.toLowerCase().includes("already activated");
+      if (activateFailed) {
+        const errM = activateHtml.match(/<b[^>]*>([^<]{5,200})<\/b>/i);
+        return interaction.editReply({ content: `❌ Account activation failed: ${errM ? errM[1].trim() : "unknown error"}. Run \`/makelink\` again.` });
+      }
+
+      await interaction.editReply({ content: `✅ Account activated! Logging in…` });
 
       // Save credentials for future use (email is the login identifier on FreeDNS)
       const FREEDNS_CREDS_FILE = join(__dirname, "../freedns-creds.json");
@@ -743,6 +752,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       });
       const allCookies = loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get("set-cookie")].filter(Boolean);
       const cookies = allCookies.map(c => c.split(";")[0]).join("; ");
+      if (!cookies.includes("dns_cookie")) {
+        return interaction.editReply({ content: `❌ Login failed after activation (status ${loginRes.status}). FreeDNS may have rejected the account. Run \`/makelink\` again.` });
+      }
 
       // If a filter was specified, find an unblocked domain first
       let chosenDomain = targetDomain;
