@@ -635,7 +635,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (!pending) return interaction.reply({ content: "❌ Session expired. Run `/makelink` again.", ephemeral: true });
 
     await interaction.deferReply({ ephemeral: true });
-    const captchaCode = interaction.fields.getTextInputValue("captcha_code").trim().toUpperCase();
+    const captchaCode = interaction.fields.getTextInputValue("captcha_code").trim();
     const { sessionCookies, mailToken, fdUser, fdPass, email, sub, serverIp } = pending;
     pendingFreeDNS.delete(interaction.user.id);
 
@@ -672,18 +672,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
       let activationCode = null;
       for (let i = 0; i < 36; i++) {
         await new Promise(r => setTimeout(r, 5000));
-        const msgs = await fetch("https://api.mail.tm/messages", {
-          headers: { Authorization: `Bearer ${mailToken}` },
-        }).then(r => r.json());
-        const msg = msgs?.["hydra:member"]?.[0];
-        if (msg) {
-          const body = await fetch(`https://api.mail.tm/messages/${msg.id}`, {
+        try {
+          const msgs = await fetch("https://api.mail.tm/messages", {
             headers: { Authorization: `Bearer ${mailToken}` },
-          }).then(r => r.json());
-          const text = body.text || body.html || "";
-          const match = text.match(/activate\.php\?([^"'\s<>]+)/);
-          if (match) { activationCode = match[1]; break; }
-        }
+          }).then(r => r.ok ? r.json() : null);
+          const msg = msgs?.["hydra:member"]?.[0];
+          if (msg) {
+            const body = await fetch(`https://api.mail.tm/messages/${msg.id}`, {
+              headers: { Authorization: `Bearer ${mailToken}` },
+            }).then(r => r.ok ? r.json() : null);
+            const text = body?.text || body?.html || "";
+            const match = text.match(/activate\.php\?([^"'\s<>]+)/);
+            if (match) { activationCode = match[1]; break; }
+          }
+        } catch {}
       }
       if (!activationCode) return interaction.editReply({ content: "❌ Activation email never arrived. Try again or use DuckDNS." });
 
@@ -1539,18 +1541,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
         let email = null, mailToken = null;
 
         for (const domain of mailDomains) {
-          const candidate = `${mailUser}@${domain}`;
-          const accRes = await fetch("https://api.mail.tm/accounts", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: candidate, password: mailPass }),
-          }).then(r => r.json());
-          if (accRes?.address) {
-            const tokRes = await fetch("https://api.mail.tm/token", {
+          try {
+            const candidate = `${mailUser}@${domain}`;
+            const accRes = await fetch("https://api.mail.tm/accounts", {
               method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ address: candidate, password: mailPass }),
-            }).then(r => r.json());
-            if (tokRes?.token) { email = candidate; mailToken = tokRes.token; break; }
-          }
+            }).then(r => r.ok ? r.json() : null);
+            if (accRes?.address) {
+              const tokRes = await fetch("https://api.mail.tm/token", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ address: candidate, password: mailPass }),
+              }).then(r => r.ok ? r.json() : null);
+              if (tokRes?.token) { email = candidate; mailToken = tokRes.token; break; }
+            }
+          } catch {}
         }
         if (!mailToken) return interaction.reply({ content: "❌ Could not create temp inbox. Try again.", ephemeral: true });
 
