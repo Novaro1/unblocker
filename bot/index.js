@@ -393,12 +393,9 @@ async function freednsCreateSubdomain(cookies, sub, serverIp) {
     headers: { Cookie: cookies, "User-Agent": "Mozilla/5.0" },
   }).then(r => r.text());
 
-  const domainMatches = [...regHtml.matchAll(/edit_domain_id=(\d+)">([\w.-]+)<\/a>/g)]
-    .filter((_, i, a) => {
-      // Only keep entries that have "public" nearby — crude but effective
-      const slice = regHtml.slice(regHtml.indexOf(a[i][0]), regHtml.indexOf(a[i][0]) + 300);
-      return slice.includes("public");
-    });
+  const domainMatches = [...regHtml.matchAll(
+    /<a href=\/subdomain\/edit\.php\?edit_domain_id=(\d+)>([\w.-]+)<\/a>(?:(?!<tr).)*?<td>public<\/td>/gs
+  )];
   if (!domainMatches.length) return null;
 
   const pick = domainMatches[Math.floor(Math.random() * domainMatches.length)];
