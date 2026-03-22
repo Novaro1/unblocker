@@ -415,20 +415,44 @@ fastify.get("/youtube", (_req, reply) => {
   return reply.type("text/html").sendFile("youtube.html");
 });
 
-// YouTube search — uses youtube-sr (no API key required)
+// YouTube search — yt-dlp ytsearch (no API key, reliable)
+function fmtDuration(secs) {
+  const s = Math.round(secs || 0);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+  return `${m}:${String(sec).padStart(2,"0")}`;
+}
+
 fastify.get("/api/youtube/search", async (req, reply) => {
   const q     = String(req.query.q || "").trim();
   const limit = Math.min(parseInt(req.query.limit) || 20, 50);
   if (!q) return reply.send([]);
   try {
-    const results = await YouTube.search(q, { limit, type: "video" });
-    reply.send(results.map(v => ({
+    const videos = await new Promise((resolve, reject) => {
+      let stdout = "", stderr = "";
+      const child = spawn("yt-dlp", [
+        `ytsearch${limit}:${q}`,
+        "--dump-json", "--flat-playlist", "--quiet", "--no-warnings",
+      ]);
+      child.stdout.on("data", d => { stdout += d; });
+      child.stderr.on("data", d => { stderr += d; });
+      child.on("close", code => {
+        if (!stdout && code !== 0) return reject(new Error(stderr.trim() || "yt-dlp error"));
+        const lines = stdout.trim().split("\n").filter(Boolean);
+        const parsed = lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+        resolve(parsed);
+      });
+      child.on("error", reject);
+    });
+    reply.send(videos.map(v => ({
       id:       v.id,
-      title:    v.title || "Unknown",
-      channel:  v.channel?.name || "Unknown",
-      duration: v.duration,             // ms
-      durationF: v.durationFormatted,   // "3:45"
-      views:    v.views,
+      title:    v.title  || "Unknown",
+      channel:  v.channel || v.uploader || "Unknown",
+      duration: (v.duration || 0) * 1000,
+      durationF: v.duration ? fmtDuration(v.duration) : "",
+      views:    v.view_count || 0,
       thumb:    `/api/youtube/thumb?id=${v.id}`,
     })));
   } catch (err) {
