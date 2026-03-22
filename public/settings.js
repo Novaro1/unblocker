@@ -47,6 +47,8 @@ const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentC
     fxCursor:       true,
     fxVignette:     true,
     perfMode:       false,
+    idleBlur:       false,
+    idleBlurDelay:  30,
     panicEnabled:   true,
     panicKey:       "alt+x",
     panicUrl:       "https://classroom.google.com",
@@ -106,6 +108,55 @@ const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentC
     document.body.classList.toggle("no-vignette",  !s.fxVignette);
     document.body.classList.toggle("perf-mode",    !!s.perfMode);
     window._veilPerfMode = !!s.perfMode;
+
+    applyIdleBlur(s);
+  }
+
+  // ── Idle blur ──────────────────────────────────────────────────────────────
+  let _idleTimer   = null;
+  let _idleOverlay = null;
+
+  function applyIdleBlur(s) {
+    clearTimeout(_idleTimer);
+
+    // Remove overlay if disabling
+    if (!s.idleBlur) {
+      if (_idleOverlay) { _idleOverlay.remove(); _idleOverlay = null; }
+      return;
+    }
+
+    // Create overlay once
+    if (!_idleOverlay) {
+      _idleOverlay = document.createElement("div");
+      _idleOverlay.id = "idle-blur-overlay";
+      _idleOverlay.setAttribute("aria-hidden", "true");
+      _idleOverlay.innerHTML = `<div id="idle-blur-hint">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        <span>Screen hidden — move mouse or press any key</span>
+      </div>`;
+      document.body.appendChild(_idleOverlay);
+      _idleOverlay.addEventListener("click", wakeUp);
+    }
+
+    const delay = Math.max(5, Number(s.idleBlurDelay) || 30) * 1000;
+
+    function sleep() {
+      _idleOverlay.classList.add("active");
+    }
+    function wakeUp() {
+      _idleOverlay.classList.remove("active");
+      resetTimer();
+    }
+    function resetTimer() {
+      clearTimeout(_idleTimer);
+      _idleTimer = setTimeout(sleep, delay);
+    }
+
+    // Store wake-up so event listeners can call it
+    window._veilIdleWake = wakeUp;
+    window._veilIdleReset = resetTimer;
+
+    resetTimer();
   }
 
   function applyCloak(s) {
@@ -201,9 +252,10 @@ const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentC
       "fx-scanlines": "fxScanlines",
       "fx-cursor":    "fxCursor",
       "fx-vignette":  "fxVignette",
-      "perf-mode-toggle": "perfMode",
-      "panic-enabled":    "panicEnabled",
-      "priv-history":     "saveHistory",
+      "perf-mode-toggle":  "perfMode",
+      "idle-blur-toggle":  "idleBlur",
+      "panic-enabled":     "panicEnabled",
+      "priv-history":      "saveHistory",
     };
     for (const [id, key] of Object.entries(checks)) {
       const cb = el(id);
@@ -216,6 +268,9 @@ const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentC
     });
 
     // Background
+    const idleDelayEl = el("idle-blur-delay");
+    if (idleDelayEl) idleDelayEl.value = String(s.idleBlurDelay || 30);
+
     const bgUrlInput = document.getElementById("bg-url");
     if (bgUrlInput) bgUrlInput.value = s.bgImage || "";
     document.querySelectorAll("#bg-gradient-picker .bg-swatch").forEach((btn) => {
@@ -254,9 +309,10 @@ const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentC
     "fx-scanlines":     "fxScanlines",
     "fx-cursor":        "fxCursor",
     "fx-vignette":      "fxVignette",
-    "perf-mode-toggle": "perfMode",
-    "panic-enabled":    "panicEnabled",
-    "priv-history":     "saveHistory",
+    "perf-mode-toggle":  "perfMode",
+    "idle-blur-toggle":  "idleBlur",
+    "panic-enabled":     "panicEnabled",
+    "priv-history":      "saveHistory",
   };
   panel?.addEventListener("change", function (e) {
     const cb = e.target;
@@ -313,6 +369,16 @@ const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentC
     document.querySelectorAll("#bg-gradient-picker .bg-swatch").forEach((b) => {
       b.classList.toggle("active", b === btn);
     });
+  });
+
+  // Idle blur delay
+  document.getElementById("idle-blur-delay")?.addEventListener("change", function () {
+    patch({ idleBlurDelay: parseInt(this.value) || 30 });
+  });
+
+  // Wake on any activity globally
+  ["mousemove", "keydown", "mousedown", "touchstart", "scroll"].forEach(evt => {
+    document.addEventListener(evt, () => window._veilIdleReset?.(), { passive: true });
   });
 
   // ── Init ──────────────────────────────────────────────────────────────────

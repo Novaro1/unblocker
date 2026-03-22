@@ -473,6 +473,24 @@
               <span class="toggle-track"></span>
             </label>
           </div>
+          <div class="settings-row">
+            <span class="settings-label">Screen Blur on Idle</span>
+            <label class="toggle">
+              <input type="checkbox" id="idle-blur-toggle" />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="settings-row" id="idle-blur-delay-row">
+            <label class="settings-label" for="idle-blur-delay">Blur after</label>
+            <select id="idle-blur-delay" class="settings-select">
+              <option value="10">10 seconds</option>
+              <option value="20">20 seconds</option>
+              <option value="30" selected>30 seconds</option>
+              <option value="45">45 seconds</option>
+              <option value="60">1 minute</option>
+              <option value="120">2 minutes</option>
+            </select>
+          </div>
         </section>
 
         <!-- Background -->
@@ -550,6 +568,9 @@
 
       </div>
     </div>
+
+    <!-- Idle blur overlay — shown after inactivity when setting is on -->
+    <div id="idle-blur-overlay" aria-hidden="true"></div>
 
     <!-- Panic / stealth overlay — filled by panic.js at runtime -->
     <div id="panic-overlay" style="display:none;"></div>
