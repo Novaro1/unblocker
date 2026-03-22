@@ -410,6 +410,93 @@ fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply
   return reply.code(200).send("ok");
 });
 
+// ── GET /youtube — YouTube player page ───────────────────────────────────────
+fastify.get("/youtube", (_req, reply) => {
+  return reply.type("text/html").sendFile("youtube.html");
+});
+
+// YouTube search — uses youtube-sr (no API key required)
+fastify.get("/api/youtube/search", async (req, reply) => {
+  const q     = String(req.query.q || "").trim();
+  const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+  if (!q) return reply.send([]);
+  try {
+    const results = await YouTube.search(q, { limit, type: "video" });
+    reply.send(results.map(v => ({
+      id:       v.id,
+      title:    v.title || "Unknown",
+      channel:  v.channel?.name || "Unknown",
+      duration: v.duration,             // ms
+      durationF: v.durationFormatted,   // "3:45"
+      views:    v.views,
+      thumb:    `/api/youtube/thumb?id=${v.id}`,
+    })));
+  } catch (err) {
+    console.error("[youtube/search]", err.message);
+    reply.send([]);
+  }
+});
+
+// YouTube thumbnail proxy — bypasses school filters
+fastify.get("/api/youtube/thumb", async (req, reply) => {
+  const id = String(req.query.id || "").trim();
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return reply.status(400).send("Invalid ID");
+  const url = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+  try {
+    const upstream = await fetch(url);
+    reply
+      .header("Content-Type",  upstream.headers.get("content-type") || "image/jpeg")
+      .header("Cache-Control", "public, max-age=86400")
+      .send(Buffer.from(await upstream.arrayBuffer()));
+  } catch {
+    reply.status(502).send("Failed to fetch thumbnail");
+  }
+});
+
+// YouTube video stream — yt-dlp extracts direct URL, server proxies for seeking
+fastify.get("/api/youtube/stream", async (req, reply) => {
+  const id = String(req.query.id || "").trim();
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return reply.status(400).send("Invalid ID");
+
+  const ytUrl = `https://www.youtube.com/watch?v=${id}`;
+
+  // Get direct stream URL (single combined video+audio file, ≤720p)
+  const directUrl = await new Promise((resolve) => {
+    execFile(
+      "yt-dlp",
+      [
+        "--no-playlist",
+        "-f", "best[height<=720][ext=mp4]/best[height<=480][ext=mp4]/best[height<=720]/best",
+        "--get-url",
+        ytUrl,
+      ],
+      { timeout: 20000 },
+      (err, stdout) => resolve(err ? null : stdout.trim().split("\n")[0] || null)
+    );
+  });
+
+  if (!directUrl) return reply.status(502).send("Could not resolve stream URL");
+
+  const upstreamHeaders = {};
+  if (req.headers.range) upstreamHeaders["range"] = req.headers.range;
+
+  try {
+    const upstream = await fetch(directUrl, { headers: upstreamHeaders });
+    reply.code(upstream.status);
+    reply.header("Content-Type",  upstream.headers.get("content-type") || "video/mp4");
+    reply.header("Accept-Ranges", "bytes");
+    reply.header("Cache-Control", "no-cache");
+    const cl = upstream.headers.get("content-length");
+    const cr = upstream.headers.get("content-range");
+    if (cl) reply.header("Content-Length", cl);
+    if (cr) reply.header("Content-Range",  cr);
+    return reply.send(Readable.fromWeb(upstream.body));
+  } catch (err) {
+    console.error("[youtube/stream] proxy error:", err.message);
+    return reply.status(502).send("Stream proxy failed");
+  }
+});
+
 // ── GET /ai — AI chat page ────────────────────────────────────────────────────
 fastify.get("/ai", (_req, reply) => {
   return reply.type("text/html").sendFile("ai.html");
