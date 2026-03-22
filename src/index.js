@@ -400,6 +400,11 @@ fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply
   return reply.code(200).send("ok");
 });
 
+// ── GET /ai — AI chat page ────────────────────────────────────────────────────
+fastify.get("/ai", (_req, reply) => {
+  return reply.type("text/html").sendFile("ai.html");
+});
+
 // ── GET /extension — install page ─────────────────────────────────────────────
 fastify.get("/extension", (_req, reply) => {
   return reply.type("text/html").sendFile("extension.html");
