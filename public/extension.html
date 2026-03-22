@@ -8,25 +8,38 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --bg:             #060610;
+      --surface:        #0e0e1e;
+      --surface2:       #15152a;
+      --border:         #1e1e38;
+      --text:           #ecedf8;
+      --muted:          #6264a0;
+      --accent:         #6366f1;
+      --accent-light:   #818cf8;
+      --accent-lighter: #a5b4fc;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #0a0b0f;
-      color: #e2e8f0;
+      font-family: ui-rounded, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 48px 20px 80px;
+      -webkit-font-smoothing: antialiased;
     }
 
-    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 48px; }
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 48px; text-decoration: none; }
     .logo svg { flex-shrink: 0; }
-    .logo-text { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
-    .logo-sub  { font-size: 13px; color: #64748b; }
+    .logo-text { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+    .logo-sub  { font-size: 13px; color: var(--muted); margin-top: 1px; }
 
     .card {
-      background: #111318;
-      border: 1px solid #1e2230;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 16px;
       padding: 32px;
       max-width: 620px;
@@ -37,22 +50,22 @@
     h1 {
       font-size: 26px;
       font-weight: 700;
-      color: #fff;
+      color: var(--text);
       margin-bottom: 8px;
       letter-spacing: -0.4px;
     }
     .tagline {
-      color: #64748b;
+      color: var(--muted);
       font-size: 15px;
       margin-bottom: 28px;
-      line-height: 1.5;
+      line-height: 1.55;
     }
 
     .download-btn {
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      background: #6366f1;
+      background: var(--accent);
       color: #fff;
       font-size: 15px;
       font-weight: 700;
@@ -62,77 +75,75 @@
       transition: filter 0.15s, transform 0.1s;
       margin-bottom: 28px;
     }
-    .download-btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+    .download-btn:hover  { filter: brightness(1.12); transform: translateY(-1px); }
     .download-btn:active { transform: translateY(0); }
-
-    .steps { counter-reset: step; display: flex; flex-direction: column; gap: 0; }
-    .step {
-      display: flex;
-      gap: 16px;
-      padding: 16px 0;
-      border-bottom: 1px solid #1a1d2a;
-    }
-    .step:last-child { border-bottom: none; }
-    .step-num {
-      counter-increment: step;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: #1e2130;
-      border: 1.5px solid #2d3148;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 700;
-      color: #a5b4fc;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-    .step-body { flex: 1; }
-    .step-title { font-size: 14px; font-weight: 600; color: #e2e8f0; margin-bottom: 4px; }
-    .step-desc  { font-size: 13px; color: #64748b; line-height: 1.55; }
-    .step-desc code {
-      background: #1a1d2a;
-      border: 1px solid #2d3148;
-      border-radius: 4px;
-      padding: 1px 6px;
-      font-family: monospace;
-      font-size: 12px;
-      color: #a5b4fc;
-    }
 
     .section-title {
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.07em;
-      color: #475569;
+      color: var(--muted);
       margin-bottom: 16px;
+    }
+
+    .steps { display: flex; flex-direction: column; }
+    .step {
+      display: flex;
+      gap: 16px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--surface2);
+    }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-lighter);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-body { flex: 1; }
+    .step-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .step-desc  { font-size: 13px; color: var(--muted); line-height: 1.55; }
+    .step-desc code {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+      font-size: 12px;
+      color: var(--accent-lighter);
     }
 
     .feature-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 12px;
-      margin-bottom: 4px;
     }
     @media (max-width: 500px) { .feature-grid { grid-template-columns: 1fr; } }
 
     .feature {
-      background: #0f1117;
-      border: 1px solid #1e2230;
+      background: var(--bg);
+      border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 14px;
+      padding: 16px;
     }
-    .feature-icon { font-size: 20px; margin-bottom: 8px; }
-    .feature-title { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 4px; }
-    .feature-desc  { font-size: 12px; color: #64748b; line-height: 1.5; }
+    .feature-icon { margin-bottom: 10px; display: flex; }
+    .feature-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .feature-desc  { font-size: 12px; color: var(--muted); line-height: 1.5; }
 
     .note {
-      background: #0f1117;
-      border: 1px solid #2d3148;
-      border-left: 3px solid #6366f1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
       border-radius: 0 8px 8px 0;
       padding: 12px 16px;
       font-size: 13px;
@@ -140,28 +151,28 @@
       margin-top: 20px;
       line-height: 1.55;
     }
-    .note strong { color: #e2e8f0; }
+    .note strong { color: var(--text); }
 
     footer {
       margin-top: 40px;
       font-size: 12px;
-      color: #334155;
+      color: var(--border);
       text-align: center;
     }
   </style>
 </head>
 <body>
 
-<div class="logo">
+<a class="logo" href="/">
   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="32" height="32" rx="8" fill="#6366f1"/>
-    <path d="M8 10h16M8 16h10M8 22h13" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="4" y1="21" x2="28" y2="21" stroke="rgba(255,255,255,0.28)" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M8 26 L16 13 L24 26" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>
   <div>
     <div class="logo-text">Veil</div>
     <div class="logo-sub">Browser Extension</div>
   </div>
-</div>
+</a>
 
 <!-- Main card -->
 <div class="card">
@@ -180,33 +191,31 @@
   <div class="section-title">Install in Chrome</div>
   <div class="steps">
     <div class="step">
-      <div class="step-num"></div>
+      <div class="step-num">1</div>
       <div class="step-body">
         <div class="step-title">Download &amp; unzip</div>
         <div class="step-desc">Click the button above to download <code>freedns-extension.zip</code>, then unzip it to a folder on your computer.</div>
       </div>
     </div>
     <div class="step">
-      <div class="step-num"></div>
+      <div class="step-num">2</div>
       <div class="step-body">
         <div class="step-title">Open Chrome Extensions</div>
         <div class="step-desc">Go to <code>chrome://extensions</code> in your address bar and enable <strong>Developer mode</strong> using the toggle in the top-right corner.</div>
       </div>
     </div>
     <div class="step">
-      <div class="step-num"></div>
+      <div class="step-num">3</div>
       <div class="step-body">
         <div class="step-title">Load unpacked</div>
         <div class="step-desc">Click <strong>Load unpacked</strong> and select the unzipped <code>freedns-extension</code> folder. The extension icon will appear in your toolbar.</div>
       </div>
     </div>
     <div class="step">
-      <div class="step-num"></div>
+      <div class="step-num">4</div>
       <div class="step-body">
         <div class="step-title">Configure settings</div>
-        <div class="step-desc">Click the extension icon → <strong>Server Settings</strong> and enter:<br>
-          Server IP: <code>16.59.60.231</code>
-        </div>
+        <div class="step-desc">Click the extension icon → <strong>Server Settings</strong> and enter your Server IP: <code>16.59.60.231</code></div>
       </div>
     </div>
   </div>
@@ -243,7 +252,7 @@
     </div>
     <div class="feature">
       <div class="feature-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       </div>
       <div class="feature-title">Local Account Storage</div>
       <div class="feature-desc">Activated accounts are saved in the extension — export credentials as JSON anytime for backup or sharing with staff.</div>
