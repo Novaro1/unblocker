@@ -405,6 +405,39 @@ fastify.get("/ai", (_req, reply) => {
   return reply.type("text/html").sendFile("ai.html");
 });
 
+// ── POST /api/ai — Groq proxy (key stays server-side) ────────────────────────
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+
+fastify.post("/api/ai", async (req, reply) => {
+  reply.header("Access-Control-Allow-Origin", "*");
+  if (!GROQ_API_KEY)
+    return reply.code(503).send({ error: "AI is not configured on this server." });
+
+  const { messages, model = "llama-3.1-8b-instant" } = req.body ?? {};
+  if (!Array.isArray(messages) || !messages.length)
+    return reply.code(400).send({ error: "messages array required" });
+
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({ model, messages, max_tokens: 1024 }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) return reply.code(res.status).send({ error: data.error?.message ?? "Groq error" });
+  return reply.send({ content: data.choices?.[0]?.message?.content ?? "" });
+});
+
+fastify.options("/api/ai", (_req, reply) => {
+  reply.header("Access-Control-Allow-Origin", "*")
+       .header("Access-Control-Allow-Methods", "POST, OPTIONS")
+       .header("Access-Control-Allow-Headers", "Content-Type")
+       .code(204).send();
+});
+
 // ── GET /extension — install page ─────────────────────────────────────────────
 fastify.get("/extension", (_req, reply) => {
   return reply.type("text/html").sendFile("extension.html");
