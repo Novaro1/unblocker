@@ -339,7 +339,7 @@ fastify.get("/api/music/stream", async (req, reply) => {
 // GitHub push webhook → Discord announcements
 const GH_WEBHOOK_SECRET   = process.env.GH_WEBHOOK_SECRET   || "";
 const DISCORD_TOKEN        = process.env.DISCORD_TOKEN        || "";
-const ANNOUNCEMENTS_CHANNEL_ID = process.env.ANNOUNCEMENTS_CHANNEL_ID || "";
+const UPDATES_CHANNEL_ID   = process.env.UPDATES_CHANNEL_ID   || "";
 
 fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply) => {
   // Verify GitHub signature
@@ -362,7 +362,7 @@ fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply
 
   const { commits = [], ref, repository, pusher } = req.body ?? {};
   if (!commits.length) return reply.code(200).send("ok");
-  if (!DISCORD_TOKEN || !ANNOUNCEMENTS_CHANNEL_ID) return reply.code(200).send("ok");
+  if (!DISCORD_TOKEN || !UPDATES_CHANNEL_ID) return reply.code(200).send("ok");
 
   const branch = ref?.replace("refs/heads/", "") ?? "unknown";
   const repoUrl = repository?.html_url ?? "";
@@ -387,7 +387,7 @@ fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply
   });
 
   try {
-    const res = await fetch(`https://discord.com/api/v10/channels/${ANNOUNCEMENTS_CHANNEL_ID}/messages`, {
+    const res = await fetch(`https://discord.com/api/v10/channels/${UPDATES_CHANNEL_ID}/messages`, {
       method: "POST",
       headers: { "Authorization": `Bot ${DISCORD_TOKEN}`, "Content-Type": "application/json" },
       body,
