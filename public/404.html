@@ -4,10 +4,76 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>404 — Veil</title>
+    <link rel="icon" href="/favicon.ico" />
     <link rel="stylesheet" href="/index.css" />
     <style>
+      /* ── Shared layout ───────────────────────────────── */
+      body { display: flex; flex-direction: column; }
+
+      .site-header {
+        position: relative;
+        z-index: 10;
+        border-bottom: 1px solid var(--border);
+        background: rgba(6, 6, 16, 0.6);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        flex-shrink: 0;
+      }
+      .site-header-inner {
+        max-width: 660px;
+        margin: 0 auto;
+        padding: 0 20px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .site-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+        color: var(--text);
+      }
+      .site-logo-text { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+
+      .site-nav { display: flex; align-items: center; gap: 20px; }
+      .site-nav-link {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--muted);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: color 0.15s;
+      }
+      .site-nav-link:hover { color: var(--text); }
+
+      .site-footer {
+        border-top: 1px solid var(--border);
+        position: relative;
+        z-index: 10;
+        flex-shrink: 0;
+      }
+      .site-footer-inner {
+        max-width: 660px;
+        margin: 0 auto;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .site-footer-inner a { color: var(--muted); text-decoration: none; transition: color 0.15s; }
+      .site-footer-inner a:hover { color: var(--text); }
+      .site-footer-sep { opacity: 0.4; }
+
+      /* ── Error content ───────────────────────────────── */
       .error-page {
-        min-height: 100vh;
+        flex: 1;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -29,10 +95,7 @@
         background-clip: text;
         opacity: 0.3;
       }
-      .error-msg {
-        font-size: 1rem;
-        color: var(--muted);
-      }
+      .error-msg { font-size: 1rem; color: var(--muted); }
       .error-home {
         margin-top: 0.5rem;
         display: inline-block;
@@ -40,7 +103,7 @@
         background: rgba(99, 102, 241, 0.1);
         border: 1px solid rgba(99, 102, 241, 0.35);
         border-radius: 999px;
-        color: #c7d2fe;
+        color: var(--accent-lighter);
         text-decoration: none;
         font-size: 0.85rem;
         font-weight: 500;
@@ -53,10 +116,43 @@
     </style>
   </head>
   <body>
+
+    <!-- Header -->
+    <header class="site-header">
+      <div class="site-header-inner">
+        <a class="site-logo" href="/">
+          <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="4" y1="21" x2="28" y2="21" stroke="rgba(255,255,255,0.28)" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M8 26 L16 13 L24 26" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="site-logo-text">Veil</span>
+        </a>
+        <nav class="site-nav">
+          <a class="site-nav-link" href="https://discord.gg/NScKEHkd6U" target="_blank" rel="noopener">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
+            </svg>
+            Discord
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Error content -->
     <div class="error-page">
       <div class="error-code">404</div>
       <p class="error-msg">This page doesn't exist.</p>
       <a href="/" class="error-home">Back to Veil</a>
     </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span>Powered by <a href="https://github.com/MercuryWorkshop/scramjet" target="_blank" rel="noopener">Scramjet</a></span>
+        <span class="site-footer-sep">·</span>
+        <a href="https://discord.gg/NScKEHkd6U" target="_blank" rel="noopener">Join Discord</a>
+      </div>
+    </footer>
+
   </body>
 </html>
