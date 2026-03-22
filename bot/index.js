@@ -937,8 +937,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         "• Exclusive themes (Aura, Crimson, Gold)\n" +
         "• Premium tab cloaks (YouTube, Spotify, Roblox, Discord)\n" +
         "• Early access to new features before public release\n" +
-        "• Ambassador leaderboard rank\n" +
-        "• Access to `/findlink` — finds unblocked domains for your school filter",
+        "• Ambassador leaderboard rank",
     };
 
     const embed = new EmbedBuilder().setColor(0x6366f1).setTitle("FAQ");
