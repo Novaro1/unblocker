@@ -142,6 +142,16 @@ fastify.addContentTypeParser("application/json", { parseAs: "buffer" }, (req, bo
   catch (e) { done(e); }
 });
 
+// ── GET / — launcher page ─────────────────────────────────────────────────────
+fastify.get("/", (_req, reply) => {
+  return reply.type("text/html").sendFile("loader.html");
+});
+
+// ── GET /go — proxy / unblocker ───────────────────────────────────────────────
+fastify.get("/go", (_req, reply) => {
+  return reply.type("text/html").sendFile("index.html");
+});
+
 // Panic escape redirect — bypasses Scramjet service worker interception
 fastify.get('/escape', (req, reply) => {
   const { to } = req.query;

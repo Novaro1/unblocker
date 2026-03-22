@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veil</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:             #060610;
+      --surface:        #0e0e1e;
+      --surface2:       #15152a;
+      --border:         #1e1e38;
+      --text:           #ecedf8;
+      --muted:          #6264a0;
+      --accent:         #6366f1;
+      --accent-light:   #818cf8;
+      --accent-lighter: #a5b4fc;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: ui-rounded, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 40px 20px;
+      gap: 48px;
+    }
+
+    /* ── Aurora blobs ─────────────────────────────────── */
+    .aurora {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .aurora-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.18;
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+    .b1 { width: 600px; height: 600px; background: #6366f1; top: -200px; left: -100px; animation-duration: 20s; }
+    .b2 { width: 500px; height: 500px; background: #818cf8; bottom: -150px; right: -100px; animation-duration: 26s; animation-delay: -8s; }
+    .b3 { width: 400px; height: 400px; background: #4f46e5; top: 40%; left: 40%; animation-duration: 22s; animation-delay: -4s; }
+    @keyframes drift { from { transform: translate(0,0) scale(1); } to { transform: translate(40px, 30px) scale(1.08); } }
+
+    /* ── Content ──────────────────────────────────────── */
+    .content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 48px; width: 100%; max-width: 860px; }
+
+    /* ── Logo ─────────────────────────────────────────── */
+    .logo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo-mark {
+      width: 56px;
+      height: 56px;
+      background: rgba(99,102,241,0.12);
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+    .logo-sub {
+      font-size: 15px;
+      color: var(--muted);
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Cards ────────────────────────────────────────── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      width: 100%;
+    }
+    @media (max-width: 640px) {
+      .cards { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px 24px;
+      text-decoration: none;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(99,102,241,0.06) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .card:hover {
+      border-color: rgba(99,102,241,0.5);
+      transform: translateY(-3px);
+      box-shadow: 0 16px 40px rgba(99,102,241,0.12);
+    }
+    .card:hover::before { opacity: 1; }
+    .card:active { transform: translateY(-1px); }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(99,102,241,0.12);
+      border: 1px solid rgba(99,102,241,0.2);
+      color: var(--accent-lighter);
+      flex-shrink: 0;
+    }
+    .card-body { flex: 1; }
+    .card-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+      letter-spacing: -0.2px;
+    }
+    .card-desc {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .card-arrow {
+      align-self: flex-end;
+      color: var(--border);
+      transition: color 0.2s, transform 0.2s;
+    }
+    .card:hover .card-arrow { color: var(--accent-lighter); transform: translateX(3px); }
+
+    /* ── Footer ───────────────────────────────────────── */
+    .footer {
+      position: relative;
+      z-index: 1;
+      font-size: 12px;
+      color: var(--border);
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    .footer a { color: var(--border); text-decoration: none; transition: color 0.15s; }
+    .footer a:hover { color: var(--muted); }
+    .footer-sep { opacity: 0.5; }
+  </style>
+</head>
+<body>
+
+<div class="aurora" aria-hidden="true">
+  <div class="aurora-blob b1"></div>
+  <div class="aurora-blob b2"></div>
+  <div class="aurora-blob b3"></div>
+</div>
+
+<div class="content">
+
+  <div class="logo">
+    <div class="logo-mark">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+        <line x1="4" y1="21" x2="28" y2="21" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M8 26 L16 13 L24 26" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="logo-title">Veil</div>
+    <div class="logo-sub">The web, unveiled.</div>
+  </div>
+
+  <div class="cards">
+
+    <!-- Unblocker -->
+    <a class="card" href="/go">
+      <div class="card-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="2" y1="12" x2="22" y2="12"/>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+      </div>
+      <div class="card-body">
+        <div class="card-title">Unblocker</div>
+        <div class="card-desc">Browse any website freely — unblock social media, games, and more through the Veil proxy.</div>
+      </div>
+      <div class="card-arrow">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </div>
+    </a>
+
+    <!-- Music -->
+    <a class="card" href="/music.html">
+      <div class="card-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18V5l12-2v13"/>
+          <circle cx="6" cy="18" r="3"/>
+          <circle cx="18" cy="16" r="3"/>
+        </svg>
+      </div>
+      <div class="card-body">
+        <div class="card-title">Music</div>
+        <div class="card-desc">Stream music ad-free from SoundCloud — search, play, and autoplay similar tracks.</div>
+      </div>
+      <div class="card-arrow">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </div>
+    </a>
+
+    <!-- AI -->
+    <a class="card" href="/ai">
+      <div class="card-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"/>
+          <path d="M8 12h4M12 8v4"/>
+          <circle cx="16" cy="12" r="1" fill="currentColor" stroke="none"/>
+        </svg>
+      </div>
+      <div class="card-body">
+        <div class="card-title">AI</div>
+        <div class="card-desc">Ask anything — homework help, explanations, code, and ideas. Powered by Groq, free and fast.</div>
+      </div>
+      <div class="card-arrow">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </div>
+    </a>
+
+  </div>
+
+</div>
+
+<div class="footer">
+  <span>Powered by <a href="https://github.com/MercuryWorkshop/scramjet" target="_blank" rel="noopener">Scramjet</a></span>
+  <span class="footer-sep">·</span>
+  <a href="https://discord.gg/NScKEHkd6U" target="_blank" rel="noopener">Join Discord</a>
+</div>
+
+</body>
+</html>

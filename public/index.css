@@ -1758,6 +1758,31 @@ body.perf-mode .ql-tile:hover {
   color: var(--text);
 }
 
+/* Launcher button on home screen */
+.launcher-home-btn {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  color: var(--muted);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  z-index: 10;
+  text-decoration: none;
+}
+.launcher-home-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--text);
+}
+
 /* ── Themes ─────────────────────────────────────────────────────────────── */
 [data-theme="ember"] {
   --bg:             #0d0804;
