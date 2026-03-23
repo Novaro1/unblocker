@@ -145,12 +145,36 @@
       aspect-ratio: 16/9;
     }
 
-    #yt-frame {
+    #yt-video {
       width: 100%;
       height: 100%;
-      border: none;
       display: block;
+      background: #000;
     }
+
+    #yt-player-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      font-size: 13px;
+      text-align: center;
+      padding: 20px;
+    }
+    #yt-player-overlay.hidden { display: none; }
+    #yt-player-overlay .spin {
+      width: 28px; height: 28px;
+      border: 3px solid rgba(255,255,255,0.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     #yt-video-title {
       font-size: 17px;
@@ -416,7 +440,11 @@
     <!-- Player panel (left, hidden until a video is selected) -->
     <div id="yt-player-panel">
       <div id="yt-video-wrap">
-        <iframe id="yt-frame" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>
+        <video id="yt-video" controls playsinline></video>
+        <div id="yt-player-overlay">
+          <div class="spin"></div>
+          <span id="yt-overlay-msg">Loading…</span>
+        </div>
       </div>
       <div id="yt-video-title"></div>
       <div id="yt-video-meta"></div>
@@ -470,13 +498,15 @@
   const gridEl       = document.getElementById("yt-grid");
   const listEl       = document.getElementById("yt-list");
   const playerPanel  = document.getElementById("yt-player-panel");
-  const ytFrame      = document.getElementById("yt-frame");
+  const videoEl      = document.getElementById("yt-video");
+  const overlay      = document.getElementById("yt-player-overlay");
+  const overlayMsg   = document.getElementById("yt-overlay-msg");
   const ytTitle      = document.getElementById("yt-video-title");
   const ytMeta       = document.getElementById("yt-video-meta");
 
   let currentResults = [];
   let currentVideoId = null;
-  let searching = false;
+  let searching      = false;
 
   // ── Suggestions ────────────────────────────────────────
   document.querySelectorAll(".yt-chip").forEach(chip => {
@@ -578,22 +608,74 @@
     });
   }
 
-  // ── Play video — youtube-nocookie.com embed iframe ────────────────────────
-  function playVideo(v) {
+  // ── Player overlay helpers ─────────────────────────────────────────────────
+  function showOverlay(msg, spin = true) {
+    overlay.classList.remove("hidden");
+    overlay.querySelector(".spin").style.display = spin ? "" : "none";
+    overlayMsg.textContent = msg;
+  }
+  function hideOverlay() { overlay.classList.add("hidden"); }
+
+  // ── Play video — Cobalt API ────────────────────────────────────────────────
+  // api.cobalt.tools is called directly from the browser (CORS-enabled).
+  // Cobalt fetches from YouTube on its own servers and tunnels a stream URL
+  // back — no sign-in, no bot checks, no iframe restrictions.
+  async function playVideo(v) {
     currentVideoId = v.id;
-    ytFrame.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
     ytTitle.textContent = v.title;
     ytMeta.textContent  = v.channel + (v.durationF ? ` · ${v.durationF}` : "");
+    videoEl.src    = "";
+    videoEl.poster = v.thumb;
+    showOverlay("Fetching video…");
 
     playerPanel.classList.add("visible");
     resultsPanel.classList.remove("full");
     if (currentResults.length) renderList(currentResults);
+
+    try {
+      const res = await fetch("https://api.cobalt.tools/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({
+          url: `https://www.youtube.com/watch?v=${v.id}`,
+          videoQuality: "720",
+          filenameStyle: "basic",
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+
+      const data = await res.json();
+
+      if (data.status === "tunnel" || data.status === "redirect") {
+        videoEl.src = data.url;
+        hideOverlay();
+        videoEl.play().catch(() => {});
+      } else if (data.status === "picker") {
+        // picker = multiple streams; pick first video item
+        const item = data.picker?.find(p => p.type === "video") ?? data.picker?.[0];
+        if (item?.url) {
+          videoEl.src = item.url;
+          hideOverlay();
+          videoEl.play().catch(() => {});
+        } else {
+          showOverlay("No playable stream found.", false);
+        }
+      } else {
+        const msg = data.error?.code ?? data.error?.message ?? "Unknown error from Cobalt.";
+        showOverlay(msg, false);
+      }
+    } catch (err) {
+      showOverlay("Could not reach video service. " + (err.message ?? ""), false);
+    }
   }
 
-  function nextServer() { /* no-op — only one embed source */ }
-
   function closePlayer() {
-    ytFrame.src = "";
+    videoEl.src    = "";
+    videoEl.poster = "";
+    hideOverlay();
     playerPanel.classList.remove("visible");
     resultsPanel.classList.add("full");
     currentVideoId = null;
