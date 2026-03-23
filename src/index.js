@@ -491,7 +491,7 @@ function ytGetUrl(id) {
     ytdlpArgs.push(
       `https://www.youtube.com/watch?v=${id}`,
       "--get-url",
-      "--format", "best[height<=720][ext=mp4]/best[height<=480][ext=mp4]/best[height<=720]/best",
+      "--format", "best[ext=mp4]/best[ext=webm]/best",
       "--no-playlist", "--quiet", "--no-warnings",
     );
     const child = spawn("yt-dlp", ytdlpArgs);
