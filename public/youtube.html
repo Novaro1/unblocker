@@ -616,26 +616,48 @@
   }
   function hideOverlay() { overlay.classList.add("hidden"); }
 
-  // ── Play video — server-side stream proxy via Tor ─────────────────────────
-  // /api/youtube/stream/:id uses yt-dlp+Tor on the server to get the URL,
-  // then pipes the googlevideo stream back. No iframes, no CORS, no auth needed.
-  function playVideo(v) {
+  // ── Play video — resolve URL server-side, play client-side ───────────────
+  // /api/youtube/url/:id uses yt-dlp+Tor to get a signed CDN URL.
+  // We wait in JS (overlay shown), then set video.src to the CDN URL directly —
+  // this avoids the browser video element's short network timeout.
+  // If the direct CDN URL fails (school blocks googlevideo.com), we fall back
+  // to /api/youtube/stream/:id which proxies through our server.
+  async function playVideo(v) {
     currentVideoId = v.id;
     ytTitle.textContent = v.title;
     ytMeta.textContent  = v.channel + (v.durationF ? ` · ${v.durationF}` : "");
+    videoEl.src    = "";
     videoEl.poster = v.thumb;
-    showOverlay("Fetching video… (may take 10–20 s the first time)");
+    showOverlay("Fetching video… (may take 10–20 s)");
 
     playerPanel.classList.add("visible");
     resultsPanel.classList.remove("full");
     if (currentResults.length) renderList(currentResults);
 
-    // Point the video element at our streaming endpoint.
-    // The server handles the yt-dlp+Tor call and pipes back the stream.
-    videoEl.src = `/api/youtube/stream/${v.id}`;
+    let cdnUrl;
+    try {
+      const res  = await fetch(`/api/youtube/url/${v.id}`, { signal: AbortSignal.timeout(60000) });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "No URL returned");
+      cdnUrl = data.url;
+    } catch (err) {
+      showOverlay("Could not fetch video: " + err.message, false);
+      return;
+    }
+
+    showOverlay("Starting playback…");
+
+    // Try direct CDN first (fastest, no server bandwidth used)
+    videoEl.src = cdnUrl;
     videoEl.load();
     videoEl.oncanplay = () => { hideOverlay(); videoEl.play().catch(() => {}); };
-    videoEl.onerror   = () => showOverlay("Could not load video. Try again.", false);
+    videoEl.onerror   = () => {
+      // Direct CDN blocked (school filter) — fall back to server proxy
+      showOverlay("Buffering via proxy…");
+      videoEl.onerror = () => showOverlay("Could not load video. Try again.", false);
+      videoEl.src = `/api/youtube/stream/${v.id}`;
+      videoEl.load();
+    };
   }
 
   function closePlayer() {
