@@ -400,7 +400,6 @@
         <iframe id="yt-frame"
           allow="autoplay; fullscreen; picture-in-picture"
           allowfullscreen
-          referrerpolicy="no-referrer"
         ></iframe>
       </div>
       <div id="yt-video-title"></div>
@@ -442,6 +441,7 @@
   </div>
 </div>
 
+<script src="/scramjet/scramjet.all.js"></script>
 <script>
   const searchForm   = document.getElementById("yt-search-form");
   const searchInput  = document.getElementById("yt-search-input");
@@ -458,6 +458,27 @@
   let currentResults = [];
   let currentVideoId = null;
   let searching = false;
+  let swReady = false;
+
+  // ── Init Scramjet so YouTube embeds route through the Veil proxy ──────────
+  // This registers the SW and stores the proxy config in IDB so /sj/ URLs work
+  (async () => {
+    try {
+      const { ScramjetController } = $scramjetLoadController();
+      const sj = new ScramjetController({
+        prefix: "/sj/",
+        files: {
+          wasm: "/scramjet/scramjet.wasm.wasm",
+          all:  "/scramjet/scramjet.all.js",
+          sync: "/scramjet/scramjet.sync.js",
+        },
+      });
+      await sj.init();
+      swReady = true;
+    } catch(e) {
+      console.warn("[youtube] proxy init failed:", e.message);
+    }
+  })();
 
   // ── Suggestions ────────────────────────────────────────
   document.querySelectorAll(".yt-chip").forEach(chip => {
@@ -583,8 +604,12 @@
       renderList(currentResults);
     }
 
-    // Load embed
-    frame.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
+    // Load embed — route through Scramjet proxy if SW is ready (bypasses school blocks)
+    // otherwise fall back to direct youtube-nocookie embed
+    const embedUrl = `https://www.youtube.com/embed/${v.id}?autoplay=1&rel=0`;
+    frame.src = swReady
+      ? `/sj/${encodeURIComponent(embedUrl)}`
+      : `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
     videoTitle.textContent = v.title;
     videoMeta.textContent  = v.channel + (v.durationF ? ` · ${v.durationF}` : "");
   }
