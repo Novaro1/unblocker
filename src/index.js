@@ -485,16 +485,15 @@ function ytGetUrl(id) {
   const cached = _ytUrlCache.get(id);
   if (cached && cached.expires > Date.now()) return Promise.resolve(cached.url);
   return new Promise((resolve, reject) => {
-    const ytdlpArgs = [
-      "--proxy", "socks5://127.0.0.1:9050",
+    const cookiesPath = "/var/www/unblocker/yt-cookies.txt";
+    const ytdlpArgs = ["--proxy", "socks5://127.0.0.1:9050"];
+    try { if (statSync(cookiesPath).isFile()) ytdlpArgs.push("--cookies", cookiesPath); } catch {}
+    ytdlpArgs.push(
       `https://www.youtube.com/watch?v=${id}`,
       "--get-url",
       "--format", "best[height<=720][ext=mp4]/best[height<=480][ext=mp4]/best[height<=720]/best",
       "--no-playlist", "--quiet", "--no-warnings",
-    ];
-    // Use cookies file if present — required for datacenter IPs
-    const cookiesPath = "/var/www/unblocker/yt-cookies.txt";
-    try { if (statSync(cookiesPath).isFile()) ytdlpArgs.splice(1, 0, "--cookies", cookiesPath); } catch {}
+    );
     const child = spawn("yt-dlp", ytdlpArgs);
     let out = "", err = "";
     child.stdout.on("data", d => { out += d; });
