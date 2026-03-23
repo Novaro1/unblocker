@@ -350,6 +350,25 @@
       padding: 0 4px 4px;
     }
 
+    /* ── Player controls row ───────────────────────────── */
+    #yt-player-controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .yt-ctrl-btn {
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .yt-ctrl-btn:hover { border-color: var(--accent); color: var(--text); }
+
     /* ── Responsive ────────────────────────────────────── */
     @media (max-width: 700px) {
       #yt-results-panel { width: 100%; border-left: none; }
@@ -394,9 +413,25 @@
   <!-- Body -->
   <div id="yt-body">
 
+    <!-- Player panel (left, hidden until a video is selected) -->
+    <div id="yt-player-panel">
+      <div id="yt-video-wrap">
+        <iframe id="yt-frame" allowfullscreen allow="autoplay; fullscreen; encrypted-media"></iframe>
+      </div>
+      <div id="yt-video-title"></div>
+      <div id="yt-video-meta"></div>
+      <div id="yt-player-controls">
+        <button class="yt-ctrl-btn" onclick="nextServer()">Try another server</button>
+        <button class="yt-ctrl-btn" onclick="closePlayer()">Close player</button>
+      </div>
+    </div>
+
     <!-- Results panel (right / full) -->
     <div id="yt-results-panel" class="full">
       <div id="yt-results-scroll">
+
+        <!-- Sidebar list (shown when player is open) -->
+        <div id="yt-list"></div>
 
         <!-- Empty state -->
         <div id="yt-empty">
@@ -435,6 +470,20 @@
   const statusEl     = document.getElementById("yt-status");
   const gridEl       = document.getElementById("yt-grid");
   const listEl       = document.getElementById("yt-list");
+  const playerPanel  = document.getElementById("yt-player-panel");
+  const ytFrame      = document.getElementById("yt-frame");
+  const ytTitle      = document.getElementById("yt-video-title");
+  const ytMeta       = document.getElementById("yt-video-meta");
+
+  // Embed sources — requests come from the USER'S browser IP (not our server),
+  // so datacenter blocks don't apply. Piped first, Invidious as fallbacks.
+  const EMBED_HOSTS = [
+    "https://piped.video",
+    "https://inv.nadeko.net",
+    "https://invidious.privacyredirect.com",
+    "https://iv.ggtyler.dev",
+  ];
+  let _embedIdx = 0;
 
   let currentResults = [];
   let currentVideoId = null;
@@ -540,20 +589,35 @@
     });
   }
 
-  // ── Play video — hand off to the Veil proxy at /go ────────────────────────
-  // Use an Invidious instance instead of youtube.com — avoids bot detection and
-  // sign-in requirements that block datacenter IPs.
-  const INVIDIOUS_INSTANCES = [
-    "https://inv.nadeko.net",
-    "https://invidious.privacyredirect.com",
-    "https://iv.ggtyler.dev",
-  ];
-  let _invIdx = 0;
-
+  // ── Play video — inline iframe, direct (not proxied) ──────────────────────
+  // The iframe's requests go directly from the user's browser to Piped/Invidious,
+  // bypassing our server. This avoids the AWS datacenter IP block entirely.
   function playVideo(v) {
-    const base = INVIDIOUS_INSTANCES[_invIdx % INVIDIOUS_INSTANCES.length];
-    sessionStorage.setItem("_veilYtPlay", `${base}/watch?v=${v.id}`);
-    window.location.href = "/go";
+    currentVideoId = v.id;
+    const base = EMBED_HOSTS[_embedIdx % EMBED_HOSTS.length];
+    ytFrame.src   = `${base}/embed/${v.id}?autoplay=1`;
+    ytTitle.textContent = v.title;
+    ytMeta.textContent  = v.channel + (v.durationF ? ` · ${v.durationF}` : "");
+
+    playerPanel.classList.add("visible");
+    resultsPanel.classList.remove("full");
+
+    if (currentResults.length) renderList(currentResults);
+  }
+
+  function nextServer() {
+    _embedIdx++;
+    const v = currentResults.find(r => r.id === currentVideoId);
+    if (v) playVideo(v);
+  }
+
+  function closePlayer() {
+    ytFrame.src = "";
+    playerPanel.classList.remove("visible");
+    resultsPanel.classList.add("full");
+    currentVideoId = null;
+    listEl.innerHTML = "";
+    if (currentResults.length) renderGrid(currentResults);
   }
 
   function esc(str) {
