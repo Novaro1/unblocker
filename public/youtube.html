@@ -541,9 +541,18 @@
   }
 
   // ── Play video — hand off to the Veil proxy at /go ────────────────────────
+  // Use an Invidious instance instead of youtube.com — avoids bot detection and
+  // sign-in requirements that block datacenter IPs.
+  const INVIDIOUS_INSTANCES = [
+    "https://inv.nadeko.net",
+    "https://invidious.privacyredirect.com",
+    "https://iv.ggtyler.dev",
+  ];
+  let _invIdx = 0;
+
   function playVideo(v) {
-    // Store URL and navigate to the proxy; index.js picks it up and auto-loads it
-    sessionStorage.setItem("_veilYtPlay", `https://www.youtube.com/watch?v=${v.id}`);
+    const base = INVIDIOUS_INSTANCES[_invIdx % INVIDIOUS_INSTANCES.length];
+    sessionStorage.setItem("_veilYtPlay", `${base}/watch?v=${v.id}`);
     window.location.href = "/go";
   }
 
