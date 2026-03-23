@@ -145,12 +145,35 @@
       aspect-ratio: 16/9;
     }
 
-    #yt-frame {
+    #yt-video {
       width: 100%;
       height: 100%;
-      border: none;
       display: block;
+      background: #000;
     }
+
+    #yt-player-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 13px;
+      pointer-events: none;
+    }
+    #yt-player-overlay.hidden { display: none; }
+    #yt-player-overlay .spin {
+      width: 28px; height: 28px;
+      border: 3px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     #yt-video-title {
       font-size: 17px;
@@ -416,7 +439,11 @@
     <!-- Player panel (left, hidden until a video is selected) -->
     <div id="yt-player-panel">
       <div id="yt-video-wrap">
-        <iframe id="yt-frame" allowfullscreen allow="autoplay; fullscreen; encrypted-media"></iframe>
+        <video id="yt-video" controls playsinline></video>
+        <div id="yt-player-overlay">
+          <div class="spin"></div>
+          <span id="yt-overlay-msg">Loading…</span>
+        </div>
       </div>
       <div id="yt-video-title"></div>
       <div id="yt-video-meta"></div>
@@ -463,27 +490,31 @@
 </div>
 
 <script>
-  const searchForm   = document.getElementById("yt-search-form");
-  const searchInput  = document.getElementById("yt-search-input");
-  const resultsPanel = document.getElementById("yt-results-panel");
-  const emptyState   = document.getElementById("yt-empty");
-  const statusEl     = document.getElementById("yt-status");
-  const gridEl       = document.getElementById("yt-grid");
-  const listEl       = document.getElementById("yt-list");
-  const playerPanel  = document.getElementById("yt-player-panel");
-  const ytFrame      = document.getElementById("yt-frame");
-  const ytTitle      = document.getElementById("yt-video-title");
-  const ytMeta       = document.getElementById("yt-video-meta");
+  const searchForm    = document.getElementById("yt-search-form");
+  const searchInput   = document.getElementById("yt-search-input");
+  const resultsPanel  = document.getElementById("yt-results-panel");
+  const emptyState    = document.getElementById("yt-empty");
+  const statusEl      = document.getElementById("yt-status");
+  const gridEl        = document.getElementById("yt-grid");
+  const listEl        = document.getElementById("yt-list");
+  const playerPanel   = document.getElementById("yt-player-panel");
+  const videoEl       = document.getElementById("yt-video");
+  const overlay       = document.getElementById("yt-player-overlay");
+  const overlayMsg    = document.getElementById("yt-overlay-msg");
+  const ytTitle       = document.getElementById("yt-video-title");
+  const ytMeta        = document.getElementById("yt-video-meta");
 
-  // Embed sources — requests come from the USER'S browser IP (not our server),
-  // so datacenter blocks don't apply. Piped first, Invidious as fallbacks.
-  const EMBED_HOSTS = [
-    "https://piped.video",
+  // Invidious API hosts — called directly from the browser (CORS enabled),
+  // so our server IP is never involved. Stream URLs use ?local=true so video
+  // traffic proxies through Invidious's servers, not YouTube directly.
+  const INV_HOSTS = [
     "https://inv.nadeko.net",
     "https://invidious.privacyredirect.com",
     "https://iv.ggtyler.dev",
+    "https://invidious.nerdvpn.de",
   ];
-  let _embedIdx = 0;
+  let _invHostIdx = 0;
+  let _currentVideo = null;
 
   let currentResults = [];
   let currentVideoId = null;
@@ -589,33 +620,70 @@
     });
   }
 
-  // ── Play video — inline iframe, direct (not proxied) ──────────────────────
-  // The iframe's requests go directly from the user's browser to Piped/Invidious,
-  // bypassing our server. This avoids the AWS datacenter IP block entirely.
-  function playVideo(v) {
+  // ── Player overlay helpers ─────────────────────────────────────────────────
+  function showOverlay(msg, spin = true) {
+    overlay.classList.remove("hidden");
+    overlay.querySelector(".spin").style.display = spin ? "" : "none";
+    overlayMsg.textContent = msg;
+  }
+  function hideOverlay() { overlay.classList.add("hidden"); }
+
+  // ── Play video — Invidious API + native <video> ────────────────────────────
+  // Fetches stream URL directly from browser (CORS) — no iframe, no proxy,
+  // no X-Frame-Options or COEP issues. ?local=true streams through Invidious.
+  async function playVideo(v) {
+    _currentVideo  = v;
     currentVideoId = v.id;
-    const base = EMBED_HOSTS[_embedIdx % EMBED_HOSTS.length];
-    ytFrame.src   = `${base}/embed/${v.id}?autoplay=1`;
+
     ytTitle.textContent = v.title;
     ytMeta.textContent  = v.channel + (v.durationF ? ` · ${v.durationF}` : "");
+    videoEl.src = "";
+    videoEl.poster = v.thumb;
+    showOverlay("Loading…");
 
     playerPanel.classList.add("visible");
     resultsPanel.classList.remove("full");
-
     if (currentResults.length) renderList(currentResults);
+
+    // Try each Invidious host until one returns a stream URL
+    for (let attempt = 0; attempt < INV_HOSTS.length; attempt++) {
+      const host = INV_HOSTS[(_invHostIdx + attempt) % INV_HOSTS.length];
+      try {
+        const res = await fetch(
+          `${host}/api/v1/videos/${v.id}?local=true&fields=formatStreams`,
+          { signal: AbortSignal.timeout(8000) }
+        );
+        if (!res.ok) continue;
+        const data = await res.json();
+        const streams = data.formatStreams || [];
+        // formatStreams are combined video+audio; last entry = highest quality
+        const stream = streams[streams.length - 1] || streams[0];
+        if (!stream?.url) continue;
+
+        _invHostIdx = (_invHostIdx + attempt) % INV_HOSTS.length;
+        videoEl.src = stream.url;
+        hideOverlay();
+        videoEl.play().catch(() => {});
+        return;
+      } catch { /* try next */ }
+    }
+
+    showOverlay("Could not load video. Try another server.", false);
   }
 
   function nextServer() {
-    _embedIdx++;
-    const v = currentResults.find(r => r.id === currentVideoId);
-    if (v) playVideo(v);
+    _invHostIdx = (_invHostIdx + 1) % INV_HOSTS.length;
+    if (_currentVideo) playVideo(_currentVideo);
   }
 
   function closePlayer() {
-    ytFrame.src = "";
+    videoEl.src = "";
+    videoEl.poster = "";
+    hideOverlay();
     playerPanel.classList.remove("visible");
     resultsPanel.classList.add("full");
     currentVideoId = null;
+    _currentVideo  = null;
     listEl.innerHTML = "";
     if (currentResults.length) renderGrid(currentResults);
   }
