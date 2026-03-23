@@ -394,18 +394,6 @@
   <!-- Body -->
   <div id="yt-body">
 
-    <!-- Player panel (left) — hidden until a video is selected -->
-    <div id="yt-player-panel">
-      <div id="yt-video-wrap">
-        <iframe id="yt-frame"
-          allow="autoplay; fullscreen; picture-in-picture"
-          allowfullscreen
-        ></iframe>
-      </div>
-      <div id="yt-video-title"></div>
-      <div id="yt-video-meta"></div>
-    </div>
-
     <!-- Results panel (right / full) -->
     <div id="yt-results-panel" class="full">
       <div id="yt-results-scroll">
@@ -432,8 +420,6 @@
         <!-- Grid results (no video selected) -->
         <div id="yt-grid"></div>
 
-        <!-- List results (video selected, sidebar) -->
-        <div id="yt-list"></div>
 
       </div>
     </div>
@@ -441,15 +427,10 @@
   </div>
 </div>
 
-<script src="/scramjet/scramjet.all.js"></script>
 <script>
   const searchForm   = document.getElementById("yt-search-form");
   const searchInput  = document.getElementById("yt-search-input");
-  const playerPanel  = document.getElementById("yt-player-panel");
   const resultsPanel = document.getElementById("yt-results-panel");
-  const frame        = document.getElementById("yt-frame");
-  const videoTitle   = document.getElementById("yt-video-title");
-  const videoMeta    = document.getElementById("yt-video-meta");
   const emptyState   = document.getElementById("yt-empty");
   const statusEl     = document.getElementById("yt-status");
   const gridEl       = document.getElementById("yt-grid");
@@ -458,37 +439,6 @@
   let currentResults = [];
   let currentVideoId = null;
   let searching = false;
-  let swReady = false;
-
-  // ── Init Scramjet so YouTube embeds route through the Veil proxy ──────────
-  let sjFrame = null; // ScramjetFrame — reused across video plays
-  (async () => {
-    try {
-      const { ScramjetController } = $scramjetLoadController();
-      const sj = new ScramjetController({
-        prefix: "/sj/",
-        files: {
-          wasm: "/scramjet/scramjet.wasm.wasm",
-          all:  "/scramjet/scramjet.all.js",
-          sync: "/scramjet/scramjet.sync.js",
-        },
-      });
-      await sj.init();
-      // Pre-create the Scramjet-managed frame and slot it into the player area
-      sjFrame = sj.createFrame();
-      const wrap = document.getElementById("yt-video-wrap");
-      wrap.innerHTML = "";
-      Object.assign(sjFrame.frame.style, {
-        width: "100%", height: "100%", border: "none", display: "block",
-      });
-      sjFrame.frame.setAttribute("allow", "autoplay; fullscreen; picture-in-picture");
-      sjFrame.frame.setAttribute("allowfullscreen", "");
-      wrap.appendChild(sjFrame.frame);
-      swReady = true;
-    } catch(e) {
-      console.warn("[youtube] proxy init failed:", e.message);
-    }
-  })();
 
   // ── Suggestions ────────────────────────────────────────
   document.querySelectorAll(".yt-chip").forEach(chip => {
@@ -533,11 +483,7 @@
       currentResults = data;
       hideStatus();
 
-      if (currentVideoId) {
-        renderList(data);
-      } else {
-        renderGrid(data);
-      }
+      renderGrid(data);
     } catch (err) {
       showStatus("Search failed. Try again.");
       console.error(err);
@@ -595,35 +541,11 @@
     });
   }
 
-  // ── Play video ─────────────────────────────────────────
+  // ── Play video — hand off to the Veil proxy at /go ────────────────────────
   function playVideo(v) {
-    currentVideoId = v.id;
-
-    // Switch layout: show player panel, shrink results to sidebar
-    playerPanel.classList.add("visible");
-    resultsPanel.classList.remove("full");
-
-    // Update active state in list
-    document.querySelectorAll(".yt-result").forEach(el => {
-      el.classList.toggle("active", el.dataset.id === v.id);
-    });
-
-    // If we were in grid view, switch to list view
-    if (gridEl.classList.contains("visible")) {
-      gridEl.classList.remove("visible");
-      renderList(currentResults);
-    }
-
-    // Load embed — use Scramjet-managed frame if ready (bypasses school blocks),
-    // otherwise fall back to direct youtube-nocookie embed in the raw iframe
-    const embedUrl = `https://www.youtube.com/embed/${v.id}?autoplay=1&rel=0`;
-    if (swReady && sjFrame) {
-      sjFrame.go(embedUrl);
-    } else {
-      frame.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
-    }
-    videoTitle.textContent = v.title;
-    videoMeta.textContent  = v.channel + (v.durationF ? ` · ${v.durationF}` : "");
+    // Store URL and navigate to the proxy; index.js picks it up and auto-loads it
+    sessionStorage.setItem("_veilYtPlay", `https://www.youtube.com/watch?v=${v.id}`);
+    window.location.href = "/go";
   }
 
   function esc(str) {

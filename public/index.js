@@ -18,6 +18,19 @@ const btnForward       = document.getElementById("btn-forward");
 const btnReload        = document.getElementById("btn-reload");
 const btnHome          = document.getElementById("btn-home");
 
+// ── YouTube player handoff — auto-navigate if coming from /youtube ──────────
+{
+  const _ytPlay = sessionStorage.getItem("_veilYtPlay");
+  if (_ytPlay) {
+    sessionStorage.removeItem("_veilYtPlay");
+    // Pre-fill the address bar and submit as if the user typed the URL
+    window.addEventListener("DOMContentLoaded", () => {
+      address.value = _ytPlay;
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    }, { once: true });
+  }
+}
+
 // Keep search engine hidden input in sync with radio chips
 document.querySelectorAll("input[name='engine']").forEach((radio) => {
   radio.addEventListener("change", () => {
