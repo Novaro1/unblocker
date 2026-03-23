@@ -461,7 +461,7 @@
   let swReady = false;
 
   // ── Init Scramjet so YouTube embeds route through the Veil proxy ──────────
-  // This registers the SW and stores the proxy config in IDB so /sj/ URLs work
+  let sjFrame = null; // ScramjetFrame — reused across video plays
   (async () => {
     try {
       const { ScramjetController } = $scramjetLoadController();
@@ -474,6 +474,16 @@
         },
       });
       await sj.init();
+      // Pre-create the Scramjet-managed frame and slot it into the player area
+      sjFrame = sj.createFrame();
+      const wrap = document.getElementById("yt-video-wrap");
+      wrap.innerHTML = "";
+      Object.assign(sjFrame.frame.style, {
+        width: "100%", height: "100%", border: "none", display: "block",
+      });
+      sjFrame.frame.setAttribute("allow", "autoplay; fullscreen; picture-in-picture");
+      sjFrame.frame.setAttribute("allowfullscreen", "");
+      wrap.appendChild(sjFrame.frame);
       swReady = true;
     } catch(e) {
       console.warn("[youtube] proxy init failed:", e.message);
@@ -604,12 +614,14 @@
       renderList(currentResults);
     }
 
-    // Load embed — route through Scramjet proxy if SW is ready (bypasses school blocks)
-    // otherwise fall back to direct youtube-nocookie embed
+    // Load embed — use Scramjet-managed frame if ready (bypasses school blocks),
+    // otherwise fall back to direct youtube-nocookie embed in the raw iframe
     const embedUrl = `https://www.youtube.com/embed/${v.id}?autoplay=1&rel=0`;
-    frame.src = swReady
-      ? `/sj/${encodeURIComponent(embedUrl)}`
-      : `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
+    if (swReady && sjFrame) {
+      sjFrame.go(embedUrl);
+    } else {
+      frame.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
+    }
     videoTitle.textContent = v.title;
     videoMeta.textContent  = v.channel + (v.durationF ? ` · ${v.durationF}` : "");
   }
