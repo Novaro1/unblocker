@@ -10,7 +10,6 @@ import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
 import { baremuxPath } from "@mercuryworkshop/bare-mux/node";
-import { YouTube } from "youtube-sr";
 import { execFile, spawn } from "node:child_process";
 import SoundCloud from "soundcloud-scraper";
 
@@ -92,7 +91,7 @@ const fastify = Fastify({
     return createServer()
       .on("request", (req, res) => {
         res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-        res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+        res.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "SAMEORIGIN");
         res.setHeader("Referrer-Policy", "no-referrer");
@@ -477,49 +476,6 @@ fastify.get("/api/youtube/thumb", async (req, reply) => {
   }
 });
 
-// YouTube video stream — yt-dlp extracts direct URL, server proxies for seeking
-fastify.get("/api/youtube/stream", async (req, reply) => {
-  const id = String(req.query.id || "").trim();
-  if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return reply.status(400).send("Invalid ID");
-
-  const ytUrl = `https://www.youtube.com/watch?v=${id}`;
-
-  // Get direct stream URL (single combined video+audio file, ≤720p)
-  const directUrl = await new Promise((resolve) => {
-    execFile(
-      "yt-dlp",
-      [
-        "--no-playlist",
-        "-f", "best[height<=720][ext=mp4]/best[height<=480][ext=mp4]/best[height<=720]/best",
-        "--get-url",
-        ytUrl,
-      ],
-      { timeout: 20000 },
-      (err, stdout) => resolve(err ? null : stdout.trim().split("\n")[0] || null)
-    );
-  });
-
-  if (!directUrl) return reply.status(502).send("Could not resolve stream URL");
-
-  const upstreamHeaders = {};
-  if (req.headers.range) upstreamHeaders["range"] = req.headers.range;
-
-  try {
-    const upstream = await fetch(directUrl, { headers: upstreamHeaders });
-    reply.code(upstream.status);
-    reply.header("Content-Type",  upstream.headers.get("content-type") || "video/mp4");
-    reply.header("Accept-Ranges", "bytes");
-    reply.header("Cache-Control", "no-cache");
-    const cl = upstream.headers.get("content-length");
-    const cr = upstream.headers.get("content-range");
-    if (cl) reply.header("Content-Length", cl);
-    if (cr) reply.header("Content-Range",  cr);
-    return reply.send(Readable.fromWeb(upstream.body));
-  } catch (err) {
-    console.error("[youtube/stream] proxy error:", err.message);
-    return reply.status(502).send("Stream proxy failed");
-  }
-});
 
 // ── GET /ai — AI chat page ────────────────────────────────────────────────────
 fastify.get("/ai", (_req, reply) => {
