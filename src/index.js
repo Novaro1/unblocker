@@ -477,6 +477,55 @@ fastify.get("/api/youtube/thumb", async (req, reply) => {
 });
 
 
+// YouTube stream proxy — yt-dlp via Tor to bypass datacenter IP block,
+// then our server pipes the googlevideo stream to the client.
+const _ytStreamCache = new Map(); // id -> { url, expires }
+
+fastify.get("/api/youtube/stream/:id", async (req, reply) => {
+  const id = String(req.params.id || "").trim();
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return reply.status(400).send("Invalid ID");
+
+  // Serve cached URL if still fresh (googlevideo URLs expire in ~6 h)
+  const cached = _ytStreamCache.get(id);
+  const streamUrl = (cached && cached.expires > Date.now())
+    ? cached.url
+    : await new Promise((resolve, reject) => {
+        const child = spawn("yt-dlp", [
+          "--proxy", "socks5://127.0.0.1:9050",
+          `https://www.youtube.com/watch?v=${id}`,
+          "--get-url",
+          "--format", "best[height<=720][ext=mp4]/best[height<=480][ext=mp4]/best[height<=720]/best",
+          "--no-playlist", "--quiet", "--no-warnings",
+        ]);
+        let out = "", err = "";
+        child.stdout.on("data", d => { out += d; });
+        child.stderr.on("data", d => { err += d; });
+        child.on("close", () => {
+          const url = out.trim().split("\n")[0];
+          if (url?.startsWith("http")) {
+            _ytStreamCache.set(id, { url, expires: Date.now() + 4 * 60 * 60 * 1000 });
+            resolve(url);
+          } else {
+            reject(new Error(err.trim() || "yt-dlp returned no URL"));
+          }
+        });
+        child.on("error", reject);
+      });
+
+  // Proxy the stream with range support so the video player can seek
+  const upstreamHeaders = {};
+  if (req.headers.range) upstreamHeaders["range"] = req.headers.range;
+
+  const upstream = await fetch(streamUrl, { headers: upstreamHeaders });
+  reply.status(upstream.status);
+  for (const h of ["content-type", "content-length", "content-range", "accept-ranges"]) {
+    const v = upstream.headers.get(h);
+    if (v) reply.header(h, v);
+  }
+  reply.header("Accept-Ranges", "bytes");
+  return reply.send(Readable.from(upstream.body));
+});
+
 // ── GET /ai — AI chat page ────────────────────────────────────────────────────
 fastify.get("/ai", (_req, reply) => {
   return reply.type("text/html").sendFile("ai.html");

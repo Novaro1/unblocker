@@ -616,65 +616,33 @@
   }
   function hideOverlay() { overlay.classList.add("hidden"); }
 
-  // ── Play video — Cobalt API ────────────────────────────────────────────────
-  // api.cobalt.tools is called directly from the browser (CORS-enabled).
-  // Cobalt fetches from YouTube on its own servers and tunnels a stream URL
-  // back — no sign-in, no bot checks, no iframe restrictions.
-  async function playVideo(v) {
+  // ── Play video — server-side stream proxy via Tor ─────────────────────────
+  // /api/youtube/stream/:id uses yt-dlp+Tor on the server to get the URL,
+  // then pipes the googlevideo stream back. No iframes, no CORS, no auth needed.
+  function playVideo(v) {
     currentVideoId = v.id;
     ytTitle.textContent = v.title;
     ytMeta.textContent  = v.channel + (v.durationF ? ` · ${v.durationF}` : "");
-    videoEl.src    = "";
     videoEl.poster = v.thumb;
-    showOverlay("Fetching video…");
+    showOverlay("Fetching video… (may take 10–20 s the first time)");
 
     playerPanel.classList.add("visible");
     resultsPanel.classList.remove("full");
     if (currentResults.length) renderList(currentResults);
 
-    try {
-      const res = await fetch("https://api.cobalt.tools/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        body: JSON.stringify({
-          url: `https://www.youtube.com/watch?v=${v.id}`,
-          videoQuality: "720",
-          filenameStyle: "basic",
-        }),
-        signal: AbortSignal.timeout(20000),
-      });
-
-      const data = await res.json();
-
-      if (data.status === "tunnel" || data.status === "redirect") {
-        videoEl.src = data.url;
-        hideOverlay();
-        videoEl.play().catch(() => {});
-      } else if (data.status === "picker") {
-        // picker = multiple streams; pick first video item
-        const item = data.picker?.find(p => p.type === "video") ?? data.picker?.[0];
-        if (item?.url) {
-          videoEl.src = item.url;
-          hideOverlay();
-          videoEl.play().catch(() => {});
-        } else {
-          showOverlay("No playable stream found.", false);
-        }
-      } else {
-        const msg = data.error?.code ?? data.error?.message ?? "Unknown error from Cobalt.";
-        showOverlay(msg, false);
-      }
-    } catch (err) {
-      showOverlay("Could not reach video service. " + (err.message ?? ""), false);
-    }
+    // Point the video element at our streaming endpoint.
+    // The server handles the yt-dlp+Tor call and pipes back the stream.
+    videoEl.src = `/api/youtube/stream/${v.id}`;
+    videoEl.load();
+    videoEl.oncanplay = () => { hideOverlay(); videoEl.play().catch(() => {}); };
+    videoEl.onerror   = () => showOverlay("Could not load video. Try again.", false);
   }
 
   function closePlayer() {
     videoEl.src    = "";
     videoEl.poster = "";
+    videoEl.oncanplay = null;
+    videoEl.onerror   = null;
     hideOverlay();
     playerPanel.classList.remove("visible");
     resultsPanel.classList.add("full");
