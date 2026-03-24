@@ -485,15 +485,13 @@ function ytGetUrl(id) {
   const cached = _ytUrlCache.get(id);
   if (cached && cached.expires > Date.now()) return Promise.resolve(cached.url);
   return new Promise((resolve, reject) => {
-    const cookiesPath = "/var/www/unblocker/yt-cookies.txt";
-    const ytdlpArgs = [];
-    try { if (statSync(cookiesPath).isFile()) ytdlpArgs.push("--cookies", cookiesPath); } catch {}
-    ytdlpArgs.push(
+    const ytdlpArgs = [
+      "--extractor-args", "youtube:player_client=android_vr",
       `https://www.youtube.com/watch?v=${id}`,
       "--get-url",
       "--format", "best[ext=mp4]/best[ext=webm]/best",
       "--no-playlist", "--quiet", "--no-warnings",
-    );
+    ];
     const child = spawn("yt-dlp", ytdlpArgs);
     let out = "", err = "";
     child.stdout.on("data", d => { out += d; });
