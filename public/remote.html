@@ -142,10 +142,22 @@
         </div>
       </div>
 
-      <!-- Note -->
+      <!-- Notes -->
       <div style="margin-top:4px;padding:10px 14px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:8px;font-size:11px;line-height:1.6;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        First run auto-installs dependencies (may take a minute). After that it starts instantly. macOS may ask for Screen Recording and Accessibility permissions &mdash; grant both for full functionality.
+        First run auto-installs dependencies (may take a minute). After that it starts instantly.
+      </div>
+
+      <div style="margin-top:8px;padding:10px 14px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:8px;font-size:11px;line-height:1.6;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <strong style="color:var(--text);">macOS permissions needed:</strong> Go to <strong style="color:var(--text);">System Settings &rarr; Privacy &amp; Security</strong> and grant Terminal access to both <strong style="color:var(--text);">Screen Recording</strong> and <strong style="color:var(--text);">Accessibility</strong>. Without these, screen sharing or input control won't work.
+      </div>
+
+      <div style="margin-top:8px;padding:10px 14px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:8px;font-size:11px;line-height:1.6;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <strong style="color:var(--text);">Want it to work with the lid closed?</strong> Plug in the charger, then run this <em>before</em> the agent command:<br>
+        <code style="display:inline-block;margin-top:4px;padding:3px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--accent-lighter);font-family:ui-monospace,monospace;">sudo pmset -b disablesleep 1</code>
+        <br>To undo later: <code style="padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--accent-lighter);font-family:ui-monospace,monospace;">sudo pmset -b disablesleep 0</code>
       </div>
 
     </div>
