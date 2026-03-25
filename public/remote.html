@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Remote Desktop — Veil</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #060610; --surface: #0e0e1e; --surface2: #15152a;
+      --border: #1e1e38; --text: #ecedf8; --muted: #6264a0;
+      --accent: #6366f1; --accent-light: #818cf8; --accent-lighter: #a5b4fc;
+    }
+    html, body { height: 100%; font-family: ui-rounded, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+
+    /* ── Join screen ──────────────────────── */
+    .join-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; gap: 32px; padding: 40px 20px;
+    }
+    .join-screen h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+    .join-screen p { color: var(--muted); font-size: 14px; max-width: 420px; text-align: center; line-height: 1.6; }
+    .join-box {
+      display: flex; gap: 10px; align-items: center;
+    }
+    .join-box input {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 20px; font-size: 22px; color: var(--text); text-align: center;
+      letter-spacing: 8px; font-weight: 700; width: 220px; outline: none;
+      text-transform: uppercase; font-family: ui-monospace, monospace;
+      transition: border-color 0.2s;
+    }
+    .join-box input:focus { border-color: var(--accent); }
+    .join-box input::placeholder { letter-spacing: 2px; font-size: 14px; color: var(--muted); font-weight: 400; }
+    .join-btn {
+      background: var(--accent); color: white; border: none; border-radius: 12px;
+      padding: 14px 28px; font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .join-btn:hover { background: var(--accent-light); }
+    .join-btn:active { transform: scale(0.97); }
+    .status-msg { color: var(--muted); font-size: 13px; min-height: 20px; }
+    .status-msg.error { color: #f87171; }
+    .back-link { color: var(--muted); text-decoration: none; font-size: 13px; transition: color 0.15s; }
+    .back-link:hover { color: var(--accent-lighter); }
+
+    /* ── Remote screen ────────────────────── */
+    .remote-screen {
+      display: none; width: 100vw; height: 100vh; background: #000;
+      position: relative; overflow: hidden;
+    }
+    .remote-screen canvas {
+      display: block; width: 100%; height: 100%;
+      object-fit: contain; cursor: crosshair;
+    }
+    .toolbar {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(14,14,30,0.92); border: 1px solid var(--border);
+      border-radius: 12px; padding: 8px 16px; display: flex; gap: 16px;
+      align-items: center; z-index: 10; backdrop-filter: blur(12px);
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .remote-screen:hover .toolbar { opacity: 1; }
+    .toolbar span { font-size: 12px; color: var(--muted); }
+    .toolbar .room-code { color: var(--accent-lighter); font-weight: 700; font-family: monospace; }
+    .toolbar button {
+      background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3);
+      border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .toolbar button:hover { background: rgba(248,113,113,0.3); }
+    .fps-counter { color: var(--muted); font-size: 11px; font-family: monospace; }
+    .fullscreen-btn {
+      background: rgba(99,102,241,0.15) !important; color: var(--accent-lighter) !important;
+      border: 1px solid rgba(99,102,241,0.3) !important;
+    }
+    .fullscreen-btn:hover { background: rgba(99,102,241,0.3) !important; }
+  </style>
+</head>
+<body>
+
+<!-- Join Screen -->
+<div class="join-screen" id="joinScreen">
+  <h1>Remote Desktop</h1>
+  <p>Enter the room code from the host computer to connect and take control of their screen.</p>
+  <div class="join-box">
+    <input type="text" id="codeInput" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false">
+    <button class="join-btn" id="joinBtn">Connect</button>
+  </div>
+  <div class="status-msg" id="statusMsg"></div>
+  <a href="/" class="back-link">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to Veil
+  </a>
+
+  <div style="margin-top:24px;padding:20px 24px;background:var(--surface);border:1px solid var(--border);border-radius:14px;max-width:480px;">
+    <div style="font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-lighter)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Setting up the host?
+    </div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.6;">
+      On the computer you want to control, run:<br>
+      <code style="display:block;margin-top:8px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--accent-lighter);word-break:break-all;user-select:all;">python3 -c "import urllib.request as r; exec(r.urlopen('https://veilub.mooo.com/api/remote/agent').read())"</code>
+      <span style="display:block;margin-top:6px;font-size:11px;">Requires Python 3. Auto-installs dependencies on first run.</span>
+    </div>
+  </div>
+</div>
+
+<!-- Remote Screen -->
+<div class="remote-screen" id="remoteScreen">
+  <div class="toolbar">
+    <span>Room: <span class="room-code" id="toolbarCode"></span></span>
+    <span class="fps-counter" id="fpsCounter">-- fps</span>
+    <button class="fullscreen-btn" id="fullscreenBtn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      Fullscreen
+    </button>
+    <button id="disconnectBtn">Disconnect</button>
+  </div>
+  <canvas id="canvas"></canvas>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const joinScreen  = $("joinScreen");
+const remoteScreen = $("remoteScreen");
+const codeInput   = $("codeInput");
+const joinBtn     = $("joinBtn");
+const statusMsg   = $("statusMsg");
+const canvas      = $("canvas");
+const ctx         = canvas.getContext("2d");
+const fpsCounter  = $("fpsCounter");
+const toolbarCode = $("toolbarCode");
+
+let ws = null;
+let imgW = 0, imgH = 0;  // actual image dimensions from host
+let frameCount = 0;
+let lastFpsTime = Date.now();
+
+// ── Join ──────────────────────────────────
+codeInput.addEventListener("keydown", e => { if (e.key === "Enter") joinBtn.click(); });
+joinBtn.addEventListener("click", connect);
+
+function setStatus(msg, isError) {
+  statusMsg.textContent = msg;
+  statusMsg.className = "status-msg" + (isError ? " error" : "");
+}
+
+function connect() {
+  const code = codeInput.value.trim().toUpperCase();
+  if (code.length < 4) return setStatus("Enter the room code from the host.", true);
+
+  setStatus("Connecting...");
+  joinBtn.disabled = true;
+
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  ws = new WebSocket(`${proto}//${location.host}/remote-ws`);
+  ws.binaryType = "arraybuffer";
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: "viewer_join", code }));
+  };
+
+  ws.onmessage = (e) => {
+    if (typeof e.data === "string") {
+      const msg = JSON.parse(e.data);
+      if (msg.type === "joined") {
+        setStatus("");
+        joinScreen.style.display = "none";
+        remoteScreen.style.display = "block";
+        toolbarCode.textContent = code;
+        canvas.focus();
+      } else if (msg.type === "host_left") {
+        setStatus("Host disconnected.", true);
+        showJoin();
+      } else if (msg.type === "error") {
+        setStatus(msg.message, true);
+        joinBtn.disabled = false;
+      }
+    } else {
+      // Binary: frame data (skip 1-byte type header)
+      const blob = new Blob([e.data.slice(1)], { type: "image/jpeg" });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        if (canvas.width !== img.width || canvas.height !== img.height) {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          imgW = img.width;
+          imgH = img.height;
+        }
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        frameCount++;
+        const now = Date.now();
+        if (now - lastFpsTime >= 1000) {
+          fpsCounter.textContent = frameCount + " fps";
+          frameCount = 0;
+          lastFpsTime = now;
+        }
+      };
+      img.src = url;
+    }
+  };
+
+  ws.onerror = () => setStatus("Connection failed.", true);
+  ws.onclose = () => { joinBtn.disabled = false; };
+}
+
+function showJoin() {
+  remoteScreen.style.display = "none";
+  joinScreen.style.display = "flex";
+  joinBtn.disabled = false;
+  if (ws) { ws.close(); ws = null; }
+}
+
+$("disconnectBtn").addEventListener("click", showJoin);
+$("fullscreenBtn").addEventListener("click", () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else remoteScreen.requestFullscreen();
+});
+
+// ── Input forwarding ──────────────────────
+function canvasCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  // Map from displayed canvas size to actual image dimensions
+  const scaleX = imgW / rect.width;
+  const scaleY = imgH / rect.height;
+  return {
+    x: Math.round(e.clientX * scaleX),  // these are in image coords
+    y: Math.round(e.clientY * scaleY),
+    // Host needs to scale from image coords to actual screen coords
+    // The host captures at MAX_DIM width, so sx = screenW / imageW
+    // We send raw image coords; the host's sx/sy factors handle the rest
+    sx: 1, sy: 1  // host will override with its own scale
+  };
+}
+
+function sendInput(evt) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "input", event: evt }));
+  }
+}
+
+canvas.addEventListener("mousemove", e => {
+  const c = canvasCoords(e);
+  sendInput({ type: "mousemove", x: c.x, y: c.y });
+});
+
+canvas.addEventListener("mousedown", e => {
+  e.preventDefault();
+  const c = canvasCoords(e);
+  sendInput({ type: "mousedown", x: c.x, y: c.y, button: e.button });
+});
+
+canvas.addEventListener("mouseup", e => {
+  const c = canvasCoords(e);
+  sendInput({ type: "mouseup", x: c.x, y: c.y, button: e.button });
+});
+
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const c = canvasCoords(e);
+  sendInput({ type: "scroll", x: c.x, y: c.y, deltaY: e.deltaY });
+}, { passive: false });
+
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+document.addEventListener("keydown", e => {
+  if (remoteScreen.style.display === "none") return;
+  // Don't capture F11, Escape when not fullscreen
+  if (e.key === "F11") return;
+  if (e.key === "Escape" && !document.fullscreenElement) { showJoin(); return; }
+  e.preventDefault();
+  sendInput({ type: "keydown", key: mapKey(e.key), code: e.code });
+});
+
+document.addEventListener("keyup", e => {
+  if (remoteScreen.style.display === "none") return;
+  sendInput({ type: "keyup", key: mapKey(e.key), code: e.code });
+});
+
+// Map browser key names to pyautogui key names
+function mapKey(key) {
+  const map = {
+    "Control": "ctrl", "Shift": "shift", "Alt": "alt", "Meta": "command",
+    "Enter": "enter", "Backspace": "backspace", "Delete": "delete",
+    "Tab": "tab", "Escape": "escape", "ArrowUp": "up", "ArrowDown": "down",
+    "ArrowLeft": "left", "ArrowRight": "right", " ": "space",
+    "Home": "home", "End": "end", "PageUp": "pageup", "PageDown": "pagedown",
+    "F1": "f1", "F2": "f2", "F3": "f3", "F4": "f4", "F5": "f5", "F6": "f6",
+    "F7": "f7", "F8": "f8", "F9": "f9", "F10": "f10", "F11": "f11", "F12": "f12",
+    "CapsLock": "capslock",
+  };
+  return map[key] || key;
+}
+
+// Keep canvas focusable for keyboard
+canvas.tabIndex = 0;
+</script>
+</body>
+</html>

@@ -11,6 +11,8 @@ import fastifyStatic from "@fastify/static";
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
 import { baremuxPath } from "@mercuryworkshop/bare-mux/node";
 import { execFile, spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { WebSocketServer } from "ws";
 import SoundCloud from "soundcloud-scraper";
 
 const publicPath        = fileURLToPath(new URL("../public/", import.meta.url));
@@ -105,6 +107,7 @@ const fastify = Fastify({
       })
       .on("upgrade", (req, socket, head) => {
         if (req.url.endsWith("/wisp/")) wisp.routeRequest(req, socket, head);
+        else if (req.url === "/remote-ws") remoteWss.handleUpgrade(req, socket, head, ws => remoteWss.emit("connection", ws, req));
         else if (bareServer.shouldRoute(req)) bareServer.routeUpgrade(req, socket, head);
         else socket.end();
       });
@@ -407,6 +410,95 @@ fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply
   }
 
   return reply.code(200).send("ok");
+});
+
+// ── Remote Desktop ────────────────────────────────────────────────────────────
+const remoteWss = new WebSocketServer({ noServer: true });
+const remoteRooms = new Map(); // code -> { host: ws, viewer: ws|null, scaleX, scaleY }
+
+function genRoomCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  const bytes = randomBytes(6);
+  for (let i = 0; i < 6; i++) code += chars[bytes[i] % chars.length];
+  return code;
+}
+
+remoteWss.on("connection", (ws) => {
+  let role = null;   // "host" | "viewer"
+  let roomCode = null;
+
+  ws.on("message", (data, isBinary) => {
+    // Binary messages from host: forward frame to viewer
+    if (isBinary && role === "host" && roomCode) {
+      const room = remoteRooms.get(roomCode);
+      if (room?.viewer?.readyState === 1) {
+        room.viewer.send(data, { binary: true });
+      }
+      return;
+    }
+
+    // Text messages
+    let msg;
+    try { msg = JSON.parse(data.toString()); } catch { return; }
+
+    if (msg.type === "host_create") {
+      // Host wants to create a room
+      let code;
+      do { code = genRoomCode(); } while (remoteRooms.has(code));
+      roomCode = code;
+      role = "host";
+      remoteRooms.set(code, { host: ws, viewer: null });
+      ws.send(JSON.stringify({ type: "room_created", code }));
+
+    } else if (msg.type === "viewer_join") {
+      // Viewer wants to join a room
+      const code = String(msg.code || "").toUpperCase();
+      const room = remoteRooms.get(code);
+      if (!room) return ws.send(JSON.stringify({ type: "error", message: "Room not found. Check the code and try again." }));
+      if (room.viewer) return ws.send(JSON.stringify({ type: "error", message: "Room already has a viewer." }));
+      roomCode = code;
+      role = "viewer";
+      room.viewer = ws;
+      ws.send(JSON.stringify({ type: "joined" }));
+      room.host.send(JSON.stringify({ type: "viewer_joined" }));
+
+    } else if (msg.type === "input" && role === "viewer" && roomCode) {
+      // Forward input from viewer to host
+      const room = remoteRooms.get(roomCode);
+      if (room?.host?.readyState === 1) {
+        room.host.send(JSON.stringify(msg));
+      }
+    }
+  });
+
+  ws.on("close", () => {
+    if (!roomCode) return;
+    const room = remoteRooms.get(roomCode);
+    if (!room) return;
+
+    if (role === "host") {
+      if (room.viewer?.readyState === 1) {
+        room.viewer.send(JSON.stringify({ type: "host_left" }));
+      }
+      remoteRooms.delete(roomCode);
+    } else if (role === "viewer") {
+      room.viewer = null;
+      if (room.host?.readyState === 1) {
+        room.host.send(JSON.stringify({ type: "viewer_left" }));
+      }
+    }
+  });
+});
+
+fastify.get("/remote", (_req, reply) => {
+  return reply.type("text/html").sendFile("remote.html");
+});
+
+// Serve the agent script for easy download
+const remotePath = fileURLToPath(new URL("../remote/", import.meta.url));
+fastify.get("/api/remote/agent", (_req, reply) => {
+  return reply.type("text/plain").sendFile("agent.py", remotePath);
 });
 
 // ── GET /ai — AI chat page ────────────────────────────────────────────────────

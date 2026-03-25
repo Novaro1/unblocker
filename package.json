@@ -20,6 +20,7 @@
     "@tomphttp/bare-server-node": "^2.0.6",
     "fastify": "^5.0.0",
     "soundcloud-scraper": "^5.0.3",
+    "ws": "^8.20.0",
     "youtube-sr": "^4.3.12"
   }
 }
