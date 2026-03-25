@@ -31,6 +31,19 @@ except ImportError:
     print("Installing Pillow..."); import subprocess
     subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow"])
     from PIL import Image, ImageDraw
+try:
+    import sounddevice as sd
+except ImportError:
+    print("Installing sounddevice..."); import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "sounddevice"])
+    import sounddevice as sd
+import numpy as np
+try:
+    np.zeros(1)
+except Exception:
+    print("Installing numpy..."); import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "numpy"])
+    import numpy as np
 
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0
@@ -47,6 +60,10 @@ screen_w = 0
 screen_h = 0
 img_w = 0    # width of the JPEG frames we send (after scaling)
 img_h = 0
+audio_device = None  # BlackHole device index (None = no audio)
+AUDIO_SAMPLE_RATE = 48000
+AUDIO_CHANNELS = 2
+AUDIO_CHUNK = 4800  # 100ms chunks at 48kHz
 
 
 def capture_loop():
@@ -101,6 +118,53 @@ def capture_loop():
             sleep_time = interval - elapsed
             if sleep_time > 0:
                 time.sleep(sleep_time)
+
+
+def find_audio_device():
+    """Find BlackHole or similar loopback audio device."""
+    try:
+        devices = sd.query_devices()
+        for i, d in enumerate(devices):
+            name = d["name"].lower()
+            if d["max_input_channels"] >= 2 and any(k in name for k in ["blackhole", "loopback", "soundflower", "virtual"]):
+                print(f"[audio] Found loopback device: {d['name']} (index {i})")
+                return i
+        print("[audio] No loopback audio device found (BlackHole not installed).")
+        print("[audio] Install BlackHole from https://existential.audio/blackhole/ for audio streaming.")
+        return None
+    except Exception as e:
+        print(f"[audio] Could not query audio devices: {e}")
+        return None
+
+
+def audio_capture_loop():
+    """Capture system audio via BlackHole and send to viewer."""
+    global running
+    try:
+        def audio_callback(indata, frames, time_info, status):
+            if not running or not ws_conn:
+                return
+            try:
+                # Convert float32 to int16 PCM
+                pcm16 = (indata * 32767).astype(np.int16)
+                raw = pcm16.tobytes()
+                ws_conn.send(b'\x02' + raw, opcode=websocket.ABNF.OPCODE_BINARY)
+            except Exception:
+                pass
+
+        with sd.InputStream(
+            device=audio_device,
+            samplerate=AUDIO_SAMPLE_RATE,
+            channels=AUDIO_CHANNELS,
+            blocksize=AUDIO_CHUNK,
+            dtype="float32",
+            callback=audio_callback,
+        ):
+            print("[audio] Streaming audio...")
+            while running and ws_conn:
+                time.sleep(0.1)
+    except Exception as e:
+        print(f"[audio] Audio capture error: {e}")
 
 
 def scale_coords(data):
@@ -184,6 +248,9 @@ def on_message(ws, message):
             print(">> Viewer connected! Streaming screen...")
             t = threading.Thread(target=capture_loop, daemon=True)
             t.start()
+            if audio_device is not None:
+                at = threading.Thread(target=audio_capture_loop, daemon=True)
+                at.start()
         elif data.get("type") == "viewer_left":
             print(">> Viewer disconnected.")
         elif data.get("type") == "settings":
@@ -229,8 +296,10 @@ def check_permissions():
 
 
 def main():
+    global audio_device
     print(f"Veil Remote Desktop Agent")
     check_permissions()
+    audio_device = find_audio_device()
     print(f"Connecting to {SERVER}...")
     ws_url = SERVER.rstrip("/") + "/remote-ws"
     ws = websocket.WebSocketApp(

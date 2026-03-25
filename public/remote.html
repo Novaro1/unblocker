@@ -49,12 +49,12 @@
     .remote-screen {
       display: none; width: 100vw; height: 100vh; background: #000;
       position: relative; overflow: hidden;
-      cursor: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualIQAAAABJRU5ErkJggg==') 0 0, none;
+      cursor: none !important;
     }
     .remote-screen canvas {
       display: block; width: 100%; height: 100%;
       object-fit: contain;
-      cursor: inherit;
+      cursor: none !important;
     }
     .toolbar {
       position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
@@ -188,6 +188,11 @@
         <br>To undo later: <code style="padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--accent-lighter);font-family:ui-monospace,monospace;">sudo pmset -b disablesleep 0</code>
       </div>
 
+      <div style="margin-top:8px;padding:10px 14px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:8px;font-size:11px;line-height:1.6;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <strong style="color:var(--text);">Want audio streaming?</strong> Install <a href="https://existential.audio/blackhole/" target="_blank" style="color:var(--accent-lighter);text-decoration:underline;">BlackHole</a> (free) on the host Mac. Then in <strong style="color:var(--text);">System Settings &rarr; Sound</strong>, set output to <strong style="color:var(--text);">"BlackHole 2ch"</strong>, or create a Multi-Output Device in Audio MIDI Setup to hear audio locally too. The agent will auto-detect it.
+      </div>
+
     </div>
   </div>
 </div>
@@ -257,6 +262,12 @@ let imgW = 0, imgH = 0;  // actual image dimensions from host
 let frameCount = 0;
 let lastFpsTime = Date.now();
 
+// ── Audio playback ───────────────────────
+let audioCtx = null;
+let audioNextTime = 0;
+const AUDIO_SAMPLE_RATE = 48000;
+const AUDIO_CHANNELS = 2;
+
 // ── Join ──────────────────────────────────
 codeInput.addEventListener("keydown", e => { if (e.key === "Enter") joinBtn.click(); });
 joinBtn.addEventListener("click", connect);
@@ -298,28 +309,55 @@ function connect() {
         joinBtn.disabled = false;
       }
     } else {
-      // Binary: frame data (skip 1-byte type header)
-      const blob = new Blob([e.data.slice(1)], { type: "image/jpeg" });
-      const url = URL.createObjectURL(blob);
-      const img = new Image();
-      img.onload = () => {
-        if (canvas.width !== img.width || canvas.height !== img.height) {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          imgW = img.width;
-          imgH = img.height;
+      const buf = e.data;
+      const type = new Uint8Array(buf, 0, 1)[0];
+      if (type === 0x01) {
+        // Video frame
+        const blob = new Blob([buf.slice(1)], { type: "image/jpeg" });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          if (canvas.width !== img.width || canvas.height !== img.height) {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            imgW = img.width;
+            imgH = img.height;
+          }
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(url);
+          frameCount++;
+          const now = Date.now();
+          if (now - lastFpsTime >= 1000) {
+            fpsCounter.textContent = frameCount + " fps";
+            frameCount = 0;
+            lastFpsTime = now;
+          }
+        };
+        img.src = url;
+      } else if (type === 0x02) {
+        // Audio chunk: 16-bit PCM stereo @ 48kHz
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: AUDIO_SAMPLE_RATE });
+          audioNextTime = 0;
         }
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-        frameCount++;
-        const now = Date.now();
-        if (now - lastFpsTime >= 1000) {
-          fpsCounter.textContent = frameCount + " fps";
-          frameCount = 0;
-          lastFpsTime = now;
+        const pcm16 = new Int16Array(buf.slice(1));
+        const numFrames = Math.floor(pcm16.length / AUDIO_CHANNELS);
+        if (numFrames === 0) return;
+        const audioBuffer = audioCtx.createBuffer(AUDIO_CHANNELS, numFrames, AUDIO_SAMPLE_RATE);
+        for (let ch = 0; ch < AUDIO_CHANNELS; ch++) {
+          const channelData = audioBuffer.getChannelData(ch);
+          for (let i = 0; i < numFrames; i++) {
+            channelData[i] = pcm16[i * AUDIO_CHANNELS + ch] / 32768;
+          }
         }
-      };
-      img.src = url;
+        const source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+        if (audioNextTime < now) audioNextTime = now + 0.02; // small buffer
+        source.start(audioNextTime);
+        audioNextTime += audioBuffer.duration;
+      }
     }
   };
 
