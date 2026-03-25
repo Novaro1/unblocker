@@ -268,7 +268,7 @@ canvas.addEventListener("wheel", e => {
 canvas.addEventListener("contextmenu", e => e.preventDefault());
 
 document.addEventListener("keydown", e => {
-  if (remoteScreen.style.display === "none") return;
+  if (remoteScreen.style.display !== "block") return;
   // Don't capture F11, Escape when not fullscreen
   if (e.key === "F11") return;
   if (e.key === "Escape" && !document.fullscreenElement) { showJoin(); return; }
@@ -277,7 +277,7 @@ document.addEventListener("keydown", e => {
 });
 
 document.addEventListener("keyup", e => {
-  if (remoteScreen.style.display === "none") return;
+  if (remoteScreen.style.display !== "block") return;
   sendInput({ type: "keyup", key: mapKey(e.key), code: e.code });
 });
 
