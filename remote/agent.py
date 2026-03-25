@@ -52,12 +52,12 @@ img_h = 0
 def capture_loop():
     """Continuously capture screen and send JPEG frames."""
     global screen_w, screen_h, img_w, img_h
-    interval = 1.0 / FPS
     with mss.mss() as sct:
         monitor = sct.monitors[1]  # primary monitor
         screen_w = monitor["width"]
         screen_h = monitor["height"]
         while running and ws_conn:
+            interval = 1.0 / FPS  # re-read each frame so settings changes apply
             t0 = time.time()
             try:
                 shot = sct.grab(monitor)
@@ -65,12 +65,10 @@ def capture_loop():
                 # Draw cursor onto the frame
                 try:
                     mx, my = pyautogui.position()
-                    # Clamp to monitor bounds
                     mx = max(0, min(mx - monitor["left"], shot.width - 1))
                     my = max(0, min(my - monitor["top"], shot.height - 1))
                     draw = ImageDraw.Draw(img)
-                    # Draw a small arrow cursor (white with black outline)
-                    cs = 20  # cursor size
+                    cs = 20
                     cursor_poly = [
                         (mx, my),
                         (mx, my + cs),
@@ -84,8 +82,8 @@ def capture_loop():
                     draw.polygon(cursor_poly, fill="white", outline="black")
                 except Exception:
                     pass
-                # Scale down if needed
-                if img.width > MAX_DIM:
+                # Scale down if MAX_DIM is set (0 = native, no scaling)
+                if MAX_DIM > 0 and img.width > MAX_DIM:
                     ratio = MAX_DIM / img.width
                     img = img.resize((MAX_DIM, int(img.height * ratio)), Image.LANCZOS)
                 img_w = img.width
@@ -158,6 +156,18 @@ def handle_input(msg):
         print(f"  [input error] {e}")
 
 
+def handle_settings(data):
+    """Update stream settings from the viewer."""
+    global QUALITY, MAX_DIM, FPS
+    if "quality" in data:
+        QUALITY = max(10, min(95, int(data["quality"])))
+    if "maxDim" in data:
+        MAX_DIM = int(data["maxDim"])  # 0 means native (no scaling)
+    if "fps" in data:
+        FPS = max(1, min(60, int(data["fps"])))
+    print(f"  [settings] quality={QUALITY} resolution={MAX_DIM or 'native'} fps={FPS}")
+
+
 def on_message(ws, message):
     if isinstance(message, str):
         data = json.loads(message)
@@ -176,6 +186,8 @@ def on_message(ws, message):
             t.start()
         elif data.get("type") == "viewer_left":
             print(">> Viewer disconnected.")
+        elif data.get("type") == "settings":
+            handle_settings(data)
         elif data.get("type") == "input":
             handle_input(json.dumps(data.get("event", {})))
         elif data.get("type") == "error":

@@ -463,8 +463,8 @@ remoteWss.on("connection", (ws) => {
       ws.send(JSON.stringify({ type: "joined" }));
       room.host.send(JSON.stringify({ type: "viewer_joined" }));
 
-    } else if (msg.type === "input" && role === "viewer" && roomCode) {
-      // Forward input from viewer to host
+    } else if ((msg.type === "input" || msg.type === "settings") && role === "viewer" && roomCode) {
+      // Forward input/settings from viewer to host
       const room = remoteRooms.get(roomCode);
       if (room?.host?.readyState === 1) {
         room.host.send(JSON.stringify(msg));

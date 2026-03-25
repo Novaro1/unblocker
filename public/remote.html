@@ -49,10 +49,12 @@
     .remote-screen {
       display: none; width: 100vw; height: 100vh; background: #000;
       position: relative; overflow: hidden;
+      cursor: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualIQAAAABJRU5ErkJggg==') 0 0, none;
     }
     .remote-screen canvas {
       display: block; width: 100%; height: 100%;
-      object-fit: contain; cursor: none;
+      object-fit: contain;
+      cursor: inherit;
     }
     .toolbar {
       position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
@@ -76,6 +78,32 @@
       border: 1px solid rgba(99,102,241,0.3) !important;
     }
     .fullscreen-btn:hover { background: rgba(99,102,241,0.3) !important; }
+    .settings-btn {
+      background: rgba(99,102,241,0.15) !important; color: var(--accent-lighter) !important;
+      border: 1px solid rgba(99,102,241,0.3) !important;
+    }
+    .settings-btn:hover { background: rgba(99,102,241,0.3) !important; }
+    .settings-panel {
+      display: none; position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
+      background: rgba(14,14,30,0.95); border: 1px solid var(--border); border-radius: 14px;
+      padding: 16px 20px; z-index: 11; backdrop-filter: blur(12px);
+      min-width: 280px;
+    }
+    .settings-panel.open { display: block; }
+    .settings-panel h3 { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 14px; }
+    .setting-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px; font-size: 12px; color: var(--muted);
+    }
+    .setting-row:last-child { margin-bottom: 0; }
+    .setting-row label { flex-shrink: 0; }
+    .setting-row select, .setting-row input[type=range] {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-size: 12px; padding: 4px 8px; outline: none;
+    }
+    .setting-row select { min-width: 120px; }
+    .setting-row input[type=range] { width: 100px; }
+    .setting-val { font-family: monospace; font-size: 11px; color: var(--accent-lighter); min-width: 30px; text-align: right; }
   </style>
 </head>
 <body>
@@ -169,11 +197,45 @@
   <div class="toolbar">
     <span>Room: <span class="room-code" id="toolbarCode"></span></span>
     <span class="fps-counter" id="fpsCounter">-- fps</span>
+    <button class="settings-btn" id="settingsBtn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
     <button class="fullscreen-btn" id="fullscreenBtn">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
       Fullscreen
     </button>
     <button id="disconnectBtn">Disconnect</button>
+  </div>
+  <div class="settings-panel" id="settingsPanel">
+    <h3>Stream Settings</h3>
+    <div class="setting-row">
+      <label>Quality</label>
+      <select id="setQuality">
+        <option value="low">Low (fast)</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="ultra">Ultra</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <label>Resolution</label>
+      <select id="setResolution">
+        <option value="960">960p (fast)</option>
+        <option value="1280" selected>1280p</option>
+        <option value="1920">1920p (Full HD)</option>
+        <option value="0">Native (no scaling)</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <label>FPS</label>
+      <select id="setFps">
+        <option value="10">10 fps (low bandwidth)</option>
+        <option value="15" selected>15 fps</option>
+        <option value="24">24 fps</option>
+        <option value="30">30 fps</option>
+      </select>
+    </div>
   </div>
   <canvas id="canvas"></canvas>
 </div>
@@ -277,6 +339,29 @@ $("fullscreenBtn").addEventListener("click", () => {
   if (document.fullscreenElement) document.exitFullscreen();
   else remoteScreen.requestFullscreen();
 });
+
+// ── Settings ──────────────────────────────
+const settingsPanel = $("settingsPanel");
+const settingsBtn = $("settingsBtn");
+settingsBtn.addEventListener("click", () => settingsPanel.classList.toggle("open"));
+// Close settings when clicking outside
+document.addEventListener("click", e => {
+  if (!settingsPanel.contains(e.target) && e.target !== settingsBtn && !settingsBtn.contains(e.target)) {
+    settingsPanel.classList.remove("open");
+  }
+});
+
+const qualityMap = { low: 25, medium: 40, high: 65, ultra: 85 };
+function sendSettings() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const quality = qualityMap[$("setQuality").value] || 40;
+  const maxDim = parseInt($("setResolution").value) || 0;
+  const fps = parseInt($("setFps").value) || 15;
+  ws.send(JSON.stringify({ type: "settings", quality, maxDim, fps }));
+}
+$("setQuality").addEventListener("change", sendSettings);
+$("setResolution").addEventListener("change", sendSettings);
+$("setFps").addEventListener("change", sendSettings);
 
 // ── Input forwarding ──────────────────────
 function canvasCoords(e) {
