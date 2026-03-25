@@ -281,10 +281,28 @@ $("fullscreenBtn").addEventListener("click", () => {
 // ── Input forwarding ──────────────────────
 function canvasCoords(e) {
   const rect = canvas.getBoundingClientRect();
-  // Map from click position (relative to canvas element) to image pixel coords
-  const x = Math.round(((e.clientX - rect.left) / rect.width) * imgW);
-  const y = Math.round(((e.clientY - rect.top) / rect.height) * imgH);
-  return { x: Math.max(0, Math.min(x, imgW)), y: Math.max(0, Math.min(y, imgH)) };
+  // object-fit:contain letterboxes — compute the actual rendered image area
+  const canvasAspect = imgW / imgH;
+  const elemAspect = rect.width / rect.height;
+  let renderW, renderH, offsetX, offsetY;
+  if (canvasAspect > elemAspect) {
+    // Image is wider than element — bars on top/bottom
+    renderW = rect.width;
+    renderH = rect.width / canvasAspect;
+    offsetX = 0;
+    offsetY = (rect.height - renderH) / 2;
+  } else {
+    // Image is taller than element — bars on left/right
+    renderH = rect.height;
+    renderW = rect.height * canvasAspect;
+    offsetX = (rect.width - renderW) / 2;
+    offsetY = 0;
+  }
+  const relX = e.clientX - rect.left - offsetX;
+  const relY = e.clientY - rect.top - offsetY;
+  const x = Math.round((relX / renderW) * imgW);
+  const y = Math.round((relY / renderH) * imgH);
+  return { x: Math.max(0, Math.min(x, imgW - 1)), y: Math.max(0, Math.min(y, imgH - 1)) };
 }
 
 function sendInput(evt) {
