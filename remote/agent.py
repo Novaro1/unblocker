@@ -6,7 +6,7 @@ Usage:  python agent.py [server_url]
    eg:  python agent.py wss://veilub.mooo.com
 """
 
-import sys, json, time, struct, threading, io, base64
+import sys, json, time, struct, threading, io, base64, ssl
 try:
     import websocket
 except ImportError:
@@ -186,7 +186,13 @@ def main():
         on_error=on_error,
         on_close=on_close,
     )
-    ws.run_forever()
+    # Use default SSL context; fall back to unverified if certs aren't installed (common on macOS)
+    try:
+        import certifi
+        sslopt = {"ca_certs": certifi.where()}
+    except ImportError:
+        sslopt = {"cert_reqs": ssl.CERT_NONE}
+    ws.run_forever(sslopt=sslopt)
 
 
 if __name__ == "__main__":
