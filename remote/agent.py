@@ -108,6 +108,7 @@ def handle_input(msg):
         elif t == "mousedown":
             x, y = scale_coords(data)
             btn = "left" if data.get("button", 0) == 0 else "right" if data.get("button") == 2 else "middle"
+            print(f"  [click] {btn} @ ({x}, {y})")
             pyautogui.click(x, y, button=btn, _pause=False)
 
         elif t == "mouseup":
@@ -115,7 +116,12 @@ def handle_input(msg):
 
         elif t == "keydown":
             key = data.get("key", "")
-            pyautogui.press(key, _pause=False)
+            print(f"  [key] {key}")
+            # Single printable characters: type them directly for reliability
+            if len(key) == 1:
+                pyautogui.typewrite(key, interval=0, _pause=False)
+            else:
+                pyautogui.press(key, _pause=False)
 
         elif t == "keyup":
             pass  # press handles down+up
@@ -126,11 +132,8 @@ def handle_input(msg):
             clicks = int(data.get("deltaY", 0) / -120) or (-1 if data.get("deltaY", 0) > 0 else 1)
             pyautogui.scroll(clicks, _pause=False)
 
-        elif t == "type":
-            pyautogui.typewrite(data.get("text", ""), interval=0, _pause=False)
-
     except Exception as e:
-        print(f"Input error: {e}")
+        print(f"  [input error] {e}")
 
 
 def on_message(ws, message):
@@ -175,8 +178,25 @@ def on_open(ws):
     print("Connected to server. Creating room...")
 
 
+def check_permissions():
+    """Check macOS accessibility permissions needed for input control."""
+    import platform
+    if platform.system() != "Darwin":
+        return
+    try:
+        import subprocess
+        # Try a tiny mouse move to trigger the permission prompt
+        pyautogui.moveTo(pyautogui.position()[0], pyautogui.position()[1], _pause=False)
+        print("[ok] Input control available.")
+    except Exception as e:
+        print(f"[!] Input control may not work: {e}")
+        print("[!] Go to System Settings > Privacy & Security > Accessibility")
+        print("[!] and grant permission to Terminal (or your terminal app).")
+
+
 def main():
     print(f"Veil Remote Desktop Agent")
+    check_permissions()
     print(f"Connecting to {SERVER}...")
     ws_url = SERVER.rstrip("/") + "/remote-ws"
     ws = websocket.WebSocketApp(
