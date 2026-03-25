@@ -26,11 +26,11 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "pyautogui"])
     import pyautogui
 try:
-    from PIL import Image
+    from PIL import Image, ImageDraw
 except ImportError:
     print("Installing Pillow..."); import subprocess
     subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow"])
-    from PIL import Image
+    from PIL import Image, ImageDraw
 
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0
@@ -62,6 +62,28 @@ def capture_loop():
             try:
                 shot = sct.grab(monitor)
                 img = Image.frombytes("RGB", (shot.width, shot.height), shot.rgb)
+                # Draw cursor onto the frame
+                try:
+                    mx, my = pyautogui.position()
+                    # Clamp to monitor bounds
+                    mx = max(0, min(mx - monitor["left"], shot.width - 1))
+                    my = max(0, min(my - monitor["top"], shot.height - 1))
+                    draw = ImageDraw.Draw(img)
+                    # Draw a small arrow cursor (white with black outline)
+                    cs = 20  # cursor size
+                    cursor_poly = [
+                        (mx, my),
+                        (mx, my + cs),
+                        (mx + cs * 0.35, my + cs * 0.7),
+                        (mx + cs * 0.55, my + cs * 1.05),
+                        (mx + cs * 0.4, my + cs * 1.1),
+                        (mx + cs * 0.2, my + cs * 0.75),
+                        (mx - cs * 0.05, my + cs * 1.05),
+                    ]
+                    cursor_poly = [(int(x), int(y)) for x, y in cursor_poly]
+                    draw.polygon(cursor_poly, fill="white", outline="black")
+                except Exception:
+                    pass
                 # Scale down if needed
                 if img.width > MAX_DIM:
                     ratio = MAX_DIM / img.width
