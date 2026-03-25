@@ -94,15 +94,60 @@
     Back to Veil
   </a>
 
-  <div style="margin-top:24px;padding:20px 24px;background:var(--surface);border:1px solid var(--border);border-radius:14px;max-width:480px;">
-    <div style="font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-lighter)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-      Setting up the host?
+  <div style="margin-top:24px;padding:24px 28px;background:var(--surface);border:1px solid var(--border);border-radius:16px;max-width:520px;width:100%;">
+    <div style="font-size:16px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-lighter)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Host Setup Guide
     </div>
-    <div style="font-size:13px;color:var(--muted);line-height:1.6;">
-      On the computer you want to control, run:<br>
-      <code style="display:block;margin-top:8px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--accent-lighter);word-break:break-all;user-select:all;">python3 -c "import urllib.request as r; exec(r.urlopen('https://veilub.mooo.com/api/remote/agent').read())"</code>
-      <span style="display:block;margin-top:6px;font-size:11px;">Requires Python 3. Auto-installs dependencies on first run.</span>
+
+    <div style="font-size:13px;color:var(--muted);line-height:1.7;">
+
+      <!-- Step 1 -->
+      <div style="display:flex;gap:12px;margin-bottom:16px;">
+        <div style="min-width:28px;height:28px;border-radius:50%;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent-lighter);">1</div>
+        <div style="flex:1;">
+          <div style="color:var(--text);font-weight:600;font-size:14px;margin-bottom:4px;">Make sure Python 3 is installed</div>
+          <div>Download from <span style="color:var(--accent-lighter);">python.org</span> if you don't have it. Most Macs and Linux machines already have it.</div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div style="display:flex;gap:12px;margin-bottom:16px;">
+        <div style="min-width:28px;height:28px;border-radius:50%;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent-lighter);">2</div>
+        <div style="flex:1;">
+          <div style="color:var(--text);font-weight:600;font-size:14px;margin-bottom:4px;">Open a terminal on the host computer</div>
+          <div><span style="color:var(--text);">Mac:</span> Spotlight &rarr; "Terminal" &nbsp;&middot;&nbsp; <span style="color:var(--text);">Windows:</span> search "cmd" or "PowerShell" &nbsp;&middot;&nbsp; <span style="color:var(--text);">Linux:</span> Ctrl+Alt+T</div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div style="display:flex;gap:12px;margin-bottom:16px;">
+        <div style="min-width:28px;height:28px;border-radius:50%;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent-lighter);">3</div>
+        <div style="flex:1;">
+          <div style="color:var(--text);font-weight:600;font-size:14px;margin-bottom:8px;">Paste and run this command</div>
+          <div style="position:relative;">
+            <code id="cmdCode" style="display:block;padding:12px 44px 12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--accent-lighter);word-break:break-all;user-select:all;font-family:ui-monospace,monospace;">curl -sL https://veilub.mooo.com/api/remote/agent -o /tmp/veil-agent.py && python3 /tmp/veil-agent.py</code>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('cmdCode').textContent);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)" style="position:absolute;top:8px;right:8px;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.3);color:var(--accent-lighter);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Copy</button>
+          </div>
+          <div style="margin-top:8px;font-size:11px;">On Windows, use: <code style="padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--accent-lighter);">python</code> instead of <code style="padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--accent-lighter);">python3</code></div>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div style="display:flex;gap:12px;margin-bottom:16px;">
+        <div style="min-width:28px;height:28px;border-radius:50%;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent-lighter);">4</div>
+        <div style="flex:1;">
+          <div style="color:var(--text);font-weight:600;font-size:14px;margin-bottom:4px;">Share the room code</div>
+          <div>The terminal will show a <span style="color:var(--accent-lighter);font-weight:600;">6-character code</span>. Give it to the person connecting, and they enter it above.</div>
+        </div>
+      </div>
+
+      <!-- Note -->
+      <div style="margin-top:4px;padding:10px 14px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:8px;font-size:11px;line-height:1.6;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        First run auto-installs dependencies (may take a minute). After that it starts instantly. macOS may ask for Screen Recording and Accessibility permissions &mdash; grant both for full functionality.
+      </div>
+
     </div>
   </div>
 </div>
