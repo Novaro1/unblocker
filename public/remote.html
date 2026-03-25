@@ -281,17 +281,10 @@ $("fullscreenBtn").addEventListener("click", () => {
 // ── Input forwarding ──────────────────────
 function canvasCoords(e) {
   const rect = canvas.getBoundingClientRect();
-  // Map from displayed canvas size to actual image dimensions
-  const scaleX = imgW / rect.width;
-  const scaleY = imgH / rect.height;
-  return {
-    x: Math.round(e.clientX * scaleX),  // these are in image coords
-    y: Math.round(e.clientY * scaleY),
-    // Host needs to scale from image coords to actual screen coords
-    // The host captures at MAX_DIM width, so sx = screenW / imageW
-    // We send raw image coords; the host's sx/sy factors handle the rest
-    sx: 1, sy: 1  // host will override with its own scale
-  };
+  // Map from click position (relative to canvas element) to image pixel coords
+  const x = Math.round(((e.clientX - rect.left) / rect.width) * imgW);
+  const y = Math.round(((e.clientY - rect.top) / rect.height) * imgH);
+  return { x: Math.max(0, Math.min(x, imgW)), y: Math.max(0, Math.min(y, imgH)) };
 }
 
 function sendInput(evt) {
