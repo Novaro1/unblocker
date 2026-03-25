@@ -822,23 +822,52 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const url       = interaction.options.getString("url");
     const name      = interaction.options.getString("name") || new URL(url).hostname;
     const submitter = interaction.options.getUser("submitter");
-    const unblocked = interaction.options.getString("unblocked");
     const links = loadLinks();
     if (links.find((l) => l.url === url)) {
       return interaction.reply({ content: "That link is already in the list.", ephemeral: true });
     }
+    await interaction.deferReply();
     const entry = { url, name, addedAt: new Date().toISOString() };
     if (submitter) {
       entry.submittedBy   = submitter.username;
       entry.submittedById = submitter.id;
     }
-    if (unblocked) {
-      entry.unblocked = unblocked.split(",").map((s) => s.trim()).filter(Boolean);
+    // Auto-check which filters this URL passes
+    const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
+    const domain = new URL(url).hostname;
+    let passedFilters = [];
+    let totalChecked = 0;
+    try {
+      let results = getCachedResults(domain);
+      if (!results) {
+        const res = await fetch(
+          `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
+        );
+        const data = await res.json();
+        if (data.success) {
+          results = data.results;
+          setCachedResults(domain, results);
+        }
+      }
+      if (results) {
+        totalChecked = results.length;
+        passedFilters = results
+          .filter((r) => !r.blocked && !r.error)
+          .map((r) => r.name);
+      }
+    } catch (e) {
+      console.error("[addlink] filter check failed:", e.message);
     }
+    entry.unblocked = passedFilters;
     links.push(entry);
     saveLinks(links);
     refreshLiveMessages();
-    return interaction.reply({ content: `Added **${name}** to the links list.` });
+    const filterSummary = passedFilters.length
+      ? `\n✅ Unblocked on: **${passedFilters.join("**, **")}**`
+      : totalChecked > 0
+        ? "\n⚠️ Blocked on all checked filters."
+        : "\n⚠️ Could not check filters (API error).";
+    return interaction.editReply({ content: `Added **${name}** to the links list.${filterSummary}` });
   }
 
   // /updatelink

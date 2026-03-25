@@ -12,7 +12,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("addlink")
-    .setDescription("Add a working link (Staff only)")
+    .setDescription("Add a working link — auto-checks which school filters it bypasses")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addStringOption((o) =>
       o.setName("url").setDescription("The full link URL (https://...)").setRequired(true)
@@ -22,9 +22,6 @@ const commands = [
     )
     .addUserOption((o) =>
       o.setName("submitter").setDescription("Who found or submitted this link?").setRequired(false)
-    )
-    .addStringOption((o) =>
-      o.setName("unblocked").setDescription("Filters it works on, comma-separated (e.g. GoGuardian, Securly, Lightspeed)").setRequired(false)
     ),
 
   new SlashCommandBuilder()
