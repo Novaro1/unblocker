@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1440" viewBox="0 0 2560 1440">
+  <defs>
+    <!-- Background gradient -->
+    <radialGradient id="bg-main" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0e0e1e"/>
+      <stop offset="100%" stop-color="#060610"/>
+    </radialGradient>
+
+    <!-- Aurora blobs -->
+    <radialGradient id="aurora-left" cx="20%" cy="60%" r="40%">
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="aurora-right" cx="80%" cy="40%" r="40%">
+      <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="aurora-center" cx="50%" cy="55%" r="35%">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="aurora-pink" cx="65%" cy="75%" r="30%">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Text gradient -->
+    <linearGradient id="title-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#a5b4fc"/>
+      <stop offset="50%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+
+    <!-- Glow filter for title -->
+    <filter id="title-glow" x="-10%" y="-50%" width="120%" height="200%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Subtle glow for tagline -->
+    <filter id="tag-glow" x="-5%" y="-80%" width="110%" height="260%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Grid line fade -->
+    <linearGradient id="grid-fade" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Base background -->
+  <rect width="2560" height="1440" fill="url(#bg-main)"/>
+
+  <!-- Aurora layers -->
+  <rect width="2560" height="1440" fill="url(#aurora-left)"/>
+  <rect width="2560" height="1440" fill="url(#aurora-right)"/>
+  <rect width="2560" height="1440" fill="url(#aurora-center)"/>
+  <rect width="2560" height="1440" fill="url(#aurora-pink)"/>
+
+  <!-- Subtle horizontal grid lines -->
+  <line x1="0" y1="360" x2="2560" y2="360" stroke="#6366f1" stroke-width="0.5" stroke-opacity="0.08"/>
+  <line x1="0" y1="720" x2="2560" y2="720" stroke="#6366f1" stroke-width="0.5" stroke-opacity="0.08"/>
+  <line x1="0" y1="1080" x2="2560" y2="1080" stroke="#6366f1" stroke-width="0.5" stroke-opacity="0.08"/>
+
+  <!-- Subtle vertical grid lines -->
+  <line x1="640"  y1="0" x2="640"  y2="1440" stroke="#6366f1" stroke-width="0.5" stroke-opacity="0.05"/>
+  <line x1="1280" y1="0" x2="1280" y2="1440" stroke="#6366f1" stroke-width="0.5" stroke-opacity="0.05"/>
+  <line x1="1920" y1="0" x2="1920" y2="1440" stroke="#6366f1" stroke-width="0.5" stroke-opacity="0.05"/>
+
+  <!-- Star field -->
+  <circle cx="200"  cy="120"  r="1.5" fill="#ecedf8" opacity="0.4"/>
+  <circle cx="480"  cy="80"   r="1"   fill="#ecedf8" opacity="0.3"/>
+  <circle cx="900"  cy="200"  r="1.5" fill="#818cf8" opacity="0.5"/>
+  <circle cx="1400" cy="90"   r="1"   fill="#ecedf8" opacity="0.35"/>
+  <circle cx="1800" cy="160"  r="2"   fill="#ecedf8" opacity="0.25"/>
+  <circle cx="2100" cy="70"   r="1.5" fill="#818cf8" opacity="0.4"/>
+  <circle cx="2400" cy="200"  r="1"   fill="#ecedf8" opacity="0.3"/>
+  <circle cx="300"  cy="1300" r="1.5" fill="#ecedf8" opacity="0.3"/>
+  <circle cx="700"  cy="1380" r="1"   fill="#818cf8" opacity="0.4"/>
+  <circle cx="1600" cy="1320" r="1.5" fill="#ecedf8" opacity="0.35"/>
+  <circle cx="2200" cy="1360" r="2"   fill="#ecedf8" opacity="0.2"/>
+  <circle cx="100"  cy="700"  r="1"   fill="#ecedf8" opacity="0.25"/>
+  <circle cx="2460" cy="750"  r="1.5" fill="#818cf8" opacity="0.3"/>
+
+  <!-- Thin accent line above title -->
+  <rect x="980" y="530" width="600" height="1.5" fill="#6366f1" opacity="0.5"/>
+
+  <!-- Main title: VEIL -->
+  <text
+    x="1280"
+    y="750"
+    text-anchor="middle"
+    font-family="'Helvetica Neue', 'Arial', sans-serif"
+    font-weight="900"
+    font-size="320"
+    letter-spacing="60"
+    fill="url(#title-grad)"
+    filter="url(#title-glow)"
+  >VEIL</text>
+
+  <!-- Thin accent line below title -->
+  <rect x="980" y="830" width="600" height="1.5" fill="#6366f1" opacity="0.5"/>
+
+  <!-- Tagline -->
+  <text
+    x="1280"
+    y="940"
+    text-anchor="middle"
+    font-family="'Helvetica Neue', 'Arial', sans-serif"
+    font-weight="300"
+    font-size="52"
+    letter-spacing="18"
+    fill="#ecedf8"
+    opacity="0.7"
+    filter="url(#tag-glow)"
+  >THE PROXY YOUR SCHOOL FORGOT TO BLOCK</text>
+
+  <!-- URL bottom center -->
+  <text
+    x="1280"
+    y="1100"
+    text-anchor="middle"
+    font-family="'Courier New', 'Courier', monospace"
+    font-size="32"
+    letter-spacing="4"
+    fill="#6366f1"
+    opacity="0.6"
+  >veilub.mooo.com</text>
+
+  <!-- Corner accent dots -->
+  <circle cx="960"  cy="720" r="4" fill="#6366f1" opacity="0.3"/>
+  <circle cx="1600" cy="720" r="4" fill="#6366f1" opacity="0.3"/>
+</svg>

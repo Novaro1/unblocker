@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <defs>
+    <!-- Outer glow for ring -->
+    <filter id="ring-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Glow for V mark -->
+    <filter id="v-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Radial gradient background -->
+    <radialGradient id="bg-grad" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#15152a"/>
+      <stop offset="100%" stop-color="#060610"/>
+    </radialGradient>
+    <!-- Accent gradient for V -->
+    <linearGradient id="v-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <!-- Aurora glow behind V -->
+    <radialGradient id="aurora-glow" cx="50%" cy="60%" r="40%">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="400" cy="400" r="400" fill="url(#bg-grad)"/>
+
+  <!-- Aurora glow blob -->
+  <circle cx="400" cy="430" r="220" fill="url(#aurora-glow)"/>
+
+  <!-- Outer ring (dim) -->
+  <circle cx="400" cy="400" r="355" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-opacity="0.25"/>
+
+  <!-- Inner ring (brighter) -->
+  <circle cx="400" cy="400" r="330" fill="none" stroke="#6366f1" stroke-width="1" stroke-opacity="0.15"/>
+
+  <!-- Glowing accent ring -->
+  <circle cx="400" cy="400" r="340" fill="none" stroke="#6366f1" stroke-width="3" stroke-opacity="0.55" filter="url(#ring-glow)"/>
+
+  <!-- V mark — geometric, bold -->
+  <!-- Left stroke of V -->
+  <polygon
+    points="185,210 275,210 400,510 325,510"
+    fill="url(#v-grad)"
+    filter="url(#v-glow)"
+  />
+  <!-- Right stroke of V -->
+  <polygon
+    points="615,210 525,210 400,510 475,510"
+    fill="url(#v-grad)"
+    filter="url(#v-glow)"
+  />
+
+  <!-- Bottom tip accent dot -->
+  <circle cx="400" cy="510" r="8" fill="#a5b4fc" opacity="0.8"/>
+
+  <!-- Subtle star specks -->
+  <circle cx="150" cy="150" r="1.5" fill="#ecedf8" opacity="0.4"/>
+  <circle cx="660" cy="180" r="1" fill="#ecedf8" opacity="0.3"/>
+  <circle cx="120" cy="620" r="1.5" fill="#ecedf8" opacity="0.35"/>
+  <circle cx="680" cy="640" r="1" fill="#ecedf8" opacity="0.25"/>
+  <circle cx="400" cy="100" r="1" fill="#818cf8" opacity="0.5"/>
+  <circle cx="700" cy="400" r="1.5" fill="#818cf8" opacity="0.3"/>
+</svg>
