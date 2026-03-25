@@ -209,6 +209,14 @@ async function getSCClient() {
   return scClient;
 }
 
+// CORS for music API (used by static site)
+fastify.addHook("onSend", (req, reply, payload, done) => {
+  if (req.url.startsWith("/api/music/")) {
+    reply.header("Access-Control-Allow-Origin", "*");
+  }
+  done();
+});
+
 // Music: search SoundCloud (no API key, no bot detection)
 fastify.get("/api/music/search", async (req, reply) => {
   const q     = String(req.query.q || "").trim();
