@@ -198,36 +198,46 @@ async function buildStatusEmbed(guild) {
     .setTimestamp();
 }
 
-function buildLinksEmbed() {
+function buildLinksEmbeds() {
   const links = loadLinks();
-  let description;
   if (!links.length) {
-    description = "No links yet. Staff can add one with `/addlink`.";
-  } else {
-    description = links.map((l, i) => {
-      let line = `**${i + 1}. [${l.name || l.url}](${l.url})**`;
-      if (l.unblocked && l.unblocked.length) {
-        line += `\n✅ Works on: ${l.unblocked.join(" · ")}`;
-      }
-      if (l.submittedBy) {
-        line += `\n👤 Submitted by ${l.submittedBy}`;
-      }
-      return line;
-    }).join("\n\n");
+    return [new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("🔗 Working Veil Links")
+      .setDescription("No links yet. Staff can add one with `/addlink`.")
+      .setTimestamp()];
   }
-  // Discord embed description limit is 4096 chars
-  if (description.length > 4096) {
-    // Truncate at last full link entry that fits
-    const truncated = description.slice(0, 4090);
-    const lastBreak = truncated.lastIndexOf("\n\n");
-    description = (lastBreak > 0 ? truncated.slice(0, lastBreak) : truncated) + "\n\n…";
+  // Build entries and split across multiple embeds (4096 char limit each, 10 embeds max)
+  const entries = links.map((l, i) => {
+    let line = `**${i + 1}. [${l.name || l.url}](${l.url})**`;
+    if (l.unblocked && l.unblocked.length) {
+      line += `\n✅ Works on: ${l.unblocked.join(" · ")}`;
+    }
+    if (l.submittedBy) {
+      line += `\n👤 Submitted by ${l.submittedBy}`;
+    }
+    return line;
+  });
+  const embeds = [];
+  let current = "";
+  for (const entry of entries) {
+    const addition = current ? "\n\n" + entry : entry;
+    if ((current + addition).length > 4090) {
+      embeds.push(current);
+      current = entry;
+    } else {
+      current += addition;
+    }
   }
-  return new EmbedBuilder()
-    .setColor(0x6366f1)
-    .setTitle("🔗 Working Veil Links")
-    .setDescription(description)
-    .setFooter({ text: "First load may take a few seconds for the SSL cert" })
-    .setTimestamp();
+  if (current) embeds.push(current);
+  return embeds.slice(0, 10).map((desc, i) =>
+    new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle(i === 0 ? "🔗 Working Veil Links" : "🔗 Working Veil Links (cont.)")
+      .setDescription(desc)
+      .setFooter(i === embeds.length - 1 ? { text: "First load may take a few seconds for the SSL cert" } : null)
+      .setTimestamp(i === embeds.length - 1 ? new Date() : null)
+  );
 }
 
 // ── Update live messages ───────────────────────────────────────────────────
@@ -244,7 +254,7 @@ async function refreshLiveMessages() {
     try {
       const ch  = await client.channels.fetch(cfg.linksChannelId);
       const msg = await ch.messages.fetch(cfg.linksMessageId);
-      await msg.edit({ embeds: [buildLinksEmbed()] });
+      await msg.edit({ embeds: buildLinksEmbeds() });
     } catch { /* message deleted or channel gone */ }
   }
 }
@@ -821,7 +831,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /links
   if (commandName === "links") {
-    return interaction.reply({ embeds: [buildLinksEmbed()] });
+    return interaction.reply({ embeds: buildLinksEmbeds() });
   }
 
   // /addlink
@@ -1087,7 +1097,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "livelinks") {
     await interaction.deferReply({ ephemeral: true });
     try {
-      const msg = await interaction.channel.send({ embeds: [buildLinksEmbed()] });
+      const msg = await interaction.channel.send({ embeds: buildLinksEmbeds() });
       const cfg = loadConfig();
       cfg.linksChannelId = interaction.channel.id;
       cfg.linksMessageId = msg.id;
