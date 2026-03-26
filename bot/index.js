@@ -198,44 +198,44 @@ async function buildStatusEmbed(guild) {
     .setTimestamp();
 }
 
-function buildLinksEmbedPages() {
-  const links = loadLinks();
-  if (!links.length) {
-    return [[new EmbedBuilder()
-      .setColor(0x6366f1)
-      .setTitle("🔗 Working Veil Links")
-      .setDescription("No links yet. Staff can add one with `/addlink`.")
-      .setTimestamp()]];
+function buildLinkEmbed(link, index) {
+  let desc = `**[${link.name || link.url}](${link.url})**`;
+  if (link.unblocked && link.unblocked.length) {
+    desc += `\n✅ Works on: ${link.unblocked.join(" · ")}`;
   }
-  // Build compact entries: show filter count instead of full list to stay under 6000 char total
-  const entries = links.map((l, i) => {
-    let line = `**${i + 1}. [${l.name || l.url}](${l.url})**`;
-    if (l.unblocked && l.unblocked.length) {
-      line += ` — ✅ ${l.unblocked.length} filters bypassed`;
-    }
-    return line;
-  });
-  // Split into pages that each fit in one message (6000 char total limit per message)
-  const pages = [];
-  let current = "";
-  for (const entry of entries) {
-    const addition = current ? "\n" + entry : entry;
-    if ((current + addition).length > 3900) {
-      pages.push(current);
-      current = entry;
-    } else {
-      current += addition;
-    }
+  if (link.submittedBy) {
+    desc += `\n👤 Submitted by ${link.submittedBy}`;
   }
-  if (current) pages.push(current);
-  return pages.map((desc, i) => [
-    new EmbedBuilder()
-      .setColor(0x6366f1)
-      .setTitle(i === 0 ? `🔗 Working Veil Links (${links.length})` : `🔗 Working Veil Links (cont.)`)
-      .setDescription(desc)
-      .setFooter(i === pages.length - 1 ? { text: "First load may take a few seconds for the SSL cert" } : null)
-      .setTimestamp(i === pages.length - 1 ? new Date() : null)
-  ]);
+  return new EmbedBuilder()
+    .setColor(0x6366f1)
+    .setDescription(desc);
+}
+
+// Post a single link embed to the live links channel and save its message ID
+async function postLinkMessage(link) {
+  const cfg = loadConfig();
+  if (!cfg.linksChannelId) return;
+  try {
+    const ch = await client.channels.fetch(cfg.linksChannelId);
+    const idx = loadLinks().findIndex(l => l.url === link.url);
+    const msg = await ch.send({ embeds: [buildLinkEmbed(link, idx)] });
+    if (!cfg.linksMessageMap) cfg.linksMessageMap = {};
+    cfg.linksMessageMap[link.url] = msg.id;
+    saveConfig(cfg);
+  } catch (e) { console.error("[livelinks] post error:", e.message); }
+}
+
+// Delete a link's message from the live links channel
+async function deleteLinkMessage(url) {
+  const cfg = loadConfig();
+  if (!cfg.linksChannelId || !cfg.linksMessageMap || !cfg.linksMessageMap[url]) return;
+  try {
+    const ch = await client.channels.fetch(cfg.linksChannelId);
+    const msg = await ch.messages.fetch(cfg.linksMessageMap[url]);
+    await msg.delete();
+  } catch { /* already deleted */ }
+  delete cfg.linksMessageMap[url];
+  saveConfig(cfg);
 }
 
 // ── Update live messages ───────────────────────────────────────────────────
@@ -248,19 +248,20 @@ async function refreshLiveMessages() {
       await msg.edit({ embeds: [await buildStatusEmbed(ch.guild)] });
     } catch { /* message deleted or channel gone */ }
   }
-  if (cfg.linksChannelId && cfg.linksMessageIds) {
-    try {
-      const ch = await client.channels.fetch(cfg.linksChannelId);
-      const pages = buildLinksEmbedPages();
-      for (let i = 0; i < cfg.linksMessageIds.length; i++) {
-        const msg = await ch.messages.fetch(cfg.linksMessageIds[i]);
-        if (i < pages.length) {
-          await msg.edit({ embeds: pages[i] });
-        } else {
-          await msg.delete().catch(() => {});
-        }
-      }
-    } catch { /* message deleted or channel gone */ }
+  // Update individual link messages if they exist
+  if (cfg.linksChannelId && cfg.linksMessageMap) {
+    const links = loadLinks();
+    const ch = await client.channels.fetch(cfg.linksChannelId).catch(() => null);
+    if (!ch) return;
+    for (const link of links) {
+      const msgId = cfg.linksMessageMap[link.url];
+      if (!msgId) continue;
+      try {
+        const idx = links.findIndex(l => l.url === link.url);
+        const msg = await ch.messages.fetch(msgId);
+        await msg.edit({ embeds: [buildLinkEmbed(link, idx)] });
+      } catch { /* message deleted */ }
+    }
   }
 }
 
@@ -836,10 +837,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /links
   if (commandName === "links") {
-    const pages = buildLinksEmbedPages();
-    await interaction.reply({ embeds: pages[0] });
-    for (let i = 1; i < pages.length; i++) {
-      await interaction.followUp({ embeds: pages[i] });
+    const links = loadLinks();
+    if (!links.length) return interaction.reply({ content: "No links yet. Staff can add one with `/addlink`.", ephemeral: true });
+    const embeds = links.map((l, i) => buildLinkEmbed(l, i));
+    // Discord allows max 10 embeds per message
+    await interaction.reply({ embeds: embeds.slice(0, 10) });
+    for (let i = 10; i < embeds.length; i += 10) {
+      await interaction.followUp({ embeds: embeds.slice(i, i + 10) });
     }
     return;
   }
@@ -893,7 +897,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     entry.unblocked = passedFilters;
     links.push(entry);
     saveLinks(links);
-    refreshLiveMessages();
+    postLinkMessage(entry);
     const filterSummary = passedFilters.length
       ? `\n✅ Unblocked on: **${passedFilters.join("**, **")}**`
       : totalChecked > 0
@@ -932,7 +936,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ content: "Link not found.", ephemeral: true });
     }
     saveLinks(filtered);
-    refreshLiveMessages();
+    deleteLinkMessage(url);
     return interaction.reply({ content: `Removed **${url}** from the links list.` });
   }
 
@@ -1107,18 +1111,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "livelinks") {
     await interaction.deferReply({ ephemeral: true });
     try {
-      const pages = buildLinksEmbedPages();
-      const messageIds = [];
-      for (const page of pages) {
-        const msg = await interaction.channel.send({ embeds: page });
-        messageIds.push(msg.id);
-      }
+      const links = loadLinks();
       const cfg = loadConfig();
       cfg.linksChannelId = interaction.channel.id;
-      cfg.linksMessageIds = messageIds;
-      delete cfg.linksMessageId; // clean up old single-message field
+      cfg.linksMessageMap = {};
+      // Clean up old fields
+      delete cfg.linksMessageId;
+      delete cfg.linksMessageIds;
+      // Post one message per link
+      for (const link of links) {
+        const idx = links.findIndex(l => l.url === link.url);
+        const msg = await interaction.channel.send({ embeds: [buildLinkEmbed(link, idx)] });
+        cfg.linksMessageMap[link.url] = msg.id;
+      }
       saveConfig(cfg);
-      return interaction.editReply({ content: "Live links embed posted! It will update automatically when links are added or removed." });
+      return interaction.editReply({ content: `Posted ${links.length} link(s). New links will be added automatically.` });
     } catch (err) {
       console.error(err);
       return interaction.editReply({ content: `Error: ${err.message}` });
