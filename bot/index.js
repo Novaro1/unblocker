@@ -203,7 +203,13 @@ function buildLinkEmbed(link, index) {
   const typeIcon = link.type === "static" ? "📄" : "🌐";
   let desc = `${typeIcon} **${typeLabel}** — **[${link.name || link.url}](${link.url})**`;
   if (link.unblocked && link.unblocked.length) {
-    desc += `\n✅ Works on: ${link.unblocked.join(" · ")}`;
+    const filterList = link.unblocked.join(" · ");
+    // Keep under 4096 embed desc limit (leave room for header + submitter)
+    if (desc.length + filterList.length + 20 > 4000) {
+      desc += `\n✅ Bypasses **${link.unblocked.length}** filters`;
+    } else {
+      desc += `\n✅ Works on: ${filterList}`;
+    }
   }
   if (link.submittedBy) {
     desc += `\n👤 Submitted by ${link.submittedBy}`;
