@@ -215,6 +215,13 @@ function buildLinksEmbed() {
       return line;
     }).join("\n\n");
   }
+  // Discord embed description limit is 4096 chars
+  if (description.length > 4096) {
+    // Truncate at last full link entry that fits
+    const truncated = description.slice(0, 4090);
+    const lastBreak = truncated.lastIndexOf("\n\n");
+    description = (lastBreak > 0 ? truncated.slice(0, lastBreak) : truncated) + "\n\n…";
+  }
   return new EmbedBuilder()
     .setColor(0x6366f1)
     .setTitle("🔗 Working Veil Links")
