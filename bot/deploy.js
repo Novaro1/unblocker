@@ -33,19 +33,47 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("updatelink")
-    .setDescription("Update filter info or submitter on an existing link (Staff only)")
+    .setDescription("Edit a specific link (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addStringOption((o) =>
       o.setName("url").setDescription("The exact URL of the link to update").setRequired(true)
+    )
+    .addStringOption((o) =>
+      o.setName("name").setDescription("Update the display name").setRequired(false)
+    )
+    .addStringOption((o) =>
+      o.setName("type").setDescription("Change link type").setRequired(false)
+        .addChoices(
+          { name: "Full (proxy + music + AI + remote)", value: "full" },
+          { name: "Static (games + launcher only)", value: "static" },
+        )
     )
     .addStringOption((o) =>
       o.setName("unblocked").setDescription("Filters it works on, comma-separated (replaces existing)").setRequired(false)
     )
     .addUserOption((o) =>
       o.setName("submitter").setDescription("Update who submitted this link").setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("bulkedit")
+    .setDescription("Bulk edit links whose URL contains a keyword (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addStringOption((o) =>
+      o.setName("contains").setDescription("Match links whose URL contains this (e.g. surge.sh, run.app)").setRequired(true)
     )
     .addStringOption((o) =>
-      o.setName("name").setDescription("Update the display name").setRequired(false)
+      o.setName("type").setDescription("Set type for all matching links").setRequired(false)
+        .addChoices(
+          { name: "Full (proxy + music + AI + remote)", value: "full" },
+          { name: "Static (games + launcher only)", value: "static" },
+        )
+    )
+    .addStringOption((o) =>
+      o.setName("name_prefix").setDescription("Set name prefix for matching links (e.g. 'Veil Static')").setRequired(false)
+    )
+    .addStringOption((o) =>
+      o.setName("unblocked").setDescription("Set filters for all matching links, comma-separated").setRequired(false)
     ),
 
   new SlashCommandBuilder()

@@ -913,6 +913,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "updatelink") {
     const url       = interaction.options.getString("url");
     const name      = interaction.options.getString("name");
+    const linkType  = interaction.options.getString("type");
     const submitter = interaction.options.getUser("submitter");
     const unblocked = interaction.options.getString("unblocked");
     const links = loadLinks();
@@ -921,13 +922,43 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ content: "Link not found.", ephemeral: true });
     }
     if (name)      entry.name = name;
+    if (linkType)  entry.type = linkType;
     if (submitter) { entry.submittedBy = submitter.username; entry.submittedById = submitter.id; }
     if (unblocked !== null) {
       entry.unblocked = unblocked.split(",").map((s) => s.trim()).filter(Boolean);
     }
     saveLinks(links);
     refreshLiveMessages();
-    return interaction.reply({ content: `Updated **${entry.name}**.`, ephemeral: true });
+    return interaction.reply({ content: `Updated **${entry.name}**${linkType ? ` (type: ${linkType})` : ""}.`, ephemeral: true });
+  }
+
+  // /bulkedit
+  if (commandName === "bulkedit") {
+    const contains   = interaction.options.getString("contains").toLowerCase();
+    const linkType   = interaction.options.getString("type");
+    const namePrefix = interaction.options.getString("name_prefix");
+    const unblocked  = interaction.options.getString("unblocked");
+    const links = loadLinks();
+    const matches = links.filter(l => l.url.toLowerCase().includes(contains));
+    if (!matches.length) {
+      return interaction.reply({ content: `No links found containing **${contains}**.`, ephemeral: true });
+    }
+    const changes = [];
+    for (const entry of matches) {
+      if (linkType)   entry.type = linkType;
+      if (namePrefix) entry.name = namePrefix;
+      if (unblocked !== null) {
+        entry.unblocked = unblocked.split(",").map(s => s.trim()).filter(Boolean);
+      }
+    }
+    if (linkType)   changes.push(`type → ${linkType}`);
+    if (namePrefix) changes.push(`name → ${namePrefix}`);
+    if (unblocked !== null) changes.push(`filters updated`);
+    saveLinks(links);
+    refreshLiveMessages();
+    return interaction.reply({
+      content: `Bulk edited **${matches.length}** link(s) matching "**${contains}**": ${changes.join(", ")}`,
+    });
   }
 
   // /removelink
