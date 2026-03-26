@@ -199,7 +199,9 @@ async function buildStatusEmbed(guild) {
 }
 
 function buildLinkEmbed(link, index) {
-  let desc = `**[${link.name || link.url}](${link.url})**`;
+  const typeLabel = link.type === "static" ? "Static" : "Full";
+  const typeIcon = link.type === "static" ? "📄" : "🌐";
+  let desc = `${typeIcon} **${typeLabel}** — **[${link.name || link.url}](${link.url})**`;
   if (link.unblocked && link.unblocked.length) {
     desc += `\n✅ Works on: ${link.unblocked.join(" · ")}`;
   }
@@ -207,7 +209,7 @@ function buildLinkEmbed(link, index) {
     desc += `\n👤 Submitted by ${link.submittedBy}`;
   }
   return new EmbedBuilder()
-    .setColor(0x6366f1)
+    .setColor(link.type === "static" ? 0x22c55e : 0x6366f1)
     .setDescription(desc);
 }
 
@@ -852,13 +854,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "addlink") {
     const url       = interaction.options.getString("url");
     const name      = interaction.options.getString("name") || new URL(url).hostname;
+    const linkType  = interaction.options.getString("type") || "full";
     const submitter = interaction.options.getUser("submitter");
     const links = loadLinks();
     if (links.find((l) => l.url === url)) {
       return interaction.reply({ content: "That link is already in the list.", ephemeral: true });
     }
     await interaction.deferReply();
-    const entry = { url, name, addedAt: new Date().toISOString() };
+    const entry = { url, name, type: linkType, addedAt: new Date().toISOString() };
     if (submitter) {
       entry.submittedBy   = submitter.username;
       entry.submittedById = submitter.id;
@@ -1457,6 +1460,38 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setFooter({ text: `${allDomains.length} public domains available · /freedns to roll again` })
       .setTimestamp();
     return interaction.reply({ embeds: [embed] });
+  }
+
+  // /searchlinks
+  if (commandName === "searchlinks") {
+    const filterName = interaction.options.getString("filter");
+    const typeFilter = interaction.options.getString("type") || "all";
+    const links = loadLinks();
+    const matches = links.filter(l => {
+      if (!l.unblocked || !l.unblocked.length) return false;
+      // Case-insensitive partial match on filter names
+      const hasFilter = l.unblocked.some(f => f.toLowerCase().includes(filterName.toLowerCase()));
+      if (!hasFilter) return false;
+      if (typeFilter === "full") return l.type !== "static";
+      if (typeFilter === "static") return l.type === "static";
+      return true;
+    });
+    if (!matches.length) {
+      return interaction.reply({
+        content: `No links found that bypass **${filterName}**${typeFilter !== "all" ? ` (${typeFilter} only)` : ""}. Try \`/findlink\` to search for a new FreeDNS domain.`,
+        ephemeral: true,
+      });
+    }
+    const embeds = matches.map((l, i) => buildLinkEmbed(l, i));
+    const typeLabel = typeFilter !== "all" ? ` (${typeFilter})` : "";
+    await interaction.reply({
+      content: `Found **${matches.length}** link(s) that bypass **${filterName}**${typeLabel}:`,
+      embeds: embeds.slice(0, 10),
+    });
+    for (let i = 10; i < embeds.length; i += 10) {
+      await interaction.followUp({ embeds: embeds.slice(i, i + 10) });
+    }
+    return;
   }
 
   // /findlink

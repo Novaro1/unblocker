@@ -20,6 +20,13 @@ const commands = [
     .addStringOption((o) =>
       o.setName("name").setDescription("Display name e.g. veilub.mooo.com").setRequired(false)
     )
+    .addStringOption((o) =>
+      o.setName("type").setDescription("Link type").setRequired(false)
+        .addChoices(
+          { name: "Full (proxy + music + AI + remote)", value: "full" },
+          { name: "Static (games + launcher only)", value: "static" },
+        )
+    )
     .addUserOption((o) =>
       o.setName("submitter").setDescription("Who found or submitted this link?").setRequired(false)
     ),
@@ -219,6 +226,45 @@ const commands = [
     .setName("addfreedns")
     .setDescription("Add a FreeDNS account to the subdomain creation pool (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+  new SlashCommandBuilder()
+    .setName("searchlinks")
+    .setDescription("Search existing links that work on your school's filter")
+    .addStringOption((o) =>
+      o.setName("filter").setDescription("Your school's content filter").setRequired(true)
+        .addChoices(
+          { name: "GoGuardian",     value: "GoGuardian"    },
+          { name: "Securly",        value: "Securly"       },
+          { name: "Lightspeed",     value: "Lightspeed"    },
+          { name: "Cisco Umbrella", value: "Cisco Umbrella"},
+          { name: "iBoss",          value: "iBoss"         },
+          { name: "Barracuda",      value: "Barracuda"     },
+          { name: "DNSFilter",      value: "DNSFilter"     },
+          { name: "FortiGuard",     value: "FortiGuard"    },
+          { name: "Linewize",       value: "Linewize"      },
+          { name: "Blocksi Web",    value: "Blocksi Web"   },
+          { name: "Blocksi AI",     value: "Blocksi AI"    },
+          { name: "Deledao",        value: "Deledao"       },
+          { name: "Senso Cloud",    value: "Senso Cloud"   },
+          { name: "Palo Alto",      value: "Palo Alto"     },
+          { name: "LanSchool",      value: "LanSchool"     },
+          { name: "Qustodio",       value: "Qustodio"      },
+          { name: "Sophos",         value: "Sophos"        },
+          { name: "ContentKeeper",  value: "ContentKeeper" },
+          { name: "Smoothwall",     value: "Smoothwall"    },
+          { name: "GoGuardian AI",  value: "GoGuardian AI" },
+          { name: "LanSchool Air",  value: "LanSchool Air" },
+          { name: "Netsweeper",     value: "Netsweeper"    },
+        )
+    )
+    .addStringOption((o) =>
+      o.setName("type").setDescription("Link type to show").setRequired(false)
+        .addChoices(
+          { name: "Full (proxy + music + AI + remote)", value: "full" },
+          { name: "Static (games + launcher only)", value: "static" },
+          { name: "All", value: "all" },
+        )
+    ),
 
   new SlashCommandBuilder()
     .setName("findlink")
