@@ -728,6 +728,9 @@ async function loadTrack(track) {
 
   setQuality("loading", "⏳ Loading...");
   elPlayPause.disabled = true;
+  // Clear stale event handlers before loading new track
+  audio.oncanplay = null;
+  audio.onerror = null;
   audio.src = `/api/music/stream?id=${track.id}`;
 
   elYtLink.textContent = "Open in SoundCloud";
@@ -985,15 +988,23 @@ async function doSearch(q) {
   elLoading.style.display      = "flex";
   elSearchBtn.disabled         = true;
 
+  let searchError = false;
   try {
     const res  = await fetch(`/api/music/search?q=${encodeURIComponent(q)}&limit=24`);
     results    = await res.json();
   } catch {
     results = [];
+    searchError = true;
   }
 
   elLoading.style.display  = "none";
   elSearchBtn.disabled     = false;
+
+  if (searchError) {
+    elEmpty.innerHTML = `<div class="mp-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div><p>Search failed — check your connection and try again.</p>`;
+    elEmpty.style.display = "flex";
+    return;
+  }
 
   if (!results.length) {
     elEmpty.innerHTML = `<div class="mp-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div><p>No results for "<strong>${esc(q)}</strong>".<br>Try a different search.</p>`;

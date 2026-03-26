@@ -261,6 +261,7 @@ let ws = null;
 let imgW = 0, imgH = 0;  // actual image dimensions from host
 let frameCount = 0;
 let lastFpsTime = Date.now();
+let frameRendering = false; // backpressure: skip frames if still rendering
 
 // ── Audio playback ───────────────────────
 let audioCtx = null;
@@ -312,7 +313,9 @@ function connect() {
       const buf = e.data;
       const type = new Uint8Array(buf, 0, 1)[0];
       if (type === 0x01) {
-        // Video frame
+        // Video frame — drop if previous frame still rendering (backpressure)
+        if (frameRendering) return;
+        frameRendering = true;
         const blob = new Blob([buf.slice(1)], { type: "image/jpeg" });
         const url = URL.createObjectURL(blob);
         const img = new Image();
@@ -325,6 +328,7 @@ function connect() {
           }
           ctx.drawImage(img, 0, 0);
           URL.revokeObjectURL(url);
+          frameRendering = false;
           frameCount++;
           const now = Date.now();
           if (now - lastFpsTime >= 1000) {
@@ -333,6 +337,7 @@ function connect() {
             lastFpsTime = now;
           }
         };
+        img.onerror = () => { URL.revokeObjectURL(url); frameRendering = false; };
         img.src = url;
       } else if (type === 0x02) {
         // Audio chunk: 16-bit PCM stereo @ 48kHz
@@ -460,16 +465,17 @@ canvas.addEventListener("contextmenu", e => e.preventDefault());
 
 document.addEventListener("keydown", e => {
   if (remoteScreen.style.display !== "block") return;
-  // Don't capture F11, Escape when not fullscreen
   if (e.key === "F11") return;
   if (e.key === "Escape" && !document.fullscreenElement) { showJoin(); return; }
   e.preventDefault();
-  sendInput({ type: "keydown", key: mapKey(e.key), code: e.code });
+  sendInput({ type: "keydown", key: mapKey(e.key), code: e.code,
+    ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, meta: e.metaKey });
 });
 
 document.addEventListener("keyup", e => {
   if (remoteScreen.style.display !== "block") return;
-  sendInput({ type: "keyup", key: mapKey(e.key), code: e.code });
+  sendInput({ type: "keyup", key: mapKey(e.key), code: e.code,
+    ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, meta: e.metaKey });
 });
 
 // Map browser key names to pyautogui key names

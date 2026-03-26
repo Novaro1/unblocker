@@ -216,6 +216,12 @@ fastify.addHook("onSend", (req, reply, payload, done) => {
   }
   done();
 });
+fastify.options("/api/music/*", (_req, reply) => {
+  reply.header("Access-Control-Allow-Origin", "*")
+       .header("Access-Control-Allow-Methods", "GET, OPTIONS")
+       .header("Access-Control-Allow-Headers", "Content-Type, Range")
+       .code(204).send();
+});
 
 // Music: search SoundCloud (no API key, no bot detection)
 fastify.get("/api/music/search", async (req, reply) => {
@@ -422,7 +428,19 @@ fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply
 
 // ── Remote Desktop ────────────────────────────────────────────────────────────
 const remoteWss = new WebSocketServer({ noServer: true });
-const remoteRooms = new Map(); // code -> { host: ws, viewer: ws|null, scaleX, scaleY }
+const remoteRooms = new Map(); // code -> { host, viewer, createdAt }
+
+// Clean up stale rooms every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, room] of remoteRooms) {
+    if (now - room.createdAt > 3600000) { // 1 hour
+      try { room.host?.close(); } catch {}
+      try { room.viewer?.close(); } catch {}
+      remoteRooms.delete(code);
+    }
+  }
+}, 600000);
 
 function genRoomCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -456,7 +474,7 @@ remoteWss.on("connection", (ws) => {
       do { code = genRoomCode(); } while (remoteRooms.has(code));
       roomCode = code;
       role = "host";
-      remoteRooms.set(code, { host: ws, viewer: null });
+      remoteRooms.set(code, { host: ws, viewer: null, createdAt: Date.now() });
       ws.send(JSON.stringify({ type: "room_created", code }));
 
     } else if (msg.type === "viewer_join") {

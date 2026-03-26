@@ -200,20 +200,37 @@ def handle_input(msg):
 
         elif t == "keydown":
             key = data.get("key", "")
-            print(f"  [key] {key}")
-            # Single printable characters: type them directly for reliability
-            if len(key) == 1:
+            ctrl = data.get("ctrl", False)
+            shift = data.get("shift", False)
+            alt = data.get("alt", False)
+            meta = data.get("meta", False)
+            # Skip modifier-only keys — they're tracked as modifiers on combos
+            if key in ("ctrl", "shift", "alt", "command"):
+                return
+            # Build hotkey combo if modifiers are held
+            mods = []
+            if ctrl:  mods.append("ctrl")
+            if shift:  mods.append("shift")
+            if alt:    mods.append("alt")
+            if meta:   mods.append("command")
+            if mods:
+                combo = "+".join(mods + [key])
+                print(f"  [hotkey] {combo}")
+                pyautogui.hotkey(*mods, key, _pause=False)
+            elif len(key) == 1:
                 pyautogui.typewrite(key, interval=0, _pause=False)
             else:
+                print(f"  [key] {key}")
                 pyautogui.press(key, _pause=False)
 
         elif t == "keyup":
-            pass  # press handles down+up
+            pass  # handled by keydown
 
         elif t == "scroll":
             x, y = scale_coords(data)
             pyautogui.moveTo(x, y, _pause=False)
-            clicks = int(data.get("deltaY", 0) / -120) or (-1 if data.get("deltaY", 0) > 0 else 1)
+            dy = data.get("deltaY", 0)
+            clicks = max(1, abs(int(dy / 120))) * (-1 if dy > 0 else 1)
             pyautogui.scroll(clicks, _pause=False)
 
     except Exception as e:
