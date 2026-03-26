@@ -198,46 +198,44 @@ async function buildStatusEmbed(guild) {
     .setTimestamp();
 }
 
-function buildLinksEmbeds() {
+function buildLinksEmbedPages() {
   const links = loadLinks();
   if (!links.length) {
-    return [new EmbedBuilder()
+    return [[new EmbedBuilder()
       .setColor(0x6366f1)
       .setTitle("🔗 Working Veil Links")
       .setDescription("No links yet. Staff can add one with `/addlink`.")
-      .setTimestamp()];
+      .setTimestamp()]];
   }
-  // Build entries and split across multiple embeds (4096 char limit each, 10 embeds max)
+  // Build compact entries: show filter count instead of full list to stay under 6000 char total
   const entries = links.map((l, i) => {
     let line = `**${i + 1}. [${l.name || l.url}](${l.url})**`;
     if (l.unblocked && l.unblocked.length) {
-      line += `\n✅ Works on: ${l.unblocked.join(" · ")}`;
-    }
-    if (l.submittedBy) {
-      line += `\n👤 Submitted by ${l.submittedBy}`;
+      line += ` — ✅ ${l.unblocked.length} filters bypassed`;
     }
     return line;
   });
-  const embeds = [];
+  // Split into pages that each fit in one message (6000 char total limit per message)
+  const pages = [];
   let current = "";
   for (const entry of entries) {
-    const addition = current ? "\n\n" + entry : entry;
-    if ((current + addition).length > 4090) {
-      embeds.push(current);
+    const addition = current ? "\n" + entry : entry;
+    if ((current + addition).length > 3900) {
+      pages.push(current);
       current = entry;
     } else {
       current += addition;
     }
   }
-  if (current) embeds.push(current);
-  return embeds.slice(0, 10).map((desc, i) =>
+  if (current) pages.push(current);
+  return pages.map((desc, i) => [
     new EmbedBuilder()
       .setColor(0x6366f1)
-      .setTitle(i === 0 ? "🔗 Working Veil Links" : "🔗 Working Veil Links (cont.)")
+      .setTitle(i === 0 ? `🔗 Working Veil Links (${links.length})` : `🔗 Working Veil Links (cont.)`)
       .setDescription(desc)
-      .setFooter(i === embeds.length - 1 ? { text: "First load may take a few seconds for the SSL cert" } : null)
-      .setTimestamp(i === embeds.length - 1 ? new Date() : null)
-  );
+      .setFooter(i === pages.length - 1 ? { text: "First load may take a few seconds for the SSL cert" } : null)
+      .setTimestamp(i === pages.length - 1 ? new Date() : null)
+  ]);
 }
 
 // ── Update live messages ───────────────────────────────────────────────────
@@ -250,11 +248,18 @@ async function refreshLiveMessages() {
       await msg.edit({ embeds: [await buildStatusEmbed(ch.guild)] });
     } catch { /* message deleted or channel gone */ }
   }
-  if (cfg.linksChannelId && cfg.linksMessageId) {
+  if (cfg.linksChannelId && cfg.linksMessageIds) {
     try {
-      const ch  = await client.channels.fetch(cfg.linksChannelId);
-      const msg = await ch.messages.fetch(cfg.linksMessageId);
-      await msg.edit({ embeds: buildLinksEmbeds() });
+      const ch = await client.channels.fetch(cfg.linksChannelId);
+      const pages = buildLinksEmbedPages();
+      for (let i = 0; i < cfg.linksMessageIds.length; i++) {
+        const msg = await ch.messages.fetch(cfg.linksMessageIds[i]);
+        if (i < pages.length) {
+          await msg.edit({ embeds: pages[i] });
+        } else {
+          await msg.delete().catch(() => {});
+        }
+      }
     } catch { /* message deleted or channel gone */ }
   }
 }
@@ -831,7 +836,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /links
   if (commandName === "links") {
-    return interaction.reply({ embeds: buildLinksEmbeds() });
+    const pages = buildLinksEmbedPages();
+    await interaction.reply({ embeds: pages[0] });
+    for (let i = 1; i < pages.length; i++) {
+      await interaction.followUp({ embeds: pages[i] });
+    }
+    return;
   }
 
   // /addlink
@@ -1097,10 +1107,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "livelinks") {
     await interaction.deferReply({ ephemeral: true });
     try {
-      const msg = await interaction.channel.send({ embeds: buildLinksEmbeds() });
+      const pages = buildLinksEmbedPages();
+      const messageIds = [];
+      for (const page of pages) {
+        const msg = await interaction.channel.send({ embeds: page });
+        messageIds.push(msg.id);
+      }
       const cfg = loadConfig();
       cfg.linksChannelId = interaction.channel.id;
-      cfg.linksMessageId = msg.id;
+      cfg.linksMessageIds = messageIds;
+      delete cfg.linksMessageId; // clean up old single-message field
       saveConfig(cfg);
       return interaction.editReply({ content: "Live links embed posted! It will update automatically when links are added or removed." });
     } catch (err) {
