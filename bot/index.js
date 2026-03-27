@@ -1519,16 +1519,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         ephemeral: true,
       });
     }
-    const embeds = matches.map((l, i) => buildLinkEmbed(l, i));
+    const pick = matches[Math.floor(Math.random() * matches.length)];
     const typeLabel = typeFilter !== "all" ? ` (${typeFilter})` : "";
-    await interaction.reply({
-      content: `Found **${matches.length}** link(s) that bypass **${filterName}**${typeLabel}:`,
-      embeds: embeds.slice(0, 10),
+    return interaction.reply({
+      content: `Here's a link that bypasses **${filterName}**${typeLabel} (${matches.length} total — run again for another):`,
+      embeds: [buildLinkEmbed(pick, 0)],
     });
-    for (let i = 10; i < embeds.length; i += 10) {
-      await interaction.followUp({ embeds: embeds.slice(i, i + 10) });
-    }
-    return;
   }
 
   // /findlink
