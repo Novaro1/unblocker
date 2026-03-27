@@ -1506,8 +1506,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const links = loadLinks();
     const matches = links.filter(l => {
       if (!l.unblocked || !l.unblocked.length) return false;
-      // Case-insensitive partial match on filter names
-      const hasFilter = l.unblocked.some(f => f.toLowerCase().includes(filterName.toLowerCase()));
+      // Case-insensitive exact match on filter names
+      const hasFilter = l.unblocked.some(f => f.toLowerCase() === filterName.toLowerCase());
       if (!hasFilter) return false;
       if (typeFilter === "full") return l.type !== "static";
       if (typeFilter === "static") return l.type === "static";
