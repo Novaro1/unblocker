@@ -836,7 +836,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
   const { commandName } = interaction;
 
   // Restrict public commands to #bot-commands
-  if (PUBLIC_COMMANDS.has(commandName) && BOT_COMMANDS_CHANNEL_ID && interaction.channel.id !== BOT_COMMANDS_CHANNEL_ID) {
+  const allowedChannels = [BOT_COMMANDS_CHANNEL_ID, MOD_LOG_CHANNEL_ID].filter(Boolean);
+  if (PUBLIC_COMMANDS.has(commandName) && allowedChannels.length && !allowedChannels.includes(interaction.channel.id)) {
     return interaction.reply({
       content: `Please use bot commands in <#${BOT_COMMANDS_CHANNEL_ID}>.`,
       ephemeral: true,
