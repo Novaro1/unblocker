@@ -537,8 +537,21 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
 
 fastify.post("/api/ai", async (req, reply) => {
   reply.header("Access-Control-Allow-Origin", "*");
-  if (!GROQ_API_KEY)
-    return reply.code(503).send({ error: "AI is not configured on this server." });
+
+  // If no API key, proxy to main server
+  if (!GROQ_API_KEY) {
+    try {
+      const upstream = await fetch("https://veilub.mooo.com/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body),
+      });
+      const data = await upstream.json();
+      return reply.code(upstream.status).send(data);
+    } catch (e) {
+      return reply.code(503).send({ error: "AI proxy failed: " + e.message });
+    }
+  }
 
   const { messages, model = "llama-3.1-8b-instant" } = req.body ?? {};
   if (!Array.isArray(messages) || !messages.length)
