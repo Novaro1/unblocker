@@ -835,9 +835,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   const { commandName } = interaction;
 
-  // Restrict public commands to #bot-commands
-  const allowedChannels = [BOT_COMMANDS_CHANNEL_ID, MOD_LOG_CHANNEL_ID].filter(Boolean);
-  if (PUBLIC_COMMANDS.has(commandName) && allowedChannels.length && !allowedChannels.includes(interaction.channel.id)) {
+  // Restrict public commands to #bot-commands (staff can use them anywhere)
+  const isStaff = interaction.member?.permissions?.has?.("ManageMessages");
+  if (PUBLIC_COMMANDS.has(commandName) && !isStaff && BOT_COMMANDS_CHANNEL_ID && interaction.channel.id !== BOT_COMMANDS_CHANNEL_ID) {
     return interaction.reply({
       content: `Please use bot commands in <#${BOT_COMMANDS_CHANNEL_ID}>.`,
       ephemeral: true,
