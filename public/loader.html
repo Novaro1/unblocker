@@ -3,8 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Veil</title>
+  <title>StudySpace — Learning Tools</title>
   <link rel="icon" href="/favicon.ico">
+  <style>
+    /* ── Cloak: educational disguise on first visit ──── */
+    .cloak {
+      display: none;
+      min-height: 100vh;
+      background: #f8f9fa;
+      color: #1a1a2e;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      padding: 0;
+    }
+    .cloak.active { display: block; }
+    .cloak-nav {
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .cloak-logo { font-size: 20px; font-weight: 700; color: #2563eb; }
+    .cloak-logo span { color: #64748b; font-weight: 400; }
+    .cloak-nav-links { display: flex; gap: 24px; }
+    .cloak-nav-links a { color: #475569; text-decoration: none; font-size: 14px; font-weight: 500; }
+    .cloak-nav-links a:hover { color: #2563eb; }
+    .cloak-hero {
+      max-width: 800px;
+      margin: 60px auto;
+      padding: 0 32px;
+      text-align: center;
+    }
+    .cloak-hero h1 {
+      font-size: 36px;
+      font-weight: 800;
+      color: #1e293b;
+      margin-bottom: 16px;
+      line-height: 1.2;
+    }
+    .cloak-hero p { font-size: 16px; color: #64748b; line-height: 1.6; max-width: 560px; margin: 0 auto 40px; }
+    .cloak-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+    @media (max-width: 640px) { .cloak-grid { grid-template-columns: 1fr; } }
+    .cloak-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 24px;
+      text-align: left;
+    }
+    .cloak-card h3 { font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 8px; }
+    .cloak-card p { font-size: 13px; color: #64748b; line-height: 1.5; }
+    .cloak-card-icon { font-size: 28px; margin-bottom: 12px; }
+    .cloak-footer {
+      text-align: center;
+      padding: 40px 20px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+  </style>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -181,6 +245,56 @@
 </head>
 <body>
 
+<!-- Cloak: fake educational site shown on first visit -->
+<div class="cloak" id="cloak">
+  <nav class="cloak-nav">
+    <div class="cloak-logo">StudySpace <span>| Learning Tools</span></div>
+    <div class="cloak-nav-links">
+      <a href="#">Resources</a>
+      <a href="#">Courses</a>
+      <a href="#">Practice</a>
+      <a href="#">About</a>
+    </div>
+  </nav>
+  <div class="cloak-hero">
+    <h1>Your all-in-one platform for academic success</h1>
+    <p>Access study guides, practice problems, and interactive tools designed to help students excel in every subject.</p>
+  </div>
+  <div class="cloak-grid">
+    <div class="cloak-card">
+      <div class="cloak-card-icon">📐</div>
+      <h3>Math Practice</h3>
+      <p>Interactive problems covering algebra, geometry, calculus, and statistics with step-by-step solutions.</p>
+    </div>
+    <div class="cloak-card">
+      <div class="cloak-card-icon">🔬</div>
+      <h3>Science Labs</h3>
+      <p>Virtual experiments and simulations for biology, chemistry, and physics courses.</p>
+    </div>
+    <div class="cloak-card">
+      <div class="cloak-card-icon">📝</div>
+      <h3>Writing Center</h3>
+      <p>Essay templates, grammar tools, and citation generators for English and humanities classes.</p>
+    </div>
+    <div class="cloak-card">
+      <div class="cloak-card-icon">🌍</div>
+      <h3>History & Geography</h3>
+      <p>Interactive timelines, map quizzes, and study guides for social studies and world history.</p>
+    </div>
+    <div class="cloak-card">
+      <div class="cloak-card-icon">💻</div>
+      <h3>Computer Science</h3>
+      <p>Coding tutorials, algorithm visualizers, and practice challenges for AP CS and beyond.</p>
+    </div>
+    <div class="cloak-card">
+      <div class="cloak-card-icon">📚</div>
+      <h3>Study Planner</h3>
+      <p>Organize your assignments, set goals, and track your progress across all subjects.</p>
+    </div>
+  </div>
+  <div class="cloak-footer">© 2026 StudySpace Learning Tools. All rights reserved. | <a href="#" style="color:#94a3b8">Privacy Policy</a> | <a href="#" style="color:#94a3b8">Terms of Service</a></div>
+</div>
+
 <div class="aurora" aria-hidden="true">
   <div class="aurora-blob b1"></div>
   <div class="aurora-blob b2"></div>
@@ -292,5 +406,29 @@
   <a href="https://discord.gg/NScKEHkd6U" target="_blank" rel="noopener">Join Discord</a>
 </div>
 
+<script>
+(function() {
+  const KEY = "v_ok";
+  const cloak = document.getElementById("cloak");
+  const aurora = document.querySelector(".aurora");
+  const content = document.querySelector(".content");
+  const footer = document.querySelector(".footer");
+
+  if (!localStorage.getItem(KEY)) {
+    // First visit: show educational cloak, hide Veil
+    cloak.classList.add("active");
+    aurora.style.display = "none";
+    content.style.display = "none";
+    footer.style.display = "none";
+    document.title = "StudySpace — Learning Tools";
+    // Set flag so next visit shows Veil
+    localStorage.setItem(KEY, "1");
+  } else {
+    // Returning visit: show Veil
+    cloak.remove();
+    document.title = "Veil";
+  }
+})();
+</script>
 </body>
 </html>
