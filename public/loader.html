@@ -245,55 +245,8 @@
 </head>
 <body>
 
-<!-- Cloak: fake educational site shown on first visit -->
-<div class="cloak" id="cloak">
-  <nav class="cloak-nav">
-    <div class="cloak-logo">StudySpace <span>| Learning Tools</span></div>
-    <div class="cloak-nav-links">
-      <a href="#">Resources</a>
-      <a href="#">Courses</a>
-      <a href="#">Practice</a>
-      <a href="#">About</a>
-    </div>
-  </nav>
-  <div class="cloak-hero">
-    <h1>Your all-in-one platform for academic success</h1>
-    <p>Access study guides, practice problems, and interactive tools designed to help students excel in every subject.</p>
-  </div>
-  <div class="cloak-grid">
-    <div class="cloak-card">
-      <div class="cloak-card-icon">📐</div>
-      <h3>Math Practice</h3>
-      <p>Interactive problems covering algebra, geometry, calculus, and statistics with step-by-step solutions.</p>
-    </div>
-    <div class="cloak-card">
-      <div class="cloak-card-icon">🔬</div>
-      <h3>Science Labs</h3>
-      <p>Virtual experiments and simulations for biology, chemistry, and physics courses.</p>
-    </div>
-    <div class="cloak-card">
-      <div class="cloak-card-icon">📝</div>
-      <h3>Writing Center</h3>
-      <p>Essay templates, grammar tools, and citation generators for English and humanities classes.</p>
-    </div>
-    <div class="cloak-card">
-      <div class="cloak-card-icon">🌍</div>
-      <h3>History & Geography</h3>
-      <p>Interactive timelines, map quizzes, and study guides for social studies and world history.</p>
-    </div>
-    <div class="cloak-card">
-      <div class="cloak-card-icon">💻</div>
-      <h3>Computer Science</h3>
-      <p>Coding tutorials, algorithm visualizers, and practice challenges for AP CS and beyond.</p>
-    </div>
-    <div class="cloak-card">
-      <div class="cloak-card-icon">📚</div>
-      <h3>Study Planner</h3>
-      <p>Organize your assignments, set goals, and track your progress across all subjects.</p>
-    </div>
-  </div>
-  <div class="cloak-footer">© 2026 StudySpace Learning Tools. All rights reserved. | <a href="#" style="color:#94a3b8">Privacy Policy</a> | <a href="#" style="color:#94a3b8">Terms of Service</a></div>
-</div>
+<!-- Cloak: disguise site shown on first visit, template chosen by domain -->
+<div class="cloak" id="cloak"></div>
 
 <div class="aurora" aria-hidden="true">
   <div class="aurora-blob b1"></div>
@@ -410,24 +363,180 @@
 (function() {
   const KEY = "v_ok";
   const cloak = document.getElementById("cloak");
-  const aurora = document.querySelector(".aurora");
-  const content = document.querySelector(".content");
-  const footer = document.querySelector(".footer");
 
-  if (!localStorage.getItem(KEY)) {
-    // First visit: show educational cloak, hide Veil
-    cloak.classList.add("active");
-    aurora.style.display = "none";
-    content.style.display = "none";
-    footer.style.display = "none";
-    document.title = "StudySpace — Learning Tools";
-    // Set flag so next visit shows Veil
-    localStorage.setItem(KEY, "1");
-  } else {
-    // Returning visit: show Veil
+  if (localStorage.getItem(KEY)) {
     cloak.remove();
     document.title = "Veil";
+    return;
   }
+
+  // ── Templates ──────────────────────────────────────────────
+  const T = [
+    {
+      id: "study",
+      keywords: ["study","learn","edu","school","class","academy","tutor","homework","quiz"],
+      title: "StudySpace",
+      subtitle: "Learning Tools",
+      accent: "#2563eb",
+      heading: "Your all-in-one platform for academic success",
+      desc: "Access study guides, practice problems, and interactive tools designed to help students excel in every subject.",
+      nav: ["Resources","Courses","Practice","About"],
+      cards: [
+        ["📐","Math Practice","Interactive problems covering algebra, geometry, calculus, and statistics with step-by-step solutions."],
+        ["🔬","Science Labs","Virtual experiments and simulations for biology, chemistry, and physics courses."],
+        ["📝","Writing Center","Essay templates, grammar tools, and citation generators for English and humanities."],
+        ["📚","Study Planner","Organize assignments, set goals, and track your progress across all subjects."],
+        ["🌍","History & Geography","Interactive timelines, map quizzes, and study guides for social studies."],
+        ["💻","Computer Science","Coding tutorials, algorithm visualizers, and practice challenges for AP CS."],
+      ]
+    },
+    {
+      id: "math",
+      keywords: ["math","calc","algebra","geometry","number","equation","formula"],
+      title: "MathLab",
+      subtitle: "Interactive Mathematics",
+      accent: "#7c3aed",
+      heading: "Master mathematics with interactive tools",
+      desc: "From basic arithmetic to advanced calculus — practice problems, graphing tools, and step-by-step solutions.",
+      nav: ["Calculator","Graphing","Practice","Formulas"],
+      cards: [
+        ["📊","Graphing Calculator","Plot functions, analyze intersections, and explore transformations in real time."],
+        ["🧮","Practice Problems","Thousands of problems with instant feedback across all math levels."],
+        ["📐","Geometry Toolkit","Interactive constructions, proofs, and angle visualizations."],
+        ["∑","Calculus","Derivatives, integrals, and limits with worked-out steps."],
+        ["📈","Statistics","Data analysis, probability distributions, and hypothesis testing tools."],
+        ["🔢","Algebra Solver","Solve equations, factor polynomials, and simplify expressions step by step."],
+      ]
+    },
+    {
+      id: "science",
+      keywords: ["science","lab","chem","bio","physics","research","experiment","molecule"],
+      title: "ScienceHub",
+      subtitle: "Virtual Laboratory",
+      accent: "#059669",
+      heading: "Explore science through virtual experiments",
+      desc: "Interactive simulations and lab tools for biology, chemistry, and physics — safe, accessible, and curriculum-aligned.",
+      nav: ["Biology","Chemistry","Physics","Simulations"],
+      cards: [
+        ["🧬","Biology","Cell diagrams, genetics simulations, and anatomy models."],
+        ["⚗️","Chemistry","Periodic table, reaction balancer, and molecular viewer."],
+        ["⚡","Physics","Motion simulators, circuit builders, and wave visualizations."],
+        ["🔬","Virtual Labs","Safe, interactive experiments you can run in your browser."],
+        ["🌱","Earth Science","Climate data, rock cycle models, and ecosystem simulations."],
+        ["🧪","Lab Reports","Templates and tools for writing scientific lab reports."],
+      ]
+    },
+    {
+      id: "writing",
+      keywords: ["write","essay","english","read","book","lit","library","novel","word","grammar"],
+      title: "WriteRight",
+      subtitle: "Writing & Language Arts",
+      accent: "#dc2626",
+      heading: "Improve your writing with guided tools",
+      desc: "Grammar checker, essay outlines, citation generator, and vocabulary builder — everything for English class.",
+      nav: ["Grammar","Essays","Citations","Vocabulary"],
+      cards: [
+        ["✏️","Grammar Check","Paste your text and get instant grammar, spelling, and style suggestions."],
+        ["📄","Essay Builder","Outline templates for argumentative, persuasive, and analytical essays."],
+        ["📖","Citation Generator","Create MLA, APA, and Chicago citations from a URL or title."],
+        ["🔤","Vocabulary","Daily words, flashcards, and context-based learning exercises."],
+        ["📕","Book Summaries","Chapter summaries and analysis for commonly assigned novels."],
+        ["💬","Discussion Prompts","Critical thinking questions for literature and writing assignments."],
+      ]
+    },
+    {
+      id: "code",
+      keywords: ["code","dev","program","hack","tech","app","software","digital","cyber","web","js","python"],
+      title: "CodePath",
+      subtitle: "Learn to Code",
+      accent: "#0891b2",
+      heading: "Build real projects while learning to code",
+      desc: "Interactive coding lessons, challenges, and projects for Python, JavaScript, HTML/CSS, and more.",
+      nav: ["Lessons","Challenges","Projects","Reference"],
+      cards: [
+        ["🐍","Python","Beginner to advanced tutorials with interactive exercises and projects."],
+        ["🌐","Web Development","HTML, CSS, and JavaScript — build real websites from scratch."],
+        ["🧩","Algorithms","Visualize sorting, searching, and graph algorithms step by step."],
+        ["🗄️","Databases","Learn SQL and data modeling with hands-on practice."],
+        ["📱","App Development","Build mobile-friendly web apps with modern frameworks."],
+        ["🏆","Challenges","Daily coding problems ranked by difficulty to sharpen your skills."],
+      ]
+    },
+    {
+      id: "health",
+      keywords: ["health","fit","sport","gym","well","body","nutrition","exercise"],
+      title: "FitTrack",
+      subtitle: "Health & Wellness",
+      accent: "#ea580c",
+      heading: "Track your fitness and wellness goals",
+      desc: "Workout planners, nutrition guides, and mindfulness tools designed for students.",
+      nav: ["Workouts","Nutrition","Mindfulness","Goals"],
+      cards: [
+        ["🏃","Workouts","Guided exercises for every fitness level — no equipment required."],
+        ["🥗","Nutrition","Meal planning, calorie tracking, and healthy recipe ideas."],
+        ["🧘","Mindfulness","Breathing exercises, meditation timers, and stress management tips."],
+        ["💪","Fitness Goals","Set targets, track progress, and celebrate milestones."],
+        ["😴","Sleep Tracker","Log your sleep and get tips for better rest."],
+        ["💧","Hydration","Daily water intake reminders and tracking."],
+      ]
+    },
+    {
+      id: "docs",
+      keywords: ["doc","note","plan","project","manage","organize","task","team","work","cloud","drive","file"],
+      title: "CloudDocs",
+      subtitle: "Document Workspace",
+      accent: "#4f46e5",
+      heading: "Organize your documents and projects",
+      desc: "A clean workspace for notes, documents, and collaboration — keep everything in one place.",
+      nav: ["Documents","Notes","Templates","Shared"],
+      cards: [
+        ["📝","Quick Notes","Capture ideas instantly with auto-saving markdown notes."],
+        ["📁","File Organizer","Sort and tag your documents across subjects and projects."],
+        ["📋","Templates","Ready-made templates for reports, presentations, and outlines."],
+        ["👥","Collaboration","Share documents and work together in real time."],
+        ["🔍","Smart Search","Find any document instantly with full-text search."],
+        ["☁️","Cloud Sync","Access your files from any device, anywhere."],
+      ]
+    },
+  ];
+
+  // ── Pick template based on domain ──────────────────────────
+  const host = location.hostname.toLowerCase();
+
+  // 1. Keyword match
+  let pick = null;
+  for (const t of T) {
+    if (t.keywords.some(k => host.includes(k))) { pick = t; break; }
+  }
+
+  // 2. Fallback: hash domain to pick consistently
+  if (!pick) {
+    let h = 0;
+    for (let i = 0; i < host.length; i++) h = (h * 31 + host.charCodeAt(i)) | 0;
+    pick = T[Math.abs(h) % T.length];
+  }
+
+  // ── Render ─────────────────────────────────────────────────
+  document.title = `${pick.title} — ${pick.subtitle}`;
+  cloak.innerHTML = `
+    <nav class="cloak-nav">
+      <div class="cloak-logo" style="color:${pick.accent}">${pick.title} <span>| ${pick.subtitle}</span></div>
+      <div class="cloak-nav-links">${pick.nav.map(n => `<a href="#">${n}</a>`).join("")}</div>
+    </nav>
+    <div class="cloak-hero">
+      <h1>${pick.heading}</h1>
+      <p>${pick.desc}</p>
+    </div>
+    <div class="cloak-grid">
+      ${pick.cards.map(c => `<div class="cloak-card"><div class="cloak-card-icon">${c[0]}</div><h3>${c[1]}</h3><p>${c[2]}</p></div>`).join("")}
+    </div>
+    <div class="cloak-footer">&copy; 2026 ${pick.title}. All rights reserved. | <a href="#" style="color:#94a3b8">Privacy Policy</a> | <a href="#" style="color:#94a3b8">Terms of Service</a></div>
+  `;
+  cloak.classList.add("active");
+  document.querySelector(".aurora").style.display = "none";
+  document.querySelector(".content").style.display = "none";
+  document.querySelector(".footer").style.display = "none";
+  localStorage.setItem(KEY, "1");
 })();
 </script>
 </body>
