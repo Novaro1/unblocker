@@ -9,11 +9,13 @@
     /* ── Cloak: educational disguise on first visit ──── */
     .cloak {
       display: none;
-      min-height: 100vh;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
       background: #f8f9fa;
       color: #1a1a2e;
       font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-      padding: 0;
+      overflow-y: auto;
     }
     .cloak.active { display: block; }
     .cloak-nav {
