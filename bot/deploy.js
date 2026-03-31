@@ -324,6 +324,10 @@ const commands = [
     .addBooleanOption((o) =>
       o.setName("skip_uncategorized").setDescription("Skip domains with no known category (default: true)").setRequired(false)
     ),
+  new SlashCommandBuilder()
+    .setName("setuppings")
+    .setDescription("Post the notification role picker panel in this channel (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);

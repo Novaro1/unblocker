@@ -177,6 +177,36 @@ async function modLog(guild, embed) {
 
 const BOT_START = Date.now();
 
+// ── Ping roles ───────────────────────────────────────────────────────────────
+const PING_ROLES = [
+  { id: "ping_announcements", label: "Announcements", emoji: "📣", color: 0xf59e0b, desc: "Server announcements & important updates" },
+  { id: "ping_newlinks",      label: "New Links",     emoji: "🔗", color: 0x6366f1, desc: "Notified when new proxy links are added" },
+  { id: "ping_updates",       label: "Updates",       emoji: "🛠️", color: 0x22c55e, desc: "Feature updates & changelog" },
+  { id: "ping_polls",         label: "Polls",         emoji: "📊", color: 0x8b5cf6, desc: "Community polls & votes" },
+];
+
+// Find or create the Discord role for a ping category
+async function ensurePingRole(guild, ping) {
+  const roleName = `Ping: ${ping.label}`;
+  let role = guild.roles.cache.find(r => r.name === roleName);
+  if (!role) {
+    role = await guild.roles.create({
+      name: roleName,
+      color: ping.color,
+      mentionable: true,
+      reason: "Auto-created ping role for notification system",
+    });
+  }
+  return role;
+}
+
+// Get the Discord role for a ping category (null if not yet created)
+function getPingRole(guild, pingId) {
+  const ping = PING_ROLES.find(p => p.id === pingId);
+  if (!ping) return null;
+  return guild.roles.cache.find(r => r.name === `Ping: ${ping.label}`) || null;
+}
+
 // ── Live embed builders ────────────────────────────────────────────────────
 async function buildStatusEmbed(guild) {
   const result = await checkStatus(SERVER_URL);
@@ -226,7 +256,11 @@ async function postLinkMessage(link) {
   try {
     const ch = await client.channels.fetch(cfg.linksChannelId);
     const idx = loadLinks().findIndex(l => l.url === link.url);
-    const msg = await ch.send({ embeds: [buildLinkEmbed(link, idx)] });
+    // Ping New Links role
+    const guild = ch.guild;
+    const role = getPingRole(guild, "ping_newlinks");
+    const content = role ? `<@&${role.id}>` : undefined;
+    const msg = await ch.send({ content, embeds: [buildLinkEmbed(link, idx)] });
     if (!cfg.linksMessageMap) cfg.linksMessageMap = {};
     cfg.linksMessageMap[link.url] = msg.id;
     saveConfig(cfg);
@@ -485,6 +519,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.followUp({ content: `Error closing ticket: ${err.message}`, ephemeral: true });
     }
     return;
+  }
+
+  // ── Ping role toggle buttons ──────────────────────────────────────────────
+  if (interaction.customId.startsWith("ping_")) {
+    const ping = PING_ROLES.find(p => p.id === interaction.customId);
+    if (ping) {
+      try {
+        const role = await ensurePingRole(interaction.guild, ping);
+        const has = interaction.member.roles.cache.has(role.id);
+        if (has) {
+          await interaction.member.roles.remove(role);
+          return interaction.reply({ content: `${ping.emoji} Removed **${ping.label}** pings. You won't be notified for these anymore.`, ephemeral: true });
+        } else {
+          await interaction.member.roles.add(role);
+          return interaction.reply({ content: `${ping.emoji} You'll now be pinged for **${ping.label}**!`, ephemeral: true });
+        }
+      } catch (err) {
+        return interaction.reply({ content: `Error toggling role: ${err.message}`, ephemeral: true });
+      }
+    }
   }
 
   if (interaction.customId === "open_ticket") {
@@ -1101,8 +1155,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setDescription(message)
       .setTimestamp()
       .setFooter({ text: `Posted by ${interaction.user.username}` });
-    await channel.send({ content: ping ? "@everyone" : undefined, embeds: [embed] });
-    return interaction.reply({ content: `Announcement posted!${ping ? " (@everyone pinged)" : " (no ping)"}`, ephemeral: true });
+    let pingContent = undefined;
+    if (ping) {
+      const role = getPingRole(interaction.guild, "ping_announcements");
+      pingContent = role ? `<@&${role.id}>` : "@everyone";
+    }
+    await channel.send({ content: pingContent, embeds: [embed] });
+    return interaction.reply({ content: `Announcement posted!${ping ? ` (${pingContent ? "pinged Announcements role" : "pinged @everyone"})` : " (no ping)"}`, ephemeral: true });
   }
 
   // /testwelcome
@@ -1763,6 +1822,37 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // /uptime
+  // /setuppings
+  if (commandName === "setuppings") {
+    // Ensure all roles exist
+    for (const ping of PING_ROLES) {
+      await ensurePingRole(interaction.guild, ping);
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("🔔 Notification Preferences")
+      .setDescription("Choose what you want to be pinged for. Click a button to toggle — click again to turn it off.\n\n"
+        + PING_ROLES.map(p => `${p.emoji} **${p.label}** — ${p.desc}`).join("\n"));
+
+    const rows = [];
+    // 4 buttons fit in one row
+    const row = new ActionRowBuilder();
+    for (const ping of PING_ROLES) {
+      row.addComponents(
+        new ButtonBuilder()
+          .setCustomId(ping.id)
+          .setLabel(ping.label)
+          .setEmoji(ping.emoji)
+          .setStyle(ButtonStyle.Secondary)
+      );
+    }
+    rows.push(row);
+
+    await interaction.channel.send({ embeds: [embed], components: rows });
+    return interaction.reply({ content: "Ping role picker posted!", ephemeral: true });
+  }
+
   if (commandName === "uptime") {
     const ms = Date.now() - BOT_START;
     const hours   = Math.floor(ms / 3600000);
