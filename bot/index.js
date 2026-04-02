@@ -1095,7 +1095,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         "Advertise Veil in a Discord server with 50+ members, screenshot it, and DM proof to staff.\n" +
         "You'll get an **ambassador token** that unlocks:\n" +
         "• Exclusive themes (Aura, Crimson, Gold)\n" +
-        "• Premium tab cloaks (YouTube, Spotify, Roblox, Discord)\n" +
+        "• Exclusive gradients (Blaze, Neon)\n" +
         "• Early access to new features before public release\n" +
         "• Ambassador leaderboard rank",
     };

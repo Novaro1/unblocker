@@ -100,8 +100,7 @@ if (autoCheckbox) {
   });
 }
 
-// Auto-open on load if enabled — only for ambassadors, only when not already in a blank cloak
-const _isAmbassador = !!JSON.parse(localStorage.getItem("veil_ambassador_v1") || "null");
-if (_isAmbassador && localStorage.getItem(BLANK_CLOAK_AUTO_KEY) === "1" && window.top === window) {
+// Auto-open on load if enabled — only when not already in a blank cloak
+if (localStorage.getItem(BLANK_CLOAK_AUTO_KEY) === "1" && window.top === window) {
   openBlankCloak();
 }

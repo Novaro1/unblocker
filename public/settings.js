@@ -404,7 +404,7 @@ const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentC
 
   // Ambassador-exclusive theme/gradient/cloak IDs
   const AMB_THEMES   = ["aura", "crimson", "gold"];
-  const AMB_CLOAKS   = ["youtube", "spotify", "discord", "roblox"];
+  const AMB_CLOAKS   = []; // tab cloaks are now free for everyone
   const AMB_GRADS    = ["blaze", "neon"];
 
   function applyAmbassador(data) {
@@ -449,13 +449,7 @@ const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentC
         el.classList.remove("bg-swatch--locked");
       });
 
-      // Unlock about:blank cloak
-      const blankBtn  = document.getElementById("blank-cloak-btn");
-      const blankAuto = document.getElementById("blank-cloak-auto");
-      const blankLock = document.getElementById("blank-cloak-lock");
-      if (blankBtn)  { blankBtn.disabled = false; blankBtn.textContent = "Open"; }
-      if (blankAuto) blankAuto.disabled = false;
-      if (blankLock) blankLock.style.display = "none";
+      // (blank cloak is now free for everyone — no unlock needed)
     } else {
       if (verifiedEl) verifiedEl.style.display = "none";
       if (formEl)     formEl.style.display     = "";
@@ -490,13 +484,7 @@ const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentC
         el.classList.add("bg-swatch--locked");
       });
 
-      // Re-lock about:blank cloak
-      const blankBtn  = document.getElementById("blank-cloak-btn");
-      const blankAuto = document.getElementById("blank-cloak-auto");
-      const blankLock = document.getElementById("blank-cloak-lock");
-      if (blankBtn)  { blankBtn.disabled = true; blankBtn.innerHTML = LOCK_SVG + " Ambassador"; }
-      if (blankAuto) blankAuto.disabled = true;
-      if (blankLock) blankLock.style.display = "";
+      // (blank cloak is now free for everyone — no re-lock needed)
 
       // Revert any locked theme/gradient that was active
       const activeTheme = document.documentElement.dataset.theme;
@@ -665,7 +653,6 @@ const STAR_SVG = '<svg class="icon icon-star" viewBox="0 0 24 24" fill="currentC
       ...AMB_GRADS.map(g => `.bg-swatch[data-gradient="${g}"]`),
       ...AMB_CLOAKS.map(c => `#cloak-opt-${c}`),
       "#ambassador-verified", "#ambassador-revoke-row", "#ambassador-home-star", "#ambassador-form",
-      "#blank-cloak-btn", "#blank-cloak-auto",
     ];
     const revert = () => applyAmbassador(loadAmbassador());
     const observer = new MutationObserver((mutations) => {
