@@ -9,6 +9,22 @@
   const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRyBP2PKfjznxIzMYnGIUv5E6V7wAE5vkhhtID71UAZFXuiDsC4y--z16d2N5yWySekVwQzwVDNVSr9/pub?gid=817149491&single=true&output=csv"; // ← paste your published CSV URL here
 
   const COLLAPSE_KEY = "veil_games_collapsed";
+  const FAVS_KEY = "veil_game_favs";
+  const isAmbassador = !!JSON.parse(localStorage.getItem("veil_ambassador_v1") || "null");
+
+  function loadFavs() {
+    try { return JSON.parse(localStorage.getItem(FAVS_KEY) || "[]"); } catch { return []; }
+  }
+  function saveFavs(favs) { localStorage.setItem(FAVS_KEY, JSON.stringify(favs)); }
+  function isFav(name) { return loadFavs().includes(name); }
+  function toggleFav(name) {
+    const favs = loadFavs();
+    const idx = favs.indexOf(name);
+    if (idx >= 0) favs.splice(idx, 1);
+    else favs.push(name);
+    saveFavs(favs);
+    return favs.includes(name);
+  }
 
   const FALLBACK = [
     { name: "Slope",          url: "https://www.crazygames.com/game/slope",                emoji: "⛷",  hue: 120 },
@@ -101,7 +117,6 @@
       return;
     }
 
-    const isAmbassador = !!JSON.parse(localStorage.getItem("veil_ambassador_v1") || "null");
     const blankCloakOn = isAmbassador && localStorage.getItem("veil_blank_cloak_auto") === "1";
 
     if (!blankCloakOn) {
@@ -145,6 +160,24 @@
 
     tile.appendChild(icon);
     tile.appendChild(label);
+
+    // Ambassador: favorite star
+    if (isAmbassador) {
+      const star = document.createElement("button");
+      star.className = "gs-fav-btn" + (isFav(game.name) ? " active" : "");
+      star.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+      star.title = isFav(game.name) ? "Remove from favorites" : "Add to favorites";
+      star.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const on = toggleFav(game.name);
+        star.classList.toggle("active", on);
+        star.title = on ? "Remove from favorites" : "Add to favorites";
+        // Re-render to update favorites section
+        if (window._veilLastGamesList) renderWith(window._veilLastGamesList);
+      });
+      tile.appendChild(star);
+    }
+
     tile.addEventListener("click", () => {
       if (isLocal) { navigateLocal(game.url); }
       else         { navigateTo(game.url); }
@@ -153,9 +186,26 @@
   }
 
   function renderWith(gamesList) {
+    window._veilLastGamesList = gamesList;
     const grid = document.getElementById("gs-grid");
     if (!grid) return;
     grid.innerHTML = "";
+
+    // ── Ambassador: Favorites section ────────────────────────────────────
+    if (isAmbassador) {
+      const favNames = loadFavs();
+      if (favNames.length) {
+        const favHeader = document.createElement("div");
+        favHeader.className = "gs-section-header";
+        favHeader.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" stroke="none" style="vertical-align:-2px;margin-right:4px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Favorites';
+        grid.appendChild(favHeader);
+        const allGames = [...LOCAL_GAMES.map(g => ({ ...g, _local: true })), ...gamesList.map(g => ({ ...g, _local: false }))];
+        favNames.forEach(name => {
+          const g = allGames.find(g => g.name === name);
+          if (g) grid.appendChild(makeTile(g, g._local));
+        });
+      }
+    }
 
     // ── Veil Music featured tile ───────────────────────────────────────────
     const musicTile = makeTile({ name: "Veil Music", hue: 240, url: "/music.html", svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' }, true);

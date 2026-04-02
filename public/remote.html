@@ -220,7 +220,7 @@
         <option value="low">Low (fast)</option>
         <option value="medium" selected>Medium</option>
         <option value="high">High</option>
-        <option value="ultra">Ultra</option>
+        <option value="ultra" disabled>Ultra (Ambassador)</option>
       </select>
     </div>
     <div class="setting-row">
@@ -238,7 +238,7 @@
         <option value="10">10 fps (low bandwidth)</option>
         <option value="15" selected>15 fps</option>
         <option value="24">24 fps</option>
-        <option value="30">30 fps</option>
+        <option value="30" disabled>30 fps (Ambassador)</option>
       </select>
     </div>
   </div>
@@ -495,6 +495,16 @@ function mapKey(key) {
 
 // Keep canvas focusable for keyboard
 canvas.tabIndex = 0;
+
+// ── Ambassador: unlock Ultra quality & 30fps ──────────
+(function() {
+  const isAmb = !!JSON.parse(localStorage.getItem("veil_ambassador_v1") || "null");
+  if (!isAmb) return;
+  const ultra = $("setQuality").querySelector('option[value="ultra"]');
+  const fps30 = $("setFps").querySelector('option[value="30"]');
+  if (ultra) { ultra.disabled = false; ultra.textContent = "Ultra (Ambassador)"; }
+  if (fps30) { fps30.disabled = false; fps30.textContent = "30 fps (Ambassador)"; }
+})();
 </script>
 </body>
 </html>

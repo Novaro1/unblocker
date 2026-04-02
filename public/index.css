@@ -1330,6 +1330,30 @@ body.no-vignette::before  { content: none; }
   flex-shrink: 0;
 }
 
+/* ── Ambassador game favorites ─────────────────────────────────────────── */
+.gs-fav-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: rgba(0,0,0,0.3);
+  border-radius: 50%;
+  color: rgba(255,255,255,0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 0;
+  z-index: 2;
+}
+.ql-tile:hover .gs-fav-btn { opacity: 1; }
+.gs-fav-btn.active { opacity: 1; color: #f59e0b; background: rgba(245,158,11,0.15); }
+.gs-fav-btn:hover { color: #f59e0b; }
+
 /* ── Splash screen ───────────────────────────────────────────────────────── */
 
 #splash {

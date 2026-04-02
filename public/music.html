@@ -463,6 +463,30 @@
     #mp-quality.preview { background: rgba(245,158,11,0.15); color: #f59e0b; }
     #mp-quality.loading { background: rgba(255,255,255,0.07); color: var(--sub); }
 
+    /* ── Ambassador visualizer ─────────────────────── */
+    #mp-visualizer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 80px;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.6;
+    }
+    .mp-amb-badge {
+      font-size: 9px;
+      font-weight: 700;
+      color: #f59e0b;
+      background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.25);
+      border-radius: 4px;
+      padding: 2px 6px;
+      letter-spacing: 0.04em;
+      display: none;
+    }
+    .mp-amb-badge.show { display: inline-block; }
+
     /* Mobile */
     @media (max-width: 700px) {
       #mp-app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
@@ -538,7 +562,9 @@
     <div id="mp-preview-note">
       ⓘ Powered by SoundCloud ·
       <a href="#" id="mp-yt-link">Open in SoundCloud</a>
+      <span class="mp-amb-badge" id="mp-amb-badge">AMBASSADOR</span>
     </div>
+    <canvas id="mp-visualizer"></canvas>
   </div>
 
   <!-- ── Right: Search + Queue ──────────────────────── -->
@@ -1037,6 +1063,58 @@ document.querySelectorAll(".mp-tab").forEach(btn => {
 // Auto-search if ?q= param in URL
 const urlQ = new URLSearchParams(location.search).get("q");
 if (urlQ) { elSearch.value = urlQ; doSearch(urlQ); }
+
+// ── Ambassador: Audio Visualizer ─────────────────────────────────────────────
+(function initVisualizer() {
+  const isAmb = !!JSON.parse(localStorage.getItem("veil_ambassador_v1") || "null");
+  const badge = document.getElementById("mp-amb-badge");
+  if (badge && isAmb) badge.classList.add("show");
+  if (!isAmb) return;
+
+  const vizCanvas = document.getElementById("mp-visualizer");
+  if (!vizCanvas) return;
+  const vCtx = vizCanvas.getContext("2d");
+  let analyser, dataArray, audioSrc, started = false;
+
+  function connectAnalyser() {
+    if (started) return;
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    audioSrc = actx.createMediaElementSource(audio);
+    analyser = actx.createAnalyser();
+    analyser.fftSize = 64;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    audioSrc.connect(analyser);
+    analyser.connect(actx.destination);
+    started = true;
+  }
+
+  audio.addEventListener("play", () => {
+    try { connectAnalyser(); } catch {}
+  });
+
+  function drawViz() {
+    requestAnimationFrame(drawViz);
+    if (!analyser || !isPlaying) {
+      vCtx.clearRect(0, 0, vizCanvas.width, vizCanvas.height);
+      return;
+    }
+    const w = vizCanvas.parentElement.clientWidth;
+    const h = 80;
+    if (vizCanvas.width !== w) vizCanvas.width = w;
+    if (vizCanvas.height !== h) vizCanvas.height = h;
+    analyser.getByteFrequencyData(dataArray);
+    vCtx.clearRect(0, 0, w, h);
+    const bars = dataArray.length;
+    const barW = w / bars;
+    for (let i = 0; i < bars; i++) {
+      const val = dataArray[i] / 255;
+      const barH = val * h;
+      vCtx.fillStyle = `rgba(99,102,241,${0.3 + val * 0.4})`;
+      vCtx.fillRect(i * barW, h - barH, barW - 1, barH);
+    }
+  }
+  drawViz();
+})();
 </script>
 </body>
 </html>

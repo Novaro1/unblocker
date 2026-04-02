@@ -275,6 +275,59 @@
       margin-top: 8px;
     }
 
+    /* ── Ambassador features ──────────────────────────── */
+    .amb-tools {
+      display: none;
+      gap: 6px;
+      align-items: center;
+    }
+    .amb-tools.show { display: flex; }
+    .amb-btn {
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.25);
+      color: #f59e0b;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .amb-btn:hover { background: rgba(245,158,11,0.2); }
+    .amb-badge-sm {
+      font-size: 9px;
+      font-weight: 700;
+      color: #f59e0b;
+      background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.25);
+      border-radius: 4px;
+      padding: 2px 6px;
+      letter-spacing: 0.04em;
+    }
+    .amb-prompt-row {
+      display: none;
+      padding: 0 20px;
+      max-width: 760px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .amb-prompt-row.show { display: block; }
+    .amb-prompt-input {
+      width: 100%;
+      background: rgba(245,158,11,0.06);
+      border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 12px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+    }
+    .amb-prompt-input:focus { border-color: rgba(245,158,11,0.4); }
+    .amb-prompt-input::placeholder { color: rgba(245,158,11,0.4); }
+
     /* ── Footer ─────────────────────────────────────────── */
     .site-footer {
       border-top: 1px solid var(--border);
@@ -315,6 +368,11 @@
         <option value="gemma2-9b-it">Gemma 2 9B</option>
         <option value="mistral-saba-24b">Mistral 24B</option>
       </select>
+      <div class="amb-tools" id="amb-tools">
+        <span class="amb-badge-sm">AMBASSADOR</span>
+        <button class="amb-btn" id="amb-export-btn" title="Export conversation">Export</button>
+        <button class="amb-btn" id="amb-prompt-toggle" title="Custom system prompt">Prompt</button>
+      </div>
       <nav class="site-nav">
         <a class="site-nav-link" href="/">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -338,6 +396,9 @@
 
 <!-- Chat -->
 <div class="chat-wrap">
+  <div class="amb-prompt-row" id="amb-prompt-row">
+    <textarea class="amb-prompt-input" id="amb-system-prompt" rows="2" placeholder="Custom system prompt (Ambassador) — e.g. &quot;You are a pirate who only speaks in pirate slang&quot;"></textarea>
+  </div>
   <div class="messages" id="messages">
     <div class="empty-state" id="empty-state">
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent-lighter)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -534,6 +595,50 @@
   }
 
   inputEl.focus();
+
+  // ── Ambassador features ──────────────────────────────────────────────────
+  (function initAmbFeatures() {
+    const isAmb = !!JSON.parse(localStorage.getItem("veil_ambassador_v1") || "null");
+    if (!isAmb) return;
+
+    document.getElementById("amb-tools").classList.add("show");
+
+    // Export conversation
+    document.getElementById("amb-export-btn").addEventListener("click", () => {
+      if (!history.length) return;
+      const text = history.map(m => `[${m.role === "user" ? "You" : "AI"}]\n${m.content}`).join("\n\n---\n\n");
+      const blob = new Blob([text], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `veil-ai-chat-${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    // Custom system prompt toggle
+    const promptRow = document.getElementById("amb-prompt-row");
+    document.getElementById("amb-prompt-toggle").addEventListener("click", () => {
+      promptRow.classList.toggle("show");
+    });
+
+    // Override the system prompt used in fetch
+    const origSend = window.send || send;
+    // Patch: intercept the fetch call to inject custom system prompt
+    const _origFetch = window.fetch;
+    window.fetch = function(url, opts) {
+      if (url === "/api/ai" && opts?.body) {
+        try {
+          const body = JSON.parse(opts.body);
+          const custom = document.getElementById("amb-system-prompt")?.value?.trim();
+          if (custom && body.messages?.[0]?.role === "system") {
+            body.messages[0].content += "\n\nAdditional instructions: " + custom;
+            opts.body = JSON.stringify(body);
+          }
+        } catch {}
+      }
+      return _origFetch.call(this, url, opts);
+    };
+  })();
 </script>
 </body>
 </html>
