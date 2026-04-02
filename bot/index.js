@@ -207,6 +207,34 @@ function getPingRole(guild, pingId) {
   return guild.roles.cache.find(r => r.name === `Ping: ${ping.label}`) || null;
 }
 
+// ── Admin role ───────────────────────────────────────────────────────────────
+const ADMIN_ROLE_NAME = "Veil Admin";
+async function ensureAdminRole(guild) {
+  let role = guild.roles.cache.find(r => r.name === ADMIN_ROLE_NAME);
+  if (!role) {
+    role = await guild.roles.create({
+      name: ADMIN_ROLE_NAME,
+      color: 0xf59e0b,
+      permissions: [
+        "ManageMessages",
+        "KickMembers",
+        "BanMembers",
+        "ManageNicknames",
+        "MuteMembers",
+        "DeafenMembers",
+        "MoveMembers",
+        "ManageRoles",
+        "ViewAuditLog",
+        "ManageChannels",
+      ],
+      hoist: true,
+      mentionable: true,
+      reason: "Veil Admin role — created by bot",
+    });
+  }
+  return role;
+}
+
 // ── Live embed builders ────────────────────────────────────────────────────
 async function buildStatusEmbed(guild) {
   const result = await checkStatus(SERVER_URL);
@@ -1851,6 +1879,58 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     await interaction.channel.send({ embeds: [embed], components: rows });
     return interaction.reply({ content: "Ping role picker posted!", ephemeral: true });
+  }
+
+  // /setupadmin
+  if (commandName === "setupadmin") {
+    try {
+      const role = await ensureAdminRole(interaction.guild);
+      return interaction.reply({ content: `Admin role ready: <@&${role.id}>. Use \`/admin\` to assign it to users.`, ephemeral: true });
+    } catch (err) {
+      return interaction.reply({ content: `Error creating admin role: ${err.message}`, ephemeral: true });
+    }
+  }
+
+  // /admin
+  if (commandName === "admin") {
+    const target = interaction.options.getUser("user");
+    const action = interaction.options.getString("action") || "add";
+    try {
+      const role = await ensureAdminRole(interaction.guild);
+      const member = await interaction.guild.members.fetch(target.id);
+
+      if (action === "add") {
+        if (member.roles.cache.has(role.id)) {
+          return interaction.reply({ content: `**${target.username}** is already an admin.`, ephemeral: true });
+        }
+        await member.roles.add(role);
+        await modLog(interaction.guild, new EmbedBuilder()
+          .setColor(0xf59e0b)
+          .setTitle("Admin Added")
+          .addFields(
+            { name: "User", value: `${target} (${target.username})`, inline: true },
+            { name: "By", value: `${interaction.user.username}`, inline: true },
+          )
+          .setTimestamp());
+        return interaction.reply({ content: `${target} is now a **Veil Admin**.`, ephemeral: true });
+      } else {
+        if (!member.roles.cache.has(role.id)) {
+          return interaction.reply({ content: `**${target.username}** is not an admin.`, ephemeral: true });
+        }
+        await member.roles.remove(role);
+        await modLog(interaction.guild, new EmbedBuilder()
+          .setColor(0xef4444)
+          .setTitle("Admin Removed")
+          .addFields(
+            { name: "User", value: `${target} (${target.username})`, inline: true },
+            { name: "By", value: `${interaction.user.username}`, inline: true },
+          )
+          .setTimestamp());
+        return interaction.reply({ content: `Removed **${target.username}** from Veil Admin.`, ephemeral: true });
+      }
+    } catch (err) {
+      return interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
+    }
   }
 
   if (commandName === "uptime") {

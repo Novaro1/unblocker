@@ -328,6 +328,26 @@ const commands = [
     .setName("setuppings")
     .setDescription("Post the notification role picker panel in this channel (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+  new SlashCommandBuilder()
+    .setName("admin")
+    .setDescription("Give or remove the Veil Admin role (Owner only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addUserOption((o) =>
+      o.setName("user").setDescription("The user to make/remove as admin").setRequired(true)
+    )
+    .addStringOption((o) =>
+      o.setName("action").setDescription("Add or remove").setRequired(false)
+        .addChoices(
+          { name: "Add", value: "add" },
+          { name: "Remove", value: "remove" },
+        )
+    ),
+
+  new SlashCommandBuilder()
+    .setName("setupadmin")
+    .setDescription("Create the Veil Admin role if it doesn't exist (Owner only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);
