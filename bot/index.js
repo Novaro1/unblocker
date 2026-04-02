@@ -213,7 +213,19 @@ const ADMIN_ROLE_NAME = "Veil Admin";
 async function ensureAdminRole(guild) {
   let role = guild.roles.cache.find(r => r.name === ADMIN_ROLE_NAME);
   if (!role) {
-    const perms = [
+    // Create with no permissions first, then set what the bot can grant
+    role = await guild.roles.create({
+      name: ADMIN_ROLE_NAME,
+      color: 0xf59e0b,
+      permissions: [],
+      hoist: true,
+      mentionable: true,
+      reason: "Veil Admin role — created by bot",
+    });
+    // Now grant permissions the bot has
+    const botMember = await guild.members.fetchMe();
+    const botPerms = botMember.permissions;
+    const wanted = [
       PermissionFlagsBits.ManageMessages,
       PermissionFlagsBits.KickMembers,
       PermissionFlagsBits.BanMembers,
@@ -225,14 +237,10 @@ async function ensureAdminRole(guild) {
       PermissionFlagsBits.ViewAuditLog,
       PermissionFlagsBits.ManageChannels,
     ];
-    role = await guild.roles.create({
-      name: ADMIN_ROLE_NAME,
-      color: 0xf59e0b,
-      permissions: perms,
-      hoist: true,
-      mentionable: true,
-      reason: "Veil Admin role — created by bot",
-    });
+    const grantable = wanted.filter(p => botPerms.has(p));
+    if (grantable.length) {
+      await role.setPermissions(grantable, "Setting admin permissions");
+    }
   }
   return role;
 }
