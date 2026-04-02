@@ -11,6 +11,7 @@ import {
   TextInputBuilder,
   TextInputStyle,
   ChannelType,
+  PermissionFlagsBits,
 } from "discord.js";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { randomUUID } from "crypto";
@@ -212,21 +213,22 @@ const ADMIN_ROLE_NAME = "Veil Admin";
 async function ensureAdminRole(guild) {
   let role = guild.roles.cache.find(r => r.name === ADMIN_ROLE_NAME);
   if (!role) {
+    const perms = [
+      PermissionFlagsBits.ManageMessages,
+      PermissionFlagsBits.KickMembers,
+      PermissionFlagsBits.BanMembers,
+      PermissionFlagsBits.ManageNicknames,
+      PermissionFlagsBits.MuteMembers,
+      PermissionFlagsBits.DeafenMembers,
+      PermissionFlagsBits.MoveMembers,
+      PermissionFlagsBits.ManageRoles,
+      PermissionFlagsBits.ViewAuditLog,
+      PermissionFlagsBits.ManageChannels,
+    ];
     role = await guild.roles.create({
       name: ADMIN_ROLE_NAME,
       color: 0xf59e0b,
-      permissions: [
-        "ManageMessages",
-        "KickMembers",
-        "BanMembers",
-        "ManageNicknames",
-        "MuteMembers",
-        "DeafenMembers",
-        "MoveMembers",
-        "ManageRoles",
-        "ViewAuditLog",
-        "ManageChannels",
-      ],
+      permissions: perms,
       hoist: true,
       mentionable: true,
       reason: "Veil Admin role — created by bot",
