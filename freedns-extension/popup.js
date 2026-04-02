@@ -1,7 +1,7 @@
 // ── Name / word lists ─────────────────────────────────────────────────────────
 
-const ADJECTIVES = ["swift","dark","neon","blue","iron","cool","fast","free","wild","bold"];
-const NOUNS      = ["proxy","link","node","wave","core","path","edge","gate","hub","veil"];
+const ADJECTIVES = ["bright","calm","clear","green","steady","prime","solid","smart","keen","true"];
+const NOUNS      = ["study","notes","class","learn","read","desk","quiz","math","plan","lab"];
 const FIRSTNAMES = ["James","Liam","Noah","Oliver","Ethan","Lucas","Mason","Logan","Aiden","Jacob","Emma","Olivia","Ava","Sophia","Isabella","Mia","Charlotte","Amelia","Harper","Evelyn"];
 const LASTNAMES  = ["Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","Davis","Wilson","Moore","Taylor","Anderson","Thomas","Jackson","White","Harris","Martin","Thompson","Lee","Walker"];
 
@@ -9,7 +9,7 @@ function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function randNum(n) { return Math.floor(Math.random() * n); }
 
 function generateUsername() {
-  return `${rand(ADJECTIVES)}${rand(NOUNS)}${100 + randNum(900)}`;
+  return `${rand(FIRSTNAMES).toLowerCase()}${rand(LASTNAMES).toLowerCase()}${10 + randNum(90)}`;
 }
 function generatePassword() {
   const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$";

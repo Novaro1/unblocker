@@ -1,14 +1,36 @@
 // ── FreeDNS Account Helper — Content Script ───────────────────────────────────
 
 // ── Generators ────────────────────────────────────────────────────────────────
-const ADJECTIVES = ["swift","dark","neon","blue","iron","cool","fast","free","wild","bold"];
-const NOUNS      = ["proxy","link","node","wave","core","path","edge","gate","hub","veil"];
+const ADJECTIVES = ["bright","calm","clear","green","steady","prime","solid","smart","keen","true"];
+const NOUNS      = ["study","notes","class","learn","read","desk","quiz","math","plan","lab"];
 const FIRSTNAMES = ["James","Liam","Noah","Oliver","Ethan","Lucas","Mason","Logan","Aiden","Jacob","Emma","Olivia","Ava","Sophia","Isabella","Mia","Charlotte","Amelia","Harper","Evelyn"];
 const LASTNAMES  = ["Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","Davis","Wilson","Moore","Taylor","Anderson","Thomas","Jackson","White","Harris","Martin","Thompson","Lee","Walker"];
 
+// Realistic subdomain name templates (school/edu sounding)
+const SUB_PREFIXES = [
+  "mr","mrs","ms","class","period","ap","honors","room","lab","study",
+  "math","bio","chem","physics","english","history","geo","art","music","tech",
+];
+const SUB_SUBJECTS = [
+  "smith","johnson","williams","brown","jones","garcia","miller","davis","wilson","moore",
+  "algebra","geometry","calculus","biology","chemistry","lit","writing","govt","econ","psych",
+  "notes","hw","review","quiz","test","work","project","worksheet","resources","tools",
+];
+function generateSubdomain() {
+  const style = randNum(5);
+  const num = 1 + randNum(9);
+  switch (style) {
+    case 0: return `${rand(SUB_PREFIXES)}${rand(SUB_SUBJECTS)}${num}`;           // mrsmith3
+    case 1: return `${rand(SUB_PREFIXES)}${rand(SUB_SUBJECTS)}`;                 // apbiology
+    case 2: return `${rand(SUB_SUBJECTS)}${rand(SUB_PREFIXES)}${num}`;           // notesperiod4
+    case 3: return `${rand(SUB_PREFIXES)}${num}${rand(SUB_SUBJECTS)}`;           // period4notes
+    default: return `${rand(SUB_SUBJECTS)}${10 + randNum(90)}`;                  // algebra42
+  }
+}
+
 function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function randNum(n) { return Math.floor(Math.random() * n); }
-function generateUsername() { return `${rand(ADJECTIVES)}${rand(NOUNS)}${100 + randNum(900)}`; }
+function generateUsername() { return `${rand(FIRSTNAMES).toLowerCase()}${rand(LASTNAMES).toLowerCase()}${10 + randNum(90)}`; }
 function generatePassword() {
   // Stick to alphanumeric — some services reject special chars in passwords
   const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -465,10 +487,8 @@ function injectSubdomainBar() {
       return;
     }
 
-    // Generate subdomain name
-    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-    const rand6 = Array.from({ length: 6 }, () => chars[randNum(chars.length)]).join("");
-    const subName = `veil${rand6}`;
+    // Generate realistic school-sounding subdomain name
+    const subName = generateSubdomain();
 
     // Fill subdomain field
     setField('input[name="subdomain"]', subName);
