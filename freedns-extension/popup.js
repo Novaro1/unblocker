@@ -16,45 +16,27 @@ function generatePassword() {
   return Array.from({ length: 14 }, () => chars[randNum(chars.length)]).join("");
 }
 
-// ── mail.tm API ───────────────────────────────────────────────────────────────
-const MAILTM = "https://api.mail.tm";
+// ── 1secmail API ──────────────────────────────────────────────────────────────
+const ONESEC = "https://www.1secmail.com/api/v1/";
+const ONESEC_DOMAINS = ["1secmail.com", "1secmail.org", "1secmail.net", "esiix.com", "wwjmp.com", "xojxe.com"];
 
-async function mailtmGetDomain() {
-  const r = await fetch(`${MAILTM}/domains?page=1`);
-  if (!r.ok) throw new Error(`Domains HTTP ${r.status}`);
-  const d = await r.json();
-  const domain = d["hydra:member"]?.[0]?.domain;
-  if (!domain) throw new Error("No domains available");
-  return domain;
+async function onesecNewInbox(username) {
+  const domain = ONESEC_DOMAINS[Math.floor(Math.random() * ONESEC_DOMAINS.length)];
+  const email = `${username.toLowerCase()}@${domain}`;
+  // 1secmail doesn't need account creation — just start using the address
+  return { email, token: JSON.stringify({ login: username.toLowerCase(), domain }) };
 }
 
-async function mailtmNewInbox(username) {
-  const domain   = await mailtmGetDomain();
-  const address  = `${username.toLowerCase()}@${domain}`;
-  const password = `Veil${Math.floor(Math.random()*9999)}xZ!`;
-  const cr = await fetch(`${MAILTM}/accounts`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address, password }),
-  });
-  if (!cr.ok) { const t = await cr.text(); throw new Error(`Create HTTP ${cr.status}: ${t.slice(0,80)}`); }
-  const tr = await fetch(`${MAILTM}/token`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address, password }),
-  });
-  if (!tr.ok) throw new Error(`Token HTTP ${tr.status}`);
-  const { token } = await tr.json();
-  return { email: address, token };
-}
-
-async function mailtmGetMessages(token) {
-  const r = await fetch(`${MAILTM}/messages?page=1`, { headers: { "Authorization": `Bearer ${token}` } });
+async function onesecGetMessages(token) {
+  const { login, domain } = JSON.parse(token);
+  const r = await fetch(`${ONESEC}?action=getMessages&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}`);
   if (!r.ok) throw new Error(`Messages HTTP ${r.status}`);
-  const d = await r.json();
-  return d["hydra:member"] || [];
+  return r.json();
 }
 
-async function mailtmGetMessage(id, token) {
-  const r = await fetch(`${MAILTM}/messages/${id}`, { headers: { "Authorization": `Bearer ${token}` } });
+async function onesecGetMessage(id, token) {
+  const { login, domain } = JSON.parse(token);
+  const r = await fetch(`${ONESEC}?action=readMessage&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}&id=${id}`);
   if (!r.ok) throw new Error(`Message HTTP ${r.status}`);
   return r.json();
 }
@@ -148,18 +130,18 @@ async function checkInbox() {
 
   setVerifyStatus("waiting", "Checking inbox…");
   try {
-    const msgs = await mailtmGetMessages(tok);
+    const msgs = await onesecGetMessages(tok);
     if (!msgs.length) {
       setVerifyStatus("waiting", "No activation email yet. Checks every 6 seconds.");
       return;
     }
 
     const target = msgs.find(m =>
-      /afraid\.org/i.test(m.from?.address || "") || /activate|confirm|verify/i.test(m.subject || "")
+      /afraid\.org/i.test(m.from || "") || /activate|confirm|verify/i.test(m.subject || "")
     ) || msgs[0];
 
-    const full = await mailtmGetMessage(target.id, tok);
-    const body = full.html?.[0] || full.text || "";
+    const full = await onesecGetMessage(target.id, tok);
+    const body = full.htmlBody || full.textBody || full.body || "";
     const url  = extractActivationUrl(body);
 
     if (url) {
@@ -204,7 +186,7 @@ async function generate() {
   let email = "", sid_token = "";
   let token = "";
   try {
-    ({ email, token } = await mailtmNewInbox(u));
+    ({ email, token } = await onesecNewInbox(u));
   } catch (e) {
     emailEl.placeholder = `Error: ${e.message}`;
     emailEl.style.borderColor = "#ef4444";

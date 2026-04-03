@@ -38,34 +38,19 @@ function generatePassword() {
 }
 
 // ── Email services ────────────────────────────────────────────────────────────
-// Tries mail.tm first, then Guerrilla Mail domains as fallback.
+// Tries 1secmail first (realistic domains), then Guerrilla Mail as fallback.
 
-const MAILTM = "https://api.mail.tm";
+const ONESEC = "https://www.1secmail.com/api/v1/";
+// 1secmail uses real-looking domains that aren't on most disposable blocklists
+const ONESEC_DOMAINS = ["1secmail.com", "1secmail.org", "1secmail.net", "esiix.com", "wwjmp.com", "xojxe.com"];
 const GM     = "https://api.guerrillamail.com/ajax.php";
-// Guerrilla Mail domains less likely to be on disposable-email blocklists
-const GM_DOMAINS = ["grr.la", "spam4.me", "guerrillamail.de", "guerrillamail.net", "guerrillamail.org"];
+const GM_DOMAINS = ["grr.la", "guerrillamail.de", "guerrillamail.net"];
 
-async function mailtmNewInbox(username) {
-  const dr = await fetch(`${MAILTM}/domains?page=1`);
-  if (!dr.ok) throw new Error(`mail.tm domains HTTP ${dr.status}`);
-  const dd = await dr.json();
-  const domain = dd["hydra:member"]?.[0]?.domain;
-  if (!domain) throw new Error("No mail.tm domains available");
-
-  const address  = `${username.toLowerCase()}@${domain}`;
-  const password = generatePassword();
-  const cr = await fetch(`${MAILTM}/accounts`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address, password }),
-  });
-  if (!cr.ok) { const t = await cr.text(); throw new Error(`mail.tm create HTTP ${cr.status}: ${t.slice(0,80)}`); }
-  const tr = await fetch(`${MAILTM}/token`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address, password }),
-  });
-  if (!tr.ok) throw new Error(`mail.tm token HTTP ${tr.status}`);
-  const { token } = await tr.json();
-  return { email: address, token, service: "mailtm" };
+async function onesecNewInbox(username) {
+  const domain = rand(ONESEC_DOMAINS);
+  const email = `${username.toLowerCase()}@${domain}`;
+  // 1secmail doesn't need account creation — just start using the address
+  return { email, token: JSON.stringify({ login: username.toLowerCase(), domain }), service: "1secmail" };
 }
 
 async function gmNewInbox(username) {
@@ -83,8 +68,8 @@ async function gmNewInbox(username) {
 }
 
 async function getNewInbox(username) {
-  try { return await mailtmNewInbox(username); } catch (e) {
-    console.warn("[FreeDNS Helper] mail.tm failed, trying Guerrilla Mail:", e.message);
+  try { return await onesecNewInbox(username); } catch (e) {
+    console.warn("[FreeDNS Helper] 1secmail failed, trying Guerrilla Mail:", e.message);
   }
   try { return await gmNewInbox(username); } catch (e) {
     console.warn("[FreeDNS Helper] Guerrilla Mail failed:", e.message);
@@ -94,14 +79,15 @@ async function getNewInbox(username) {
 
 // Poll for activation email
 async function checkForActivationEmail(service, token) {
-  if (service === "mailtm") {
-    const r = await fetch(`${MAILTM}/messages?page=1`, { headers: { "Authorization": `Bearer ${token}` } });
-    if (!r.ok) throw new Error(`mail.tm messages HTTP ${r.status}`);
-    const d = await r.json();
-    const msgs = d["hydra:member"] || [];
+  if (service === "1secmail") {
+    const { login, domain } = JSON.parse(token);
+    const r = await fetch(`${ONESEC}?action=getMessages&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}`);
+    if (!r.ok) throw new Error(`1secmail messages HTTP ${r.status}`);
+    const msgs = await r.json();
     for (const m of msgs) {
-      const full = await fetch(`${MAILTM}/messages/${m.id}`, { headers: { "Authorization": `Bearer ${token}` } }).then(r => r.json());
-      const url = extractActivationUrl(full.html?.[0] || full.text || "");
+      const full = await fetch(`${ONESEC}?action=readMessage&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}&id=${m.id}`);
+      const msg = await full.json();
+      const url = extractActivationUrl(msg.htmlBody || msg.textBody || msg.body || "");
       if (url) return url;
     }
   } else if (service === "guerrillamail") {
