@@ -521,6 +521,9 @@ fastify.get("/remote", (_req, reply) => {
   return reply.type("text/html").sendFile("remote.html");
 });
 
+fastify.get("/void",  (_req, reply) => reply.type("text/html").sendFile("void.html"));
+fastify.get("/claim", (_req, reply) => reply.type("text/html").sendFile("claim.html"));
+
 // Serve the agent script for easy download
 const remotePath = fileURLToPath(new URL("../remote/", import.meta.url));
 fastify.get("/api/remote/agent", (_req, reply) => {
