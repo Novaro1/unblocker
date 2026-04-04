@@ -94,7 +94,7 @@
 
     <div class="claim-box">
       <div class="claim-box-label">Claim Code</div>
-      <div class="claim-code" id="claim-code"></div>
+      <div class="claim-code">{{CLAIM_CODE}}</div>
     </div>
 
     <div class="claim-instructions">
@@ -108,10 +108,5 @@
   </div>
 
   <script src="/register-sw.js"></script>
-  <script>
-    // Display claim code
-    const _c = [80,72,65,78,84,79,77,45,57,86,51,76];
-    document.getElementById('claim-code').textContent = _c.map(n => String.fromCharCode(n)).join('');
-  </script>
 </body>
 </html>

@@ -523,9 +523,17 @@ fastify.get("/remote", (_req, reply) => {
 
 fastify.get("/void", (_req, reply) => reply.type("text/html").sendFile("void.html"));
 
-fastify.post("/api/s", (_req, reply) => {
+// Rate limit store for unlock endpoint — 1 attempt per IP per 10 minutes
+const _sLim = new Map();
+fastify.post("/api/s", (req, reply) => {
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket?.remoteAddress || "x";
+  const now = Date.now();
+  const entry = _sLim.get(ip);
+  if (entry && now < entry) return reply.code(429).send({ error: "rate limited" });
+  _sLim.set(ip, now + 10 * 60 * 1000);
+  if (_sLim.size > 5000) { for (const [k, v] of _sLim) { if (now > v) _sLim.delete(k); } }
   const sec = process.env.UNLOCK_SECRET || "fallback";
-  const win = Math.floor(Date.now() / (5 * 60 * 1000));
+  const win = Math.floor(now / (5 * 60 * 1000));
   const tok = createHmac("sha256", sec).update(String(win)).digest("hex").slice(0, 20);
   return reply.send({ k: tok });
 });
@@ -539,7 +547,11 @@ fastify.get("/claim", (req, reply) => {
     createHmac("sha256", sec).update(String(w)).digest("hex").slice(0, 20)
   );
   if (!valid.includes(k)) return reply.code(404).type("text/html").sendFile("404.html");
-  return reply.type("text/html").sendFile("claim.html");
+  const code = process.env.CLAIM_CODE || "???";
+  const html = readFileSync(new URL("../public/claim.html", import.meta.url), "utf8")
+    .replace("{{CLAIM_CODE}}", code);
+  console.log(`[claim] valid claim at ${new Date().toISOString()} ip=${req.headers["x-forwarded-for"] || req.socket?.remoteAddress}`);
+  return reply.type("text/html").send(html);
 });
 
 // Serve the agent script for easy download

@@ -12,11 +12,11 @@ window.veil = {
   }
 };
 (function () {
-  const _k = [38,38,40,40,37,39,37,39,66,65];
+  const _x = [1,1,3,3,0,2,0,2,29,28].map(v=>37+v);
   let _p = 0;
   document.addEventListener('keydown', function (e) {
-    _p = (e.keyCode === _k[_p]) ? _p + 1 : (e.keyCode === _k[0] ? 1 : 0);
-    if (_p === _k.length) {
+    _p = (e.keyCode === _x[_p]) ? _p + 1 : (e.keyCode === _x[0] ? 1 : 0);
+    if (_p === _x.length) {
       _p = 0;
       fetch('/api/s', { method: 'POST' })
         .then(r => r.json())
