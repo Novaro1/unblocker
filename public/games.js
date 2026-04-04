@@ -48,7 +48,26 @@
     { name: "Geometry Dash",  url: "https://www.crazygames.com/game/geometry-dash-classic",emoji: "⬛", hue: 0   },
     { name: "Minesweeper",    url: "https://minesweeperonline.com",                        emoji: "💣", hue: 0   },
     { name: "Wordle",         url: "https://www.nytimes.com/games/wordle/index.html",      emoji: "🟩", hue: 130 },
-    { name: "Chess",          url: "https://www.chess.com/play/online",                    emoji: "♟",  hue: 45  },
+    { name: "Chess",             url: "https://www.chess.com/play/online",                        emoji: "♟",  hue: 45  },
+    { name: "Krunker.io",        url: "https://krunker.io",                                       emoji: "🔫", hue: 200 },
+    { name: "Smash Karts",       url: "https://www.crazygames.com/game/smash-karts",              emoji: "🏎",  hue: 0   },
+    { name: "Stickman Hook",     url: "https://www.crazygames.com/game/stickman-hook",            emoji: "🕷",  hue: 220 },
+    { name: "Getaway Shootout",  url: "https://www.crazygames.com/game/getaway-shootout",         emoji: "🏃", hue: 15  },
+    { name: "Rooftop Snipers",   url: "https://www.crazygames.com/game/rooftop-snipers",          emoji: "🎯", hue: 0   },
+    { name: "Happy Wheels",      url: "https://www.coolmathgames.com/0-happy-wheels",             emoji: "🚲", hue: 50  },
+    { name: "Monkey Mart",       url: "https://www.crazygames.com/game/monkey-mart",              emoji: "🐒", hue: 45  },
+    { name: "Eggy Car",          url: "https://www.crazygames.com/game/eggy-car",                 emoji: "🥚", hue: 55  },
+    { name: "Cat Ninja",         url: "https://www.coolmathgames.com/0-cat-ninja",                emoji: "🐱", hue: 270 },
+    { name: "Color Tunnel",      url: "https://www.crazygames.com/game/color-tunnel",             emoji: "🌈", hue: 280 },
+    { name: "Friday Night Funkin", url: "https://www.crazygames.com/game/friday-night-funkin",   emoji: "🎤", hue: 340 },
+    { name: "Fireboy & Watergirl 1", url: "https://www.coolmathgames.com/0-fireboy-and-watergirl-1", emoji: "🔥", hue: 15 },
+    { name: "Shell Shockers",    url: "https://shellshock.io",                                    emoji: "🥚", hue: 200 },
+    { name: "Vortelli's Pizza",  url: "https://www.crazygames.com/game/vortellis-pizza",          emoji: "🍕", hue: 10  },
+    { name: "Stickman Warriors", url: "https://www.crazygames.com/game/stickman-warriors",        emoji: "🥷", hue: 0   },
+    { name: "Penalty Shooters 2",url: "https://www.crazygames.com/game/penalty-shooters-2",      emoji: "⚽", hue: 100 },
+    { name: "Earn to Die",       url: "https://www.crazygames.com/game/earn-to-die",              emoji: "🧟", hue: 20  },
+    { name: "Bullet Force",      url: "https://www.crazygames.com/game/bullet-force-multiplayer", emoji: "💥", hue: 0   },
+    { name: "Road Fury",         url: "https://www.crazygames.com/game/road-fury",                emoji: "💨", hue: 40  },
   ];
 
 
@@ -99,6 +118,13 @@
     { name: "Pong",                  emoji: "🏓", hue: 180, url: "/games/pong.html" },
     { name: "Breakout",              emoji: "🧱", hue: 30,  url: "/games/breakout.html" },
     { name: "Minesweeper",           emoji: "💣", hue: 0,   url: "/games/minesweeper.html" },
+    // ── now.gg cloud games ─────────────────────────────────────────────────
+    { name: "Geometry Dash",         emoji: "⬛", hue: 0,   url: "/games/nowgg/geometry-dash.html" },
+    { name: "Cookie Run: Kingdom",   emoji: "🍪", hue: 25,  url: "/games/nowgg/cookie-run.html" },
+    { name: "Melon Sandbox",         emoji: "🍈", hue: 100, url: "/games/nowgg/melon-sandbox.html" },
+    { name: "Rocket League Sideswipe", emoji: "🚀", hue: 210, url: "/games/nowgg/rocket-league.html" },
+    { name: "Fortnite",              emoji: "🎯", hue: 190, url: "/games/nowgg/fortnite.html" },
+    { name: "EA Sports FC",          emoji: "⚽", hue: 130, url: "/games/nowgg/ea-sports-fc.html" },
   ];
 
   // ── Navigation ─────────────────────────────────────────────────────────────
