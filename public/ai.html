@@ -189,6 +189,10 @@
 
     .message-bubble p { margin-bottom: 10px; }
     .message-bubble p:last-child { margin-bottom: 0; }
+    .message-bubble ul, .message-bubble ol { padding-left: 20px; margin: 6px 0; }
+    .message-bubble li { margin-bottom: 3px; }
+    .message-bubble strong { font-weight: 700; }
+    .message-bubble em { font-style: italic; }
     .message-bubble code {
       background: rgba(255,255,255,0.08);
       border-radius: 4px;
@@ -721,52 +725,60 @@
 
   // Basic markdown renderer
   function renderMarkdown(text) {
-    // Extract math before escaping so $ signs aren't touched
-    const mathBlocks = [];
-    function stashMath(src) {
-      // display math: $$...$$ or \[...\]
-      src = src.replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]/g, (_, a, b) => {
-        const expr = (a || b).trim();
-        try {
-          const html = typeof katex !== "undefined"
-            ? katex.renderToString(expr, { displayMode: true, throwOnError: false })
-            : `<span class="math-fallback">$$${expr}$$</span>`;
-          mathBlocks.push(html);
-        } catch { mathBlocks.push(`<span class="math-fallback">$$${expr}$$</span>`); }
-        return `\x00MATH${mathBlocks.length - 1}\x00`;
-      });
-      // inline math: $...$ or \(...\)
-      src = src.replace(/\$([^\$\n]+?)\$|\\\((.+?)\\\)/g, (_, a, b) => {
-        const expr = (a || b).trim();
-        try {
-          const html = typeof katex !== "undefined"
-            ? katex.renderToString(expr, { displayMode: false, throwOnError: false })
-            : `<span class="math-fallback">$${expr}$</span>`;
-          mathBlocks.push(html);
-        } catch { mathBlocks.push(`<span class="math-fallback">$${expr}$</span>`); }
-        return `\x00MATH${mathBlocks.length - 1}\x00`;
-      });
-      return src;
-    }
-    function restoreMath(s) {
-      return s.replace(/\x00MATH(\d+)\x00/g, (_, i) => mathBlocks[+i]);
-    }
-
-    const stashed = stashMath(text);
-    const escaped = escHtml(stashed)
-      .replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) => `<pre><code>${code.trim()}</code></pre>`)
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      .replace(/^#{1,3} (.+)$/gm, "<strong>$1</strong>")
-      .replace(/^[•\-\*] (.+)$/gm, "<li>$1</li>")
-      .replace(/(<li>.*<\/li>\n?)+/g, s => `<ul>${s}</ul>`)
-      .replace(/^\d+\. (.+)$/gm, "<li>$1</li>")
-      .split(/\n{2,}/).map(p => {
-        if (p.startsWith("<ul>") || p.startsWith("<pre>")) return p;
-        return `<p>${p.replace(/\n/g, "<br>")}</p>`;
-      }).join("");
-    return restoreMath(escaped);
+    const mathBlocks = [], rawBlocks = [];
+    // 1. Stash code blocks (don't touch their content)
+    let s = text.replace(/```([\w]*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+      rawBlocks.push(`<pre><code>${escHtml(code.trim())}</code></pre>`);
+      return `\x00R${rawBlocks.length-1}\x00`;
+    });
+    s = s.replace(/`([^`\n]+)`/g, (_, c) => {
+      rawBlocks.push(`<code>${escHtml(c)}</code>`);
+      return `\x00R${rawBlocks.length-1}\x00`;
+    });
+    // 2. Stash math
+    s = s.replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]/g, (_, a, b) => {
+      const expr = (a || b).trim();
+      try { mathBlocks.push(typeof katex !== "undefined" ? katex.renderToString(expr, { displayMode: true, throwOnError: false }) : `<span>$$${escHtml(expr)}$$</span>`); }
+      catch { mathBlocks.push(`<span>$$${escHtml(expr)}$$</span>`); }
+      return `\x00M${mathBlocks.length-1}\x00`;
+    });
+    s = s.replace(/\$([^\$\n]+?)\$|\\\((.+?)\\\)/g, (_, a, b) => {
+      const expr = (a || b).trim();
+      try { mathBlocks.push(typeof katex !== "undefined" ? katex.renderToString(expr, { displayMode: false, throwOnError: false }) : `<span>$${escHtml(expr)}$</span>`); }
+      catch { mathBlocks.push(`<span>$${escHtml(expr)}$</span>`); }
+      return `\x00M${mathBlocks.length-1}\x00`;
+    });
+    // 3. Escape remaining HTML
+    s = escHtml(s);
+    // 4. Markdown
+    // Headers
+    s = s.replace(/^######\s+(.+)$/gm, '<strong style="font-size:0.85em">$1</strong>');
+    s = s.replace(/^#{1,5}\s+(.+)$/gm, '<strong>$1</strong>');
+    // Bold before italic
+    s = s.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__([^_\n]+?)__/g,    '<strong>$1</strong>');
+    s = s.replace(/\*([^*\n]+?)\*/g,    '<em>$1</em>');
+    s = s.replace(/_([^_\n]+?)_/g,      '<em>$1</em>');
+    // Lists — collect consecutive list lines into <ul>/<ol>
+    s = s.replace(/((?:^[-*•]\s+.+$\n?)+)/gm, block => {
+      const items = block.trim().split('\n').map(l => `<li>${l.replace(/^[-*•]\s+/, '')}</li>`).join('');
+      return `<ul>${items}</ul>`;
+    });
+    s = s.replace(/((?:^\d+\.\s+.+$\n?)+)/gm, block => {
+      const items = block.trim().split('\n').map(l => `<li>${l.replace(/^\d+\.\s+/, '')}</li>`).join('');
+      return `<ol>${items}</ol>`;
+    });
+    // Paragraphs
+    s = s.split(/\n{2,}/).map(p => {
+      p = p.trim();
+      if (!p) return '';
+      if (/^<(ul|ol|pre|strong|h[1-6])/.test(p)) return p;
+      return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+    }).join('');
+    // 5. Restore stashed blocks
+    s = s.replace(/\x00M(\d+)\x00/g, (_, i) => mathBlocks[+i]);
+    s = s.replace(/\x00R(\d+)\x00/g, (_, i) => rawBlocks[+i]);
+    return s;
   }
 
   function escHtml(s) {

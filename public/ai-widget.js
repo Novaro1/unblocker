@@ -235,7 +235,12 @@
     }
     .vai-dot:nth-child(2) { animation-delay: 0.2s; }
     .vai-dot:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes vai-bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-5px)} }
+
+    #vai-root .vai-bubble ul, #vai-root .vai-bubble ol { padding-left: 18px !important; margin: 4px 0 !important; }
+    #vai-root .vai-bubble li { margin-bottom: 2px !important; }
+    #vai-root .vai-bubble strong { font-weight: 700 !important; }
+    #vai-root .vai-bubble em { font-style: italic !important; }
+        @keyframes vai-bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-5px)} }
 
     /* Input */
     #vai-input-row {
@@ -572,26 +577,59 @@
   }
 
   function renderMd(text) {
-    const mathBlocks = [];
-    function stash(src) {
-      src = src.replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]/g, (_, a, b) => {
-        const expr = (a || b).trim();
-        try { mathBlocks.push(typeof katex !== "undefined" ? katex.renderToString(expr, { displayMode: true, throwOnError: false }) : "$$" + expr + "$$"); } catch { mathBlocks.push("$$" + expr + "$$"); }
-        return "\x00M" + (mathBlocks.length-1) + "\x00";
-      });
-      src = src.replace(/\$([^\$\n]+?)\$|\\\((.+?)\\\)/g, (_, a, b) => {
-        const expr = (a || b).trim();
-        try { mathBlocks.push(typeof katex !== "undefined" ? katex.renderToString(expr, { displayMode: false, throwOnError: false }) : "$" + expr + "$"); } catch { mathBlocks.push("$" + expr + "$"); }
-        return "\x00M" + (mathBlocks.length-1) + "\x00";
-      });
-      return src;
-    }
-    const restore = s => s.replace(/\x00M(\d+)\x00/g, (_, i) => mathBlocks[+i]);
-    return restore(escHtml(stash(text))
-      .replace(/```[\w]*\n?([\s\S]*?)```/g, (_, c) => "<pre><code>" + c.trim() + "</code></pre>")
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      .replace(/\n/g, "<br>"));
+    const mathBlocks = [], rawBlocks = [];
+    // 1. Stash code blocks (don't touch their content)
+    let s = text.replace(/```([\w]*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+      rawBlocks.push(`<pre><code>${escHtml(code.trim())}</code></pre>`);
+      return `\x00R${rawBlocks.length-1}\x00`;
+    });
+    s = s.replace(/`([^`\n]+)`/g, (_, c) => {
+      rawBlocks.push(`<code>${escHtml(c)}</code>`);
+      return `\x00R${rawBlocks.length-1}\x00`;
+    });
+    // 2. Stash math
+    s = s.replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]/g, (_, a, b) => {
+      const expr = (a || b).trim();
+      try { mathBlocks.push(typeof katex !== "undefined" ? katex.renderToString(expr, { displayMode: true, throwOnError: false }) : `<span>$$${escHtml(expr)}$$</span>`); }
+      catch { mathBlocks.push(`<span>$$${escHtml(expr)}$$</span>`); }
+      return `\x00M${mathBlocks.length-1}\x00`;
+    });
+    s = s.replace(/\$([^\$\n]+?)\$|\\\((.+?)\\\)/g, (_, a, b) => {
+      const expr = (a || b).trim();
+      try { mathBlocks.push(typeof katex !== "undefined" ? katex.renderToString(expr, { displayMode: false, throwOnError: false }) : `<span>$${escHtml(expr)}$</span>`); }
+      catch { mathBlocks.push(`<span>$${escHtml(expr)}$</span>`); }
+      return `\x00M${mathBlocks.length-1}\x00`;
+    });
+    // 3. Escape remaining HTML
+    s = escHtml(s);
+    // 4. Markdown
+    // Headers
+    s = s.replace(/^######\s+(.+)$/gm, '<strong style="font-size:0.85em">$1</strong>');
+    s = s.replace(/^#{1,5}\s+(.+)$/gm, '<strong>$1</strong>');
+    // Bold before italic
+    s = s.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__([^_\n]+?)__/g,    '<strong>$1</strong>');
+    s = s.replace(/\*([^*\n]+?)\*/g,    '<em>$1</em>');
+    s = s.replace(/_([^_\n]+?)_/g,      '<em>$1</em>');
+    // Lists — collect consecutive list lines into <ul>/<ol>
+    s = s.replace(/((?:^[-*•]\s+.+$\n?)+)/gm, block => {
+      const items = block.trim().split('\n').map(l => `<li>${l.replace(/^[-*•]\s+/, '')}</li>`).join('');
+      return `<ul>${items}</ul>`;
+    });
+    s = s.replace(/((?:^\d+\.\s+.+$\n?)+)/gm, block => {
+      const items = block.trim().split('\n').map(l => `<li>${l.replace(/^\d+\.\s+/, '')}</li>`).join('');
+      return `<ol>${items}</ol>`;
+    });
+    // Paragraphs
+    s = s.split(/\n{2,}/).map(p => {
+      p = p.trim();
+      if (!p) return '';
+      if (/^<(ul|ol|pre|strong|h[1-6])/.test(p)) return p;
+      return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+    }).join('');
+    // 5. Restore stashed blocks
+    s = s.replace(/\x00M(\d+)\x00/g, (_, i) => mathBlocks[+i]);
+    s = s.replace(/\x00R(\d+)\x00/g, (_, i) => rawBlocks[+i]);
+    return s;
   }
 })();
