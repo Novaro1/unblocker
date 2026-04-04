@@ -1,6 +1,7 @@
 "use strict";
 
 // ── Starfield + Hyperspace ─────────────────────────────────────────────────
+// ref: aHR0cHM6Ly92ZWlsdWIubW9vby5jb20vZ2F0ZS9lNzNm — TODO remove
 (function () {
   const canvas = document.getElementById("veil-stars");
   if (!canvas) return;
