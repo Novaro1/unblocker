@@ -49,9 +49,9 @@
     { name: "Minesweeper",    url: "https://minesweeperonline.com",                        emoji: "💣", hue: 0   },
     { name: "Wordle",         url: "https://www.nytimes.com/games/wordle/index.html",      emoji: "🟩", hue: 130 },
     { name: "Chess",             url: "https://www.chess.com/play/online",                        emoji: "♟",  hue: 45  },
-    { name: "Agar.io",           url: "https://agar.io",                                          emoji: "🔵", hue: 200, direct: true },
-    { name: "Krunker.io",        url: "https://krunker.io",                                       emoji: "🔫", hue: 200, direct: true },
-    { name: "Shell Shockers",    url: "https://shellshock.io",                                    emoji: "🥚", hue: 200, direct: true },
+    { name: "Agar.io",           url: "https://agar.io",                                          emoji: "🔵", hue: 200 },
+    { name: "Krunker.io",        url: "https://krunker.io",                                       emoji: "🔫", hue: 200 },
+    { name: "Shell Shockers",    url: "https://shellshock.io",                                    emoji: "🥚", hue: 200 },
     { name: "Smash Karts",       url: "https://www.crazygames.com/game/smash-karts",              emoji: "🏎",  hue: 0   },
     { name: "Stickman Hook",     url: "https://www.crazygames.com/game/stickman-hook",            emoji: "🕷",  hue: 220 },
     { name: "Getaway Shootout",  url: "https://www.crazygames.com/game/getaway-shootout",         emoji: "🏃", hue: 15  },
@@ -201,7 +201,7 @@
 
     tile.addEventListener("click", () => {
       if (isLocal)        { navigateLocal(game.url); }
-      else if (game.direct) { window.open(game.url, "_blank"); }
+
       else                { navigateTo(game.url); }
     });
     return tile;
