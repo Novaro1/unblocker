@@ -1,5 +1,25 @@
 "use strict";
 
+// — internal —
+window.veil = {
+  whisper() {
+    const b = 'color:#6366f1;font-weight:bold;font-size:13px;';
+    const d = 'color:#a5b4fc;font-size:13px;letter-spacing:0.1em;';
+    const f = 'color:rgba(255,255,255,0.25);font-size:11px;';
+    console.log('%c[VEIL] signal acquired', b);
+    console.log('%c↑  ↑  ↓  ↓  ←  →  ←  →  B  A', d);
+    console.log('%creturn to the home screen and enter the sequence', f);
+  }
+};
+(function () {
+  const _k = [38,38,40,40,37,39,37,39,66,65];
+  let _p = 0;
+  document.addEventListener('keydown', function (e) {
+    _p = (e.keyCode === _k[_p]) ? _p + 1 : (e.keyCode === _k[0] ? 1 : 0);
+    if (_p === _k.length) { _p = 0; location.href = '/claim'; }
+  });
+})();
+
 const form             = document.getElementById("sj-form");
 const address          = document.getElementById("sj-address");
 const searchEngineInput= document.getElementById("sj-search-engine");
@@ -368,3 +388,4 @@ form.addEventListener("submit", async (event) => {
     setLoading(false);
   }
 });
+

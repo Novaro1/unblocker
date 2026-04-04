@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>∅</title>
+  <link rel="stylesheet" href="/index.css" />
+  <style>
+    body { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; overflow:hidden; }
+    .void-glyph {
+      font-size: clamp(6rem, 20vw, 14rem);
+      color: rgba(255,255,255,0.04);
+      font-weight: 100;
+      letter-spacing: -0.05em;
+      user-select: none;
+      animation: pulse 8s ease-in-out infinite;
+      font-family: serif;
+    }
+    .void-nums {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.18);
+      letter-spacing: 0.18em;
+      margin-top: 2.5rem;
+      animation: fadein 4s ease forwards;
+      opacity: 0;
+    }
+    .void-sub {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.07);
+      margin-top: 1rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      animation: fadein 7s ease forwards;
+      opacity: 0;
+    }
+    @keyframes fadein { to { opacity: 1; } }
+    @keyframes pulse {
+      0%,100% { opacity: 0.04; transform: scale(1); }
+      50%      { opacity: 0.07; transform: scale(1.03); }
+    }
+  </style>
+</head>
+<body>
+  <div class="aurora" aria-hidden="true">
+    <div class="aurora-blob b1"></div>
+    <div class="aurora-blob b2"></div>
+    <div class="aurora-blob b3"></div>
+    <div class="aurora-blob b4"></div>
+  </div>
+
+  <div class="void-glyph">∅</div>
+  <!-- 119 104 105 115 112 101 114 -->
+  <div class="void-nums">119 &nbsp; 104 &nbsp; 105 &nbsp; 115 &nbsp; 112 &nbsp; 101 &nbsp; 114</div>
+  <div class="void-sub">the machine listens</div>
+</body>
+</html>

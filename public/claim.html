@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Veil</title>
+  <link rel="stylesheet" href="/index.css" />
+  <style>
+    body { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; overflow:hidden; text-align:center; padding:2rem; }
+    .claim-wrap { position:relative; z-index:10; max-width:480px; }
+    .claim-icon {
+      width: 64px; height: 64px; margin: 0 auto 1.5rem;
+      opacity: 0; animation: rise 0.8s 0.3s ease forwards;
+    }
+    .claim-title {
+      font-size: clamp(1.6rem, 5vw, 2.4rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+      opacity: 0; animation: rise 0.8s 0.5s ease forwards;
+    }
+    .claim-sub {
+      font-size: 1rem;
+      color: var(--muted);
+      margin-bottom: 2.5rem;
+      opacity: 0; animation: rise 0.8s 0.7s ease forwards;
+    }
+    .claim-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 1.5rem;
+      opacity: 0; animation: rise 0.8s 1s ease forwards;
+    }
+    .claim-box-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+    .claim-code {
+      font-family: 'Courier New', monospace;
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--accent-lighter);
+    }
+    .claim-instructions {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.7;
+      opacity: 0; animation: rise 0.8s 1.2s ease forwards;
+    }
+    .claim-instructions a {
+      color: var(--accent-light);
+      text-decoration: none;
+    }
+    .claim-instructions a:hover { text-decoration: underline; }
+    .claim-badge {
+      display: inline-block;
+      margin-top: 1.5rem;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: rgba(255,255,255,0.15);
+      opacity: 0; animation: rise 0.8s 1.8s ease forwards;
+    }
+    @keyframes rise {
+      from { opacity:0; transform:translateY(18px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="aurora" aria-hidden="true">
+    <div class="aurora-blob b1"></div>
+    <div class="aurora-blob b2"></div>
+    <div class="aurora-blob b3"></div>
+    <div class="aurora-blob b4"></div>
+  </div>
+  <canvas id="veil-stars" aria-hidden="true"></canvas>
+
+  <div class="claim-wrap">
+    <svg class="claim-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="32" cy="32" r="31" stroke="var(--accent)" stroke-width="1.5" opacity="0.3"/>
+      <polygon points="32,10 37.5,24.5 53,26 42,36.5 45.5,52 32,44 18.5,52 22,36.5 11,26 26.5,24.5"
+               fill="var(--accent)" opacity="0.9"/>
+    </svg>
+
+    <div class="claim-title">You found it.</div>
+    <div class="claim-sub">You are one of the few who made it here.</div>
+
+    <div class="claim-box">
+      <div class="claim-box-label">Claim Code</div>
+      <div class="claim-code" id="claim-code"></div>
+    </div>
+
+    <div class="claim-instructions">
+      DM this code to <strong>the Veil Discord</strong> to claim your prize.<br/>
+      <a href="https://discord.gg/NScKEHkd6U" target="_blank" rel="noopener">discord.gg/NScKEHkd6U</a>
+      <br/><br/>
+      Screenshot this page as proof. First valid claim wins.
+    </div>
+
+    <div class="claim-badge">veil · phantom hunter</div>
+  </div>
+
+  <script src="/register-sw.js"></script>
+  <script>
+    // Display claim code
+    const _c = [80,72,65,78,84,79,77,45,57,86,51,76];
+    document.getElementById('claim-code').textContent = _c.map(n => String.fromCharCode(n)).join('');
+  </script>
+</body>
+</html>
