@@ -267,8 +267,13 @@
     if (modelSel.value === "meta-llama/llama-4-scout-17b-16e-instruct") modelSel.value = "llama-3.1-8b-instant";
   }
   function captureFrame() {
-    if (!screenCvs.width || !screenCvs.height) return null;
-    return screenCvs.toDataURL("image/jpeg", 0.7).split(",")[1];
+    if (!screenVid || screenVid.readyState < 2) return null;
+    const vw = screenVid.videoWidth, vh = screenVid.videoHeight;
+    if (!vw || !vh) return null;
+    const cap = document.createElement("canvas");
+    cap.width = vw; cap.height = vh;
+    cap.getContext("2d").drawImage(screenVid, 0, 0, vw, vh);
+    return cap.toDataURL("image/jpeg", 0.85).split(",")[1];
   }
 
   function send() {

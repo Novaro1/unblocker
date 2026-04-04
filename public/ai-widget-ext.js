@@ -450,8 +450,13 @@
   }
 
   function captureFrame() {
-    if (!screenCanvas.width || !screenCanvas.height) return null;
-    return screenCanvas.toDataURL("image/jpeg", 0.7).split(",")[1];
+    if (!screenVideo || screenVideo.readyState < 2) return null;
+    const vw = screenVideo.videoWidth, vh = screenVideo.videoHeight;
+    if (!vw || !vh) return null;
+    const cap = document.createElement("canvas");
+    cap.width = vw; cap.height = vh;
+    cap.getContext("2d").drawImage(screenVideo, 0, 0, vw, vh);
+    return cap.toDataURL("image/jpeg", 0.85).split(",")[1];
   }
 
   // ── Send ─────────────────────────────────────────────────────────────────────
