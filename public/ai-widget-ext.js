@@ -487,7 +487,7 @@
       body: JSON.stringify({
         model: modelSelect.value,
         messages: [
-          { role: "system", content: "You are a helpful, friendly assistant built into Veil. Keep responses clear and concise. Format using markdown where helpful." },
+          { role: "system", content: frame ? "You are a helpful assistant built into Veil. The user has shared their screen — a screenshot is attached to their message. ALWAYS look at the screenshot first to understand the context of their request before answering. If they refer to problems, questions, or items by number or range (like \"46-54\"), find those on the screen rather than interpreting it as math. Keep responses clear and concise. Format using markdown where helpful." : "You are a helpful, friendly assistant built into Veil. Keep responses clear and concise. Format using markdown where helpful." },
           ...messagesForApi,
         ],
       }),
