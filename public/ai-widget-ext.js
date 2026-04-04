@@ -299,7 +299,7 @@
           <select id="vai-model">
             <option value="llama-3.1-8b-instant">Llama 3.1 8B</option>
             <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
-            <option value="llama-4-scout-17b-16e-instruct">Llama 4 Scout</option>
+            <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout</option>
           </select>
           <button class="vai-icon-btn" id="vai-clear-btn" title="Clear chat">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
@@ -433,7 +433,7 @@
 
       screenBtn.classList.add("active");
       screenBar.classList.add("show");
-      modelSelect.value = "llama-4-scout-17b-16e-instruct";
+      modelSelect.value = "meta-llama/llama-4-scout-17b-16e-instruct";
     } catch (e) {
       if (e.name !== "NotAllowedError") console.warn("Veil AI screen share:", e);
     }
@@ -446,7 +446,7 @@
     screenVideo = null;
     screenBtn.classList.remove("active");
     screenBar.classList.remove("show");
-    if (modelSelect.value === "llama-4-scout-17b-16e-instruct") modelSelect.value = "llama-3.1-8b-instant";
+    if (modelSelect.value === "meta-llama/llama-4-scout-17b-16e-instruct") modelSelect.value = "llama-3.1-8b-instant";
   }
 
   function captureFrame() {
