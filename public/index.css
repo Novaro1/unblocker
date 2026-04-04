@@ -539,6 +539,111 @@ main:has(.search-bar:focus-within) {
 /* ── Footer ───────────────────────────────────── */
 
 /* ── Discord community banner ─────────────────────────────────────────────── */
+/* ── Phantom Challenge Banner ──────────────────────────────────────────── */
+.phantom-banner {
+  position: relative;
+  margin: 1.5rem 0 0;
+  border-radius: 16px;
+  border: 1px solid rgba(99,102,241,0.25);
+  padding: 1.75rem 1.75rem 1.6rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  animation: slide-up-fade 0.5s ease-out 0.45s both;
+  background: linear-gradient(135deg, rgba(99,102,241,0.07) 0%, rgba(124,58,237,0.05) 50%, rgba(236,72,153,0.04) 100%);
+}
+.phantom-banner-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 80% at 90% 50%, rgba(99,102,241,0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 60% at 10% 80%, rgba(236,72,153,0.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+.phantom-banner > * { position: relative; z-index: 1; }
+.phantom-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+  background: rgba(99,102,241,0.15);
+  border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 99px;
+  padding: 0.2rem 0.65rem;
+  width: fit-content;
+}
+.phantom-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #6ee7b7;
+  box-shadow: 0 0 6px #6ee7b7;
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+.phantom-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.phantom-sub {
+  font-size: 0.875rem;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.6;
+  max-width: 480px;
+}
+.phantom-clue {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  width: fit-content;
+  max-width: 100%;
+}
+.phantom-clue-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgba(255,255,255,0.25);
+}
+.phantom-clue-text {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.6);
+  font-style: italic;
+}
+.phantom-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+  width: fit-content;
+  padding: 0.55rem 1.1rem;
+  border-radius: 99px;
+  background: rgba(99,102,241,0.2);
+  border: 1px solid rgba(99,102,241,0.4);
+  color: var(--accent-lighter);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+.phantom-btn:hover {
+  background: rgba(99,102,241,0.35);
+  border-color: rgba(99,102,241,0.6);
+}
+
 .community-banner {
   margin: 1.5rem 0 0;
   animation: slide-up-fade 0.5s ease-out 0.6s both;
