@@ -532,6 +532,19 @@ fastify.get("/ai", (_req, reply) => {
   return reply.type("text/html").sendFile("ai.html");
 });
 
+fastify.get("/ai/widget", (_req, reply) => {
+  return reply.type("text/html").sendFile("ai-widget-install.html");
+});
+fastify.get("/ai/popup", (_req, reply) => {
+  return reply.type("text/html").sendFile("ai-popup.html");
+});
+
+// Serve ai-widget-ext.js with permissive CORS so bookmarklet works cross-origin
+fastify.get("/ai-widget-ext.js", (_req, reply) => {
+  reply.header("Access-Control-Allow-Origin", "*");
+  return reply.type("application/javascript").sendFile("ai-widget-ext.js");
+});
+
 // ── POST /api/ai — Groq proxy (key stays server-side) ────────────────────────
 const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
 

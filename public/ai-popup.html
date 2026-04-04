@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veil AI</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #060610; --surface: #0e0e1e; --surface2: #15152a;
+      --border: #1e1e38; --text: #ecedf8; --muted: #6264a0;
+      --accent: #6366f1;
+    }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-rounded, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    /* Header */
+    .hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--bg);
+    }
+    .hdr-left { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+    .hdr-right { display: flex; align-items: center; gap: 6px; }
+    select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #a5b4fc;
+      font-size: 11px;
+      font-family: inherit;
+      padding: 3px 6px;
+      cursor: pointer;
+      outline: none;
+    }
+    .icon-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); border-radius: 6px; padding: 4px;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 0.15s, background 0.15s;
+    }
+    .icon-btn:hover { color: var(--text); background: var(--surface2); }
+
+    /* Screen bar */
+    #screen-bar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: rgba(74,222,128,0.06);
+      border-bottom: 1px solid rgba(74,222,128,0.15);
+      font-size: 11px;
+      color: #4ade80;
+      flex-shrink: 0;
+    }
+    #screen-bar.show { display: flex; }
+    #screen-canvas { border-radius: 4px; border: 1px solid #4ade8033; max-width: 80px; max-height: 45px; }
+    #screen-stop {
+      margin-left: auto;
+      background: none; border: 1px solid #4ade8033;
+      border-radius: 5px; color: #4ade80;
+      font-size: 10px; font-family: inherit;
+      padding: 2px 8px; cursor: pointer;
+    }
+
+    /* Messages */
+    #msgs {
+      flex: 1; overflow-y: auto;
+      padding: 12px;
+      display: flex; flex-direction: column; gap: 10px;
+      scroll-behavior: smooth;
+    }
+    #msgs::-webkit-scrollbar { width: 4px; }
+    #msgs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .empty {
+      margin: auto; text-align: center;
+      color: var(--muted); font-size: 12px; line-height: 1.6;
+    }
+    .empty svg { display: block; margin: 0 auto 8px; opacity: 0.4; }
+
+    .msg { display: flex; gap: 8px; align-items: flex-start; }
+    .msg.user { flex-direction: row-reverse; }
+    .av {
+      width: 24px; height: 24px; border-radius: 50%;
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    }
+    .msg.ai   .av { background: var(--accent); }
+    .msg.user .av { background: var(--surface2); }
+    .bubble {
+      max-width: 84%; padding: 8px 11px; border-radius: 12px;
+      font-size: 13px; line-height: 1.55; color: var(--text);
+      word-break: break-word;
+    }
+    .msg.ai   .bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px 12px 12px 3px; }
+    .msg.user .bubble { background: var(--accent); border-radius: 12px 12px 3px 12px; }
+    .bubble p { margin-bottom: 5px; }
+    .bubble p:last-child { margin-bottom: 0; }
+    .bubble code { background: rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 5px; font-size: 11px; font-family: ui-monospace,monospace; }
+    .bubble pre { background: rgba(0,0,0,0.35); border-radius: 6px; padding: 7px 9px; overflow-x: auto; margin: 4px 0; }
+    .bubble pre code { background: none; padding: 0; }
+    .bubble strong { font-weight: 700; }
+    .bubble em { font-style: italic; }
+
+    .typing { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+    .dot { width: 6px; height: 6px; background: var(--muted); border-radius: 50%; animation: bounce 1.2s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-5px)} }
+
+    /* Input */
+    .input-row {
+      flex-shrink: 0;
+      display: flex; gap: 8px; align-items: flex-end;
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+    }
+    #screen-btn {
+      width: 30px; height: 30px; border-radius: 7px;
+      border: 1px solid var(--border); background: none; color: var(--muted);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: color 0.15s, border-color 0.15s;
+    }
+    #screen-btn:hover { color: var(--text); border-color: var(--accent); }
+    #screen-btn.active { color: #4ade80; border-color: #4ade8055; background: rgba(74,222,128,0.07); }
+    #inp {
+      flex: 1; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 13px; font-family: inherit;
+      padding: 7px 11px; resize: none; outline: none;
+      min-height: 34px; max-height: 100px; line-height: 1.5;
+      transition: border-color 0.15s;
+    }
+    #inp:focus { border-color: var(--accent); }
+    #inp::placeholder { color: var(--muted); }
+    #send-btn {
+      width: 30px; height: 30px; border-radius: 7px; border: none;
+      background: var(--accent); color: #fff; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: filter 0.15s, opacity 0.15s;
+    }
+    #send-btn:hover:not(:disabled) { filter: brightness(1.12); }
+    #send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="hdr-left">
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
+        <line x1="4" y1="21" x2="28" y2="21" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M8 26 L16 13 L24 26" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Veil AI
+    </div>
+    <div class="hdr-right">
+      <select id="model-select">
+        <option value="llama-3.1-8b-instant">Llama 3.1 8B</option>
+        <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+        <option value="llama-3.2-11b-vision-preview">Vision 11B</option>
+      </select>
+      <button class="icon-btn" id="clear-btn" title="Clear">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="screen-bar">
+    <canvas id="screen-canvas"></canvas>
+    <span>Screen sharing</span>
+    <button id="screen-stop">Stop</button>
+  </div>
+
+  <div id="msgs">
+    <div class="empty" id="empty">
+      <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+        <line x1="4" y1="21" x2="28" y2="21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M8 26 L16 13 L24 26" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Ask anything — share your screen<br>and get help on whatever you're doing.
+    </div>
+  </div>
+
+  <div class="input-row">
+    <button id="screen-btn" title="Share screen">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    </button>
+    <textarea id="inp" placeholder="Ask anything…" rows="1"></textarea>
+    <button id="send-btn" disabled>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  const msgsEl      = document.getElementById("msgs");
+  const emptyEl     = document.getElementById("empty");
+  const inpEl       = document.getElementById("inp");
+  const sendBtn     = document.getElementById("send-btn");
+  const modelSel    = document.getElementById("model-select");
+  const clearBtn    = document.getElementById("clear-btn");
+  const screenBtn   = document.getElementById("screen-btn");
+  const screenBar   = document.getElementById("screen-bar");
+  const screenCvs   = document.getElementById("screen-canvas");
+  const screenStop  = document.getElementById("screen-stop");
+  const ctx         = screenCvs.getContext("2d");
+
+  const history = [];
+  let loading = false, screenStream = null, screenVid = null, screenTick = null;
+
+  clearBtn.addEventListener("click", () => {
+    history.length = 0;
+    msgsEl.innerHTML = "";
+    msgsEl.appendChild(emptyEl);
+  });
+
+  inpEl.addEventListener("input", () => {
+    inpEl.style.height = "auto";
+    inpEl.style.height = Math.min(inpEl.scrollHeight, 100) + "px";
+    sendBtn.disabled = !inpEl.value.trim() || loading;
+  });
+  inpEl.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+  sendBtn.addEventListener("click", send);
+
+  // Screen share
+  screenBtn.addEventListener("click", async () => {
+    if (screenStream) { stopScreen(); return; }
+    try {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 5 }, audio: false });
+      screenVid = document.createElement("video");
+      screenVid.srcObject = screenStream; screenVid.muted = true;
+      await screenVid.play();
+      screenStream.getVideoTracks()[0].addEventListener("ended", stopScreen);
+      screenTick = setInterval(() => {
+        if (!screenVid || screenVid.readyState < 2) return;
+        const vw = screenVid.videoWidth, vh = screenVid.videoHeight;
+        const scale = Math.min(80/vw, 45/vh, 1);
+        screenCvs.width = Math.round(vw*scale); screenCvs.height = Math.round(vh*scale);
+        ctx.drawImage(screenVid, 0, 0, screenCvs.width, screenCvs.height);
+      }, 200);
+      screenBtn.classList.add("active");
+      screenBar.classList.add("show");
+      modelSel.value = "llama-3.2-11b-vision-preview";
+    } catch (e) { if (e.name !== "NotAllowedError") console.warn(e); }
+  });
+  screenStop.addEventListener("click", stopScreen);
+  function stopScreen() {
+    if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+    if (screenTick) { clearInterval(screenTick); screenTick = null; }
+    screenVid = null;
+    screenBtn.classList.remove("active"); screenBar.classList.remove("show");
+    if (modelSel.value === "llama-3.2-11b-vision-preview") modelSel.value = "llama-3.1-8b-instant";
+  }
+  function captureFrame() {
+    if (!screenCvs.width || !screenCvs.height) return null;
+    return screenCvs.toDataURL("image/jpeg", 0.7).split(",")[1];
+  }
+
+  function send() {
+    const text = inpEl.value.trim();
+    if (!text || loading) return;
+    if (emptyEl.parentNode) emptyEl.remove();
+
+    const frame = captureFrame();
+    addMsg("user", text);
+    history.push({ role: "user", content: text });
+    const apiMsgs = [
+      ...history.slice(0, -1),
+      { role: "user", content: frame
+        ? [{ type: "text", text }, { type: "image_url", image_url: { url: `data:image/jpeg;base64,${frame}` } }]
+        : text },
+    ];
+    inpEl.value = ""; inpEl.style.height = "auto";
+    sendBtn.disabled = true; loading = true;
+    const typingEl = addTyping();
+
+    fetch("/api/ai", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelSel.value,
+        messages: [
+          { role: "system", content: "You are a helpful, friendly assistant built into Veil. Keep responses clear and concise. Format using markdown where helpful." },
+          ...apiMsgs,
+        ],
+      }),
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        typingEl.remove();
+        if (!ok) throw new Error(d.error || "Unknown error");
+        const reply = d.content.trim();
+        history.push({ role: "assistant", content: reply });
+        addMsg("ai", reply);
+      })
+      .catch(err => { typingEl.remove(); addMsg("ai", `Error: ${err.message}`); })
+      .finally(() => { loading = false; sendBtn.disabled = !inpEl.value.trim(); inpEl.focus(); });
+  }
+
+  function addMsg(role, content) {
+    const wrap = document.createElement("div"); wrap.className = `msg ${role}`;
+    const av = document.createElement("div"); av.className = "av";
+    av.innerHTML = role === "ai"
+      ? `<svg width="11" height="11" viewBox="0 0 32 32" fill="none"><line x1="4" y1="21" x2="28" y2="21" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/><path d="M8 26 L16 13 L24 26" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+      : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+    const bubble = document.createElement("div"); bubble.className = "bubble";
+    bubble.innerHTML = role === "ai" ? renderMd(content) : escHtml(content);
+    wrap.appendChild(av); wrap.appendChild(bubble);
+    msgsEl.appendChild(wrap); msgsEl.scrollTop = msgsEl.scrollHeight;
+    return wrap;
+  }
+  function addTyping() {
+    const wrap = document.createElement("div"); wrap.className = "msg ai";
+    wrap.innerHTML = `<div class="av"><svg width="11" height="11" viewBox="0 0 32 32" fill="none"><line x1="4" y1="21" x2="28" y2="21" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/><path d="M8 26 L16 13 L24 26" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bubble"><div class="typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>`;
+    msgsEl.appendChild(wrap); msgsEl.scrollTop = msgsEl.scrollHeight;
+    return wrap;
+  }
+  function escHtml(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function renderMd(t) {
+    return escHtml(t)
+      .replace(/```[\s\S]*?```/g, m => { const c = m.slice(3,m.lastIndexOf("```")).replace(/^[^\n]*\n?/,""); return `<pre><code>${c}</code></pre>`; })
+      .replace(/`([^`]+)`/g,"<code>$1</code>")
+      .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g,"<em>$1</em>")
+      .replace(/\n/g,"<br>");
+  }
+</script>
+</body>
+</html>
