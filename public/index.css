@@ -2397,4 +2397,111 @@ body.perf-mode .ql-tile:hover {
 }
 body.panic-active .panic-dismiss-hint {
   display: block;
+
+/* ── Holiday Themes ────────────────────────────────────────────────────── */
+
+/* Halloween — October */
+html[data-theme="halloween"] {
+  --bg:             #09050a;
+  --surface:        #130a14;
+  --surface2:       #1c1020;
+  --border:         #2e1533;
+  --accent:         #f97316;
+  --accent-light:   #fb923c;
+  --accent-lighter: #fdba74;
+  --aurora-2:       #7c3aed;
+  --aurora-3:       #ea580c;
+  --aurora-4:       #9333ea;
+  --muted:          #7c4f3a;
+}
+
+/* Christmas — Dec 1–25 */
+html[data-theme="christmas"] {
+  --bg:             #040d06;
+  --surface:        #081008;
+  --surface2:       #0d1a0d;
+  --border:         #162b18;
+  --accent:         #22c55e;
+  --accent-light:   #4ade80;
+  --accent-lighter: #86efac;
+  --aurora-2:       #16a34a;
+  --aurora-3:       #dc2626;
+  --aurora-4:       #ef4444;
+  --muted:          #3d6b47;
+}
+
+/* New Year's — Dec 26 – Jan 7 */
+html[data-theme="newyear"] {
+  --bg:             #09080a;
+  --surface:        #120f14;
+  --surface2:       #19151c;
+  --border:         #2e2535;
+  --accent:         #f59e0b;
+  --accent-light:   #fbbf24;
+  --accent-lighter: #fde68a;
+  --aurora-2:       #d97706;
+  --aurora-3:       #a855f7;
+  --aurora-4:       #f97316;
+  --muted:          #8b7040;
+}
+
+/* Valentine's Day — Feb 1–14 */
+html[data-theme="valentine"] {
+  --bg:             #0d040a;
+  --surface:        #180810;
+  --surface2:       #200c17;
+  --border:         #351020;
+  --accent:         #ec4899;
+  --accent-light:   #f472b6;
+  --accent-lighter: #f9a8d4;
+  --aurora-2:       #db2777;
+  --aurora-3:       #f43f5e;
+  --aurora-4:       #be185d;
+  --muted:          #9b5167;
+}
+
+/* St. Patrick's Day — Mar 10–17 */
+html[data-theme="stpatricks"] {
+  --bg:             #040d05;
+  --surface:        #081208;
+  --surface2:       #0d1a0e;
+  --border:         #142c16;
+  --accent:         #22c55e;
+  --accent-light:   #4ade80;
+  --accent-lighter: #86efac;
+  --aurora-2:       #15803d;
+  --aurora-3:       #166534;
+  --aurora-4:       #16a34a;
+  --muted:          #3d6b47;
+}
+
+/* 4th of July — Jul 1–4 */
+html[data-theme="july4"] {
+  --bg:             #04040f;
+  --surface:        #0a0a1a;
+  --surface2:       #0d0d22;
+  --border:         #151535;
+  --accent:         #3b82f6;
+  --accent-light:   #60a5fa;
+  --accent-lighter: #93c5fd;
+  --aurora-2:       #dc2626;
+  --aurora-3:       #1d4ed8;
+  --aurora-4:       #ef4444;
+  --muted:          #4a5580;
+}
+
+/* Thanksgiving — Nov 20–30 */
+html[data-theme="thanksgiving"] {
+  --bg:             #0d0804;
+  --surface:        #180d06;
+  --surface2:       #201208;
+  --border:         #351a0a;
+  --accent:         #d97706;
+  --accent-light:   #f59e0b;
+  --accent-lighter: #fcd34d;
+  --aurora-2:       #b45309;
+  --aurora-3:       #92400e;
+  --aurora-4:       #78350f;
+  --muted:          #7c5a2a;
+}
 }
