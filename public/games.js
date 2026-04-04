@@ -118,13 +118,6 @@
     { name: "Pong",                  emoji: "🏓", hue: 180, url: "/games/pong.html" },
     { name: "Breakout",              emoji: "🧱", hue: 30,  url: "/games/breakout.html" },
     { name: "Minesweeper",           emoji: "💣", hue: 0,   url: "/games/minesweeper.html" },
-    // ── now.gg cloud games ─────────────────────────────────────────────────
-    { name: "Geometry Dash",         emoji: "⬛", hue: 0,   url: "/games/nowgg/geometry-dash.html" },
-    { name: "Cookie Run: Kingdom",   emoji: "🍪", hue: 25,  url: "/games/nowgg/cookie-run.html" },
-    { name: "Melon Sandbox",         emoji: "🍈", hue: 100, url: "/games/nowgg/melon-sandbox.html" },
-    { name: "Rocket League Sideswipe", emoji: "🚀", hue: 210, url: "/games/nowgg/rocket-league.html" },
-    { name: "Fortnite",              emoji: "🎯", hue: 190, url: "/games/nowgg/fortnite.html" },
-    { name: "EA Sports FC",          emoji: "⚽", hue: 130, url: "/games/nowgg/ea-sports-fc.html" },
   ];
 
   // ── Navigation ─────────────────────────────────────────────────────────────
