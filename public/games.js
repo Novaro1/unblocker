@@ -120,6 +120,7 @@
     { name: "Pong",                  emoji: "🏓", hue: 180, url: "/games/pong.html" },
     { name: "Breakout",              emoji: "🧱", hue: 30,  url: "/games/breakout.html" },
     { name: "Minesweeper",           emoji: "💣", hue: 0,   url: "/games/minesweeper.html" },
+    { name: "Slither.io",            emoji: "🐍", hue: 100, url: "/games/slither.html" },
   ];
 
   // ── Navigation ─────────────────────────────────────────────────────────────
