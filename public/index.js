@@ -16,7 +16,13 @@ window.veil = {
   let _p = 0;
   document.addEventListener('keydown', function (e) {
     _p = (e.keyCode === _k[_p]) ? _p + 1 : (e.keyCode === _k[0] ? 1 : 0);
-    if (_p === _k.length) { _p = 0; location.href = '/claim'; }
+    if (_p === _k.length) {
+      _p = 0;
+      fetch('/api/s', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => { location.href = '/claim?k=' + d.k; })
+        .catch(() => {});
+    }
   });
 })();
 

@@ -521,8 +521,26 @@ fastify.get("/remote", (_req, reply) => {
   return reply.type("text/html").sendFile("remote.html");
 });
 
-fastify.get("/void",  (_req, reply) => reply.type("text/html").sendFile("void.html"));
-fastify.get("/claim", (_req, reply) => reply.type("text/html").sendFile("claim.html"));
+fastify.get("/void", (_req, reply) => reply.type("text/html").sendFile("void.html"));
+
+fastify.post("/api/s", (_req, reply) => {
+  const sec = process.env.UNLOCK_SECRET || "fallback";
+  const win = Math.floor(Date.now() / (5 * 60 * 1000));
+  const tok = createHmac("sha256", sec).update(String(win)).digest("hex").slice(0, 20);
+  return reply.send({ k: tok });
+});
+
+fastify.get("/claim", (req, reply) => {
+  const sec = process.env.UNLOCK_SECRET || "fallback";
+  const { k } = req.query;
+  if (!k) return reply.code(404).type("text/html").sendFile("404.html");
+  const now = Math.floor(Date.now() / (5 * 60 * 1000));
+  const valid = [now, now - 1].map(w =>
+    createHmac("sha256", sec).update(String(w)).digest("hex").slice(0, 20)
+  );
+  if (!valid.includes(k)) return reply.code(404).type("text/html").sendFile("404.html");
+  return reply.type("text/html").sendFile("claim.html");
+});
 
 // Serve the agent script for easy download
 const remotePath = fileURLToPath(new URL("../remote/", import.meta.url));
