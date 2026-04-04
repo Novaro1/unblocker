@@ -3,6 +3,21 @@
 // Works on any page — uses absolute URLs for API and assets.
 
 (function () {
+
+  // Load KaTeX for math rendering if not already present
+  if (!document.getElementById("vai-katex-css")) {
+    const link = document.createElement("link");
+    link.id = "vai-katex-css";
+    link.rel = "stylesheet";
+    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css";
+    document.head.appendChild(link);
+  }
+  if (!window.katex && !document.getElementById("vai-katex-js")) {
+    const s = document.createElement("script");
+    s.id = "vai-katex-js";
+    s.src = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js";
+    document.head.appendChild(s);
+  }
   const API = "https://veilub.mooo.com/api/ai";
 
   if (document.getElementById("vai-root")) {
@@ -547,15 +562,27 @@
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
   function renderMd(text) {
-    return escHtml(text)
-      .replace(/```[\s\S]*?```/g, m => {
-        const code = m.slice(3, m.lastIndexOf("```")).replace(/^[^\n]*\n?/, "");
-        return `<pre><code>${code}</code></pre>`;
-      })
+    const mathBlocks = [];
+    function stash(src) {
+      src = src.replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]/g, (_, a, b) => {
+        const expr = (a || b).trim();
+        try { mathBlocks.push(typeof katex !== "undefined" ? katex.renderToString(expr, { displayMode: true, throwOnError: false }) : "$$" + expr + "$$"); } catch { mathBlocks.push("$$" + expr + "$$"); }
+        return "\x00M" + (mathBlocks.length-1) + "\x00";
+      });
+      src = src.replace(/\$([^\$\n]+?)\$|\\\((.+?)\\\)/g, (_, a, b) => {
+        const expr = (a || b).trim();
+        try { mathBlocks.push(typeof katex !== "undefined" ? katex.renderToString(expr, { displayMode: false, throwOnError: false }) : "$" + expr + "$"); } catch { mathBlocks.push("$" + expr + "$"); }
+        return "\x00M" + (mathBlocks.length-1) + "\x00";
+      });
+      return src;
+    }
+    const restore = s => s.replace(/\x00M(\d+)\x00/g, (_, i) => mathBlocks[+i]);
+    return restore(escHtml(stash(text))
+      .replace(/```[\w]*\n?([\s\S]*?)```/g, (_, c) => "<pre><code>" + c.trim() + "</code></pre>")
       .replace(/`([^`]+)`/g, "<code>$1</code>")
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      .replace(/\n/g, "<br>");
+      .replace(/\n/g, "<br>"));
   }
 
   // Auto-open on first inject

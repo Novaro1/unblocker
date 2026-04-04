@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI — Veil</title>
   <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -719,29 +721,52 @@
 
   // Basic markdown renderer
   function renderMarkdown(text) {
-    return escHtml(text)
-      // code blocks
+    // Extract math before escaping so $ signs aren't touched
+    const mathBlocks = [];
+    function stashMath(src) {
+      // display math: $$...$$ or \[...\]
+      src = src.replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]/g, (_, a, b) => {
+        const expr = (a || b).trim();
+        try {
+          const html = typeof katex !== "undefined"
+            ? katex.renderToString(expr, { displayMode: true, throwOnError: false })
+            : `<span class="math-fallback">$$${expr}$$</span>`;
+          mathBlocks.push(html);
+        } catch { mathBlocks.push(`<span class="math-fallback">$$${expr}$$</span>`); }
+        return `\x00MATH${mathBlocks.length - 1}\x00`;
+      });
+      // inline math: $...$ or \(...\)
+      src = src.replace(/\$([^\$\n]+?)\$|\\\((.+?)\\\)/g, (_, a, b) => {
+        const expr = (a || b).trim();
+        try {
+          const html = typeof katex !== "undefined"
+            ? katex.renderToString(expr, { displayMode: false, throwOnError: false })
+            : `<span class="math-fallback">$${expr}$</span>`;
+          mathBlocks.push(html);
+        } catch { mathBlocks.push(`<span class="math-fallback">$${expr}$</span>`); }
+        return `\x00MATH${mathBlocks.length - 1}\x00`;
+      });
+      return src;
+    }
+    function restoreMath(s) {
+      return s.replace(/\x00MATH(\d+)\x00/g, (_, i) => mathBlocks[+i]);
+    }
+
+    const stashed = stashMath(text);
+    const escaped = escHtml(stashed)
       .replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) => `<pre><code>${code.trim()}</code></pre>`)
-      // inline code
       .replace(/`([^`]+)`/g, "<code>$1</code>")
-      // bold
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      // italic
       .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      // headers
-      .replace(/^### (.+)$/gm, "<strong>$1</strong>")
-      .replace(/^## (.+)$/gm, "<strong>$1</strong>")
-      .replace(/^# (.+)$/gm, "<strong>$1</strong>")
-      // unordered lists
+      .replace(/^#{1,3} (.+)$/gm, "<strong>$1</strong>")
       .replace(/^[•\-\*] (.+)$/gm, "<li>$1</li>")
       .replace(/(<li>.*<\/li>\n?)+/g, s => `<ul>${s}</ul>`)
-      // ordered lists
       .replace(/^\d+\. (.+)$/gm, "<li>$1</li>")
-      // line breaks → paragraphs
       .split(/\n{2,}/).map(p => {
         if (p.startsWith("<ul>") || p.startsWith("<pre>")) return p;
         return `<p>${p.replace(/\n/g, "<br>")}</p>`;
       }).join("");
+    return restoreMath(escaped);
   }
 
   function escHtml(s) {
