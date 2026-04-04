@@ -2397,6 +2397,7 @@ body.perf-mode .ql-tile:hover {
 }
 body.panic-active .panic-dismiss-hint {
   display: block;
+}
 
 /* ── Holiday Themes ────────────────────────────────────────────────────── */
 
@@ -2503,5 +2504,4 @@ html[data-theme="thanksgiving"] {
   --aurora-3:       #92400e;
   --aurora-4:       #78350f;
   --muted:          #7c5a2a;
-}
 }
