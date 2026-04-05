@@ -121,6 +121,7 @@
     { name: "Breakout",              emoji: "🧱", hue: 30,  url: "/games/breakout.html" },
     { name: "Minesweeper",           emoji: "💣", hue: 0,   url: "/games/minesweeper.html" },
     { name: "Slither.io",            emoji: "🐍", hue: 100, url: "/games/slither.html" },
+    { name: "Five Nights at Epstein's", emoji: "🌙", hue: 10, url: "/games/Five%20Nights%20at%20Epstein's.html" },
   ];
 
   // ── Navigation ─────────────────────────────────────────────────────────────
