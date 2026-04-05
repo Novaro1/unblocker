@@ -522,6 +522,36 @@ fastify.get("/remote", (_req, reply) => {
   return reply.type("text/html").sendFile("remote.html");
 });
 
+// Sandboxed game wrapper — prevents any game from redirecting the top frame
+fastify.get("/games/play", (req, reply) => {
+  const src = req.query.src || "";
+  // Only allow paths that start with /games/ to prevent open redirect
+  if (!src.startsWith("/games/")) return reply.code(400).send("Invalid game path");
+  const escaped = src.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Game</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000;overflow:hidden}
+iframe{width:100%;height:100%;border:none;display:block}
+</style>
+</head>
+<body>
+<iframe
+  src="${escaped}"
+  sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-orientation-lock allow-modals"
+  allow="autoplay; fullscreen; gamepad"
+  referrerpolicy="no-referrer"
+></iframe>
+</body>
+</html>`;
+  return reply.type("text/html").send(html);
+});
+
 fastify.get("/void", (_req, reply) => reply.type("text/html").sendFile("void.html"));
 
 // Rate limit store for unlock endpoint — 1 attempt per IP per 10 minutes

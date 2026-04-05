@@ -202,7 +202,7 @@
     }
 
     tile.addEventListener("click", () => {
-      if (isLocal)        { navigateLocal(game.url); }
+      if (isLocal)        { navigateLocal("/games/play?src=" + encodeURIComponent(game.url)); }
 
       else                { navigateTo(game.url); }
     });
