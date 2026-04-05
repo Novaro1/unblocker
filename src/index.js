@@ -522,6 +522,19 @@ fastify.get("/remote", (_req, reply) => {
   return reply.type("text/html").sendFile("remote.html");
 });
 
+// Block popups/redirects on all game HTML files at the HTTP header level
+fastify.get("/games/:file", (req, reply) => {
+  const file = req.params.file;
+  if (!file.endsWith(".html")) return reply.callNotFound();
+  reply
+    .header("Content-Security-Policy",
+      "default-src * data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; " +
+      "navigate-to 'none'; form-action 'none'")
+    .header("X-Frame-Options", "SAMEORIGIN")
+    .type("text/html")
+    .sendFile("games/" + file);
+});
+
 // Sandboxed game wrapper — prevents any game from redirecting the top frame
 fastify.get("/games/play", (req, reply) => {
   const src = req.query.src || "";
