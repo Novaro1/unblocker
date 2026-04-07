@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "FreeDNS Account Helper",
+  "version": "1.0",
+  "description": "Auto-fills FreeDNS signup forms and exports credentials for Veil.",
+  "permissions": ["storage", "scripting", "activeTab", "clipboardWrite"],
+  "host_permissions": ["https://freedns.afraid.org/*", "https://api.mail.gw/*", "https://api.guerrillamail.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": { "32": "icon.png" }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://freedns.afraid.org/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
