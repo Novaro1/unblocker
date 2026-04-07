@@ -490,12 +490,24 @@ remoteWss.on("connection", (ws) => {
       ws.send(JSON.stringify({ type: "joined" }));
       room.host.send(JSON.stringify({ type: "viewer_joined" }));
 
-    } else if ((msg.type === "input" || msg.type === "settings") && role === "viewer" && roomCode) {
-      // Forward input/settings from viewer to host
-      const room = remoteRooms.get(roomCode);
-      if (room?.host?.readyState === 1) {
-        room.host.send(JSON.stringify(msg));
+    } else if (msg.type === "settings" && role === "viewer" && roomCode) {
+      // Cap settings to safe limits before forwarding to host
+      const MAX_RES = 1280;
+      const MAX_FPS = 20;
+      const MAX_QUALITY = 70;
+      if (msg.resolution && msg.resolution !== "native") {
+        msg.resolution = Math.min(parseInt(msg.resolution) || MAX_RES, MAX_RES);
+      } else if (msg.resolution === "native") {
+        msg.resolution = MAX_RES;
       }
+      if (msg.fps)     msg.fps     = Math.min(parseInt(msg.fps)     || MAX_FPS,     MAX_FPS);
+      if (msg.quality) msg.quality = Math.min(parseInt(msg.quality) || MAX_QUALITY, MAX_QUALITY);
+      const room = remoteRooms.get(roomCode);
+      if (room?.host?.readyState === 1) room.host.send(JSON.stringify(msg));
+
+    } else if (msg.type === "input" && role === "viewer" && roomCode) {
+      const room = remoteRooms.get(roomCode);
+      if (room?.host?.readyState === 1) room.host.send(JSON.stringify(msg));
     }
   });
 
