@@ -158,7 +158,7 @@ const {
   MOD_LOG_CHANNEL_ID,
   TICKETS_CHANNEL_ID,
   STAFF_ROLE_ID,
-  SERVER_URL = "https://veilub.mooo.com",
+  SERVER_URL = "https://secure.brightpathlearning.website",
 } = process.env;
 
 // Public commands that must be used in #bot-commands
@@ -1114,7 +1114,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       link:
         "**Make Your Own Veil Link**\n" +
         "The easiest way is to use the **FreeDNS Helper** browser extension — it auto-fills everything for you.\n\n" +
-        "**Get the extension:** https://veilub.mooo.com/extension\n\n" +
+        "**Get the extension:** https://secure.brightpathlearning.website/extension\n\n" +
         "Or manually:\n" +
         "1. Go to [freedns.afraid.org](https://freedns.afraid.org) → create a free account\n" +
         "2. Click **Subdomains** → **Add**\n" +
@@ -1371,7 +1371,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setDescription(
         `Thanks for advertising Veil! Here is your exclusive ambassador token.\n\n` +
         `**Token:** \`${token}\`\n\n` +
-        `Go to **veilub.mooo.com → Settings → Ambassador** and enter your token to unlock exclusive features.`
+        `Go to **secure.brightpathlearning.website → Settings → Ambassador** and enter your token to unlock exclusive features.`
       )
       .setFooter({ text: "Keep this token private — it's linked to your account." });
 
@@ -1463,7 +1463,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setDescription(
           `${sign}${pts} points${reason ? ` — *${reason}*` : ""}.\n` +
           `Your new total: **${entry.points} pts**\n\n` +
-          `Check the leaderboard at **Settings → Ambassador** on veilub.mooo.com.`
+          `Check the leaderboard at **Settings → Ambassador** on secure.brightpathlearning.website.`
         );
       await target.send({ embeds: [dmEmbed] });
     } catch { /* DMs closed */ }
@@ -1777,7 +1777,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         {
           name: "Download & Install",
           value: [
-            "1. Go to **https://veilub.mooo.com/extension** and click **Download Extension**",
+            "1. Go to **https://secure.brightpathlearning.website/extension** and click **Download Extension**",
             "2. Unzip the downloaded file",
             "3. Open Chrome → `chrome://extensions` → enable **Developer mode**",
             "4. Click **Load unpacked** and select the unzipped folder",

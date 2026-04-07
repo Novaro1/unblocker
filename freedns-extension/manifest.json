@@ -4,7 +4,10 @@
   "version": "1.0",
   "description": "Auto-fills FreeDNS signup forms and exports credentials for Veil.",
   "permissions": ["storage", "scripting", "activeTab", "clipboardWrite"],
-  "host_permissions": ["https://freedns.afraid.org/*", "https://www.1secmail.com/*", "https://api.guerrillamail.com/*"],
+  "host_permissions": ["https://freedns.afraid.org/*", "https://api.mail.gw/*", "https://api.guerrillamail.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": { "32": "icon.png" }

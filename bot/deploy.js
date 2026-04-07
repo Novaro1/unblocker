@@ -18,7 +18,7 @@ const commands = [
       o.setName("url").setDescription("The full link URL (https://...)").setRequired(true)
     )
     .addStringOption((o) =>
-      o.setName("name").setDescription("Display name e.g. veilub.mooo.com").setRequired(false)
+      o.setName("name").setDescription("Display name e.g. secure.brightpathlearning.website").setRequired(false)
     )
     .addStringOption((o) =>
       o.setName("type").setDescription("Link type").setRequired(false)

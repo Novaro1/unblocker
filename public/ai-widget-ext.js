@@ -1,5 +1,5 @@
 // ── Veil AI — bookmarklet widget ─────────────────────────────────────────────
-// Loaded from https://veilub.mooo.com/ai-widget-ext.js
+// Loaded from https://secure.brightpathlearning.website/ai-widget-ext.js
 // Works on any page — uses absolute URLs for API and assets.
 
 (function () {
@@ -18,7 +18,7 @@
     s.src = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js";
     document.head.appendChild(s);
   }
-  const API = "https://veilub.mooo.com/api/ai";
+  const API = "https://secure.brightpathlearning.website/api/ai";
 
   if (document.getElementById("vai-root")) {
     // Already loaded — just toggle

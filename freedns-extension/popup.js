@@ -16,28 +16,51 @@ function generatePassword() {
   return Array.from({ length: 14 }, () => chars[randNum(chars.length)]).join("");
 }
 
-// ── 1secmail API ──────────────────────────────────────────────────────────────
-const ONESEC = "https://www.1secmail.com/api/v1/";
-const ONESEC_DOMAINS = ["1secmail.com", "1secmail.org", "1secmail.net", "esiix.com", "wwjmp.com", "xojxe.com"];
+// ── mail.gw API ───────────────────────────────────────────────────────────────
+const MAILGW = "https://api.mail.gw";
 
-async function onesecNewInbox(username) {
-  const domain = ONESEC_DOMAINS[Math.floor(Math.random() * ONESEC_DOMAINS.length)];
-  const email = `${username.toLowerCase()}@${domain}`;
-  // 1secmail doesn't need account creation — just start using the address
-  return { email, token: JSON.stringify({ login: username.toLowerCase(), domain }) };
+async function mailgwNewInbox(username) {
+  const r = await fetch(`${MAILGW}/domains`);
+  if (!r.ok) throw new Error(`mail.gw domains HTTP ${r.status}`);
+  const data = await r.json();
+  const domains = (data["hydra:member"] || []).map(d => d.domain).filter(Boolean);
+  if (!domains.length) throw new Error("mail.gw: no domains available");
+  const domain  = domains[Math.floor(Math.random() * domains.length)];
+  const address = `${username.toLowerCase()}@${domain}`;
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const password = Array.from({ length: 14 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const cr = await fetch(`${MAILGW}/accounts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address, password }),
+  });
+  if (!cr.ok) throw new Error(`mail.gw create HTTP ${cr.status}`);
+  return { email: address, token: JSON.stringify({ address, password }) };
 }
 
-async function onesecGetMessages(token) {
-  const { login, domain } = JSON.parse(token);
-  const r = await fetch(`${ONESEC}?action=getMessages&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}`);
-  if (!r.ok) throw new Error(`Messages HTTP ${r.status}`);
-  return r.json();
+async function mailgwGetJwt(token) {
+  const { address, password } = JSON.parse(token);
+  const r = await fetch(`${MAILGW}/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address, password }),
+  });
+  if (!r.ok) throw new Error(`mail.gw token HTTP ${r.status}`);
+  const d = await r.json();
+  return d.token;
 }
 
-async function onesecGetMessage(id, token) {
-  const { login, domain } = JSON.parse(token);
-  const r = await fetch(`${ONESEC}?action=readMessage&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}&id=${id}`);
-  if (!r.ok) throw new Error(`Message HTTP ${r.status}`);
+async function mailgwGetMessages(token) {
+  const jwt = await mailgwGetJwt(token);
+  const r = await fetch(`${MAILGW}/messages`, { headers: { "Authorization": `Bearer ${jwt}` } });
+  if (!r.ok) throw new Error(`mail.gw messages HTTP ${r.status}`);
+  const d = await r.json();
+  return { messages: d["hydra:member"] || [], jwt };
+}
+
+async function mailgwGetMessage(id, jwt) {
+  const r = await fetch(`${MAILGW}/messages/${id}`, { headers: { "Authorization": `Bearer ${jwt}` } });
+  if (!r.ok) throw new Error(`mail.gw message HTTP ${r.status}`);
   return r.json();
 }
 
@@ -130,18 +153,18 @@ async function checkInbox() {
 
   setVerifyStatus("waiting", "Checking inbox…");
   try {
-    const msgs = await onesecGetMessages(tok);
-    if (!msgs.length) {
+    const { messages, jwt } = await mailgwGetMessages(tok);
+    if (!messages.length) {
       setVerifyStatus("waiting", "No activation email yet. Checks every 6 seconds.");
       return;
     }
 
-    const target = msgs.find(m =>
-      /afraid\.org/i.test(m.from || "") || /activate|confirm|verify/i.test(m.subject || "")
-    ) || msgs[0];
+    const target = messages.find(m =>
+      /afraid\.org/i.test(m.from?.address || "") || /activate|confirm|verify/i.test(m.subject || "")
+    ) || messages[0];
 
-    const full = await onesecGetMessage(target.id, tok);
-    const body = full.htmlBody || full.textBody || full.body || "";
+    const full = await mailgwGetMessage(target.id, jwt);
+    const body = (full.html || []).join("") || full.intro || full.text || "";
     const url  = extractActivationUrl(body);
 
     if (url) {
@@ -186,7 +209,7 @@ async function generate() {
   let email = "", sid_token = "";
   let token = "";
   try {
-    ({ email, token } = await onesecNewInbox(u));
+    ({ email, token } = await mailgwNewInbox(u));
   } catch (e) {
     emailEl.placeholder = `Error: ${e.message}`;
     emailEl.style.borderColor = "#ef4444";

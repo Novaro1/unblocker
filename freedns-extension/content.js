@@ -37,30 +37,45 @@ function generatePassword() {
   return Array.from({ length: 14 }, () => chars[randNum(chars.length)]).join("");
 }
 
-// ── Email services ────────────────────────────────────────────────────────────
-// Tries 1secmail first (realistic domains), then Guerrilla Mail as fallback.
+// ── Background fetch proxy ───────────────────────────────────────────────────
+// Content scripts in MV3 can't make cross-origin requests even with host_permissions.
+// Route all API calls through the background service worker.
+function bgFetch(url, { method = "GET", body, headers } = {}) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ type: "fetch-proxy", url, method, body, headers }, (res) => {
+      if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+      if (!res?.ok) return reject(new Error(res?.error || "Background fetch failed"));
+      resolve(res.data);
+    });
+  });
+}
 
-const ONESEC = "https://www.1secmail.com/api/v1/";
-// 1secmail uses real-looking domains that aren't on most disposable blocklists
-const ONESEC_DOMAINS = ["1secmail.com", "1secmail.org", "1secmail.net", "esiix.com", "wwjmp.com", "xojxe.com"];
-const GM     = "https://api.guerrillamail.com/ajax.php";
+// ── Email services ────────────────────────────────────────────────────────────
+// Tries mail.gw first (real-looking domains), then Guerrilla Mail as fallback.
+
+const MAILGW  = "https://api.mail.gw";
+const GM      = "https://api.guerrillamail.com/ajax.php";
 const GM_DOMAINS = ["grr.la", "guerrillamail.de", "guerrillamail.net"];
 
-async function onesecNewInbox(username) {
-  const domain = rand(ONESEC_DOMAINS);
-  const email = `${username.toLowerCase()}@${domain}`;
-  // 1secmail doesn't need account creation — just start using the address
-  return { email, token: JSON.stringify({ login: username.toLowerCase(), domain }), service: "1secmail" };
+async function mailgwNewInbox(username) {
+  const domainsData = await bgFetch(`${MAILGW}/domains`);
+  const domains = (domainsData["hydra:member"] || []).map(d => d.domain).filter(Boolean);
+  if (!domains.length) throw new Error("mail.gw: no domains available");
+  const domain  = rand(domains);
+  const address = `${username.toLowerCase()}@${domain}`;
+  const password = Array.from({ length: 14 }, () => "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 62)]).join("");
+  await bgFetch(`${MAILGW}/accounts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address, password }),
+  });
+  return { email: address, token: JSON.stringify({ address, password }), service: "mailgw" };
 }
 
 async function gmNewInbox(username) {
   for (const domain of GM_DOMAINS) {
     try {
-      const r = await fetch(`${GM}?f=set_email_user&email_user=${encodeURIComponent(username)}&email_domain=${domain}&lang=en&sid_token=`, {
-        credentials: "omit",
-      });
-      if (!r.ok) continue;
-      const d = await r.json();
+      const d = await bgFetch(`${GM}?f=set_email_user&email_user=${encodeURIComponent(username)}&email_domain=${domain}&lang=en&sid_token=`);
       if (d.email_addr) return { email: d.email_addr, token: d.sid_token || "", service: "guerrillamail" };
     } catch {}
   }
@@ -68,8 +83,8 @@ async function gmNewInbox(username) {
 }
 
 async function getNewInbox(username) {
-  try { return await onesecNewInbox(username); } catch (e) {
-    console.warn("[FreeDNS Helper] 1secmail failed, trying Guerrilla Mail:", e.message);
+  try { return await mailgwNewInbox(username); } catch (e) {
+    console.warn("[FreeDNS Helper] mail.gw failed, trying Guerrilla Mail:", e.message);
   }
   try { return await gmNewInbox(username); } catch (e) {
     console.warn("[FreeDNS Helper] Guerrilla Mail failed:", e.message);
@@ -79,24 +94,29 @@ async function getNewInbox(username) {
 
 // Poll for activation email
 async function checkForActivationEmail(service, token) {
-  if (service === "1secmail") {
-    const { login, domain } = JSON.parse(token);
-    const r = await fetch(`${ONESEC}?action=getMessages&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}`);
-    if (!r.ok) throw new Error(`1secmail messages HTTP ${r.status}`);
-    const msgs = await r.json();
+  if (service === "mailgw") {
+    const { address, password } = JSON.parse(token);
+    const { token: jwt } = await bgFetch(`${MAILGW}/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address, password }),
+    });
+    const data = await bgFetch(`${MAILGW}/messages`, {
+      headers: { "Authorization": `Bearer ${jwt}` },
+    });
+    const msgs = data["hydra:member"] || [];
     for (const m of msgs) {
-      const full = await fetch(`${ONESEC}?action=readMessage&login=${encodeURIComponent(login)}&domain=${encodeURIComponent(domain)}&id=${m.id}`);
-      const msg = await full.json();
-      const url = extractActivationUrl(msg.htmlBody || msg.textBody || msg.body || "");
+      const msg = await bgFetch(`${MAILGW}/messages/${m.id}`, {
+        headers: { "Authorization": `Bearer ${jwt}` },
+      });
+      const url = extractActivationUrl(msg.html?.join("") || msg.intro || msg.text || "");
       if (url) return url;
     }
   } else if (service === "guerrillamail") {
-    const r = await fetch(`${GM}?f=check_email&seq=0&sid_token=${encodeURIComponent(token)}`, { credentials: "omit" });
-    if (!r.ok) throw new Error(`GM check HTTP ${r.status}`);
-    const d = await r.json();
+    const d = await bgFetch(`${GM}?f=check_email&seq=0&sid_token=${encodeURIComponent(token)}`);
     const list = d.list || [];
     for (const m of list) {
-      const full = await fetch(`${GM}?f=fetch_email&email_id=${m.mail_id}&sid_token=${encodeURIComponent(token)}`, { credentials: "omit" }).then(r => r.json());
+      const full = await bgFetch(`${GM}?f=fetch_email&email_id=${m.mail_id}&sid_token=${encodeURIComponent(token)}`);
       const url = extractActivationUrl(full.mail_body || full.mail_excerpt || "");
       if (url) return url;
     }

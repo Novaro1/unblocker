@@ -631,7 +631,7 @@ fastify.post("/api/ai", async (req, reply) => {
   // If no API key, proxy to main server
   if (!GROQ_API_KEY) {
     try {
-      const upstream = await fetch("https://veilub.mooo.com/api/ai", {
+      const upstream = await fetch("https://secure.brightpathlearning.website/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(req.body),
