@@ -3,10 +3,10 @@
 Veil Remote Desktop – Host Agent
 Run this on the computer you want to share.
 Usage:  python agent.py [server_url]
-   eg:  python agent.py wss://veilub.mooo.com
+   eg:  python agent.py wss://secure.brightpathlearning.website
 """
 
-import sys, json, time, struct, threading, io, base64, ssl
+import sys, json, time, threading, io, ssl, hashlib
 try:
     import websocket
 except ImportError:
@@ -48,14 +48,16 @@ except Exception:
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0
 
-SERVER = sys.argv[1] if len(sys.argv) > 1 else "wss://veilub.mooo.com"
+SERVER = sys.argv[1] if len(sys.argv) > 1 else "wss://secure.brightpathlearning.website"
 QUALITY = 40       # JPEG quality (lower = faster)
-MAX_DIM = 1280     # max width for captured frames
+MAX_DIM = 1280     # max width for captured frames (0 = native, server caps to 1920)
 FPS = 15           # target frames per second
 
 room_code = None
 ws_conn = None
 running = True
+viewer_count = 0
+capture_started = False
 screen_w = 0
 screen_h = 0
 img_w = 0    # width of the JPEG frames we send (after scaling)
@@ -65,20 +67,41 @@ AUDIO_SAMPLE_RATE = 48000
 AUDIO_CHANNELS = 2
 AUDIO_CHUNK = 4800  # 100ms chunks at 48kHz
 
+# Frame dedup: skip frame if screen hasn't changed
+_last_frame_hash = None
+
+
+def quick_hash(raw_bytes):
+    """Sample every 200th byte for a fast 'did screen change' check."""
+    return hashlib.md5(raw_bytes[::200]).digest()
+
 
 def capture_loop():
     """Continuously capture screen and send JPEG frames."""
-    global screen_w, screen_h, img_w, img_h
+    global screen_w, screen_h, img_w, img_h, _last_frame_hash
     with mss.mss() as sct:
         monitor = sct.monitors[1]  # primary monitor
         screen_w = monitor["width"]
         screen_h = monitor["height"]
-        while running and ws_conn:
+        while running and ws_conn and viewer_count > 0:
             interval = 1.0 / FPS  # re-read each frame so settings changes apply
             t0 = time.time()
             try:
                 shot = sct.grab(monitor)
+                raw = bytes(shot.raw)
+
+                # Skip frame if screen hasn't changed
+                h = quick_hash(raw)
+                if h == _last_frame_hash:
+                    elapsed = time.time() - t0
+                    sleep_time = interval - elapsed
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
+                    continue
+                _last_frame_hash = h
+
                 img = Image.frombytes("RGB", (shot.width, shot.height), shot.rgb)
+
                 # Draw cursor onto the frame
                 try:
                     mx, my = pyautogui.position()
@@ -99,15 +122,20 @@ def capture_loop():
                     draw.polygon(cursor_poly, fill="white", outline="black")
                 except Exception:
                     pass
+
                 # Scale down if MAX_DIM is set (0 = native, no scaling)
                 if MAX_DIM > 0 and img.width > MAX_DIM:
                     ratio = MAX_DIM / img.width
-                    img = img.resize((MAX_DIM, int(img.height * ratio)), Image.LANCZOS)
+                    # BILINEAR is 3-5x faster than LANCZOS with minimal quality loss at speed
+                    img = img.resize((MAX_DIM, int(img.height * ratio)), Image.BILINEAR)
+
                 img_w = img.width
                 img_h = img.height
                 buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=QUALITY, optimize=True)
+                # subsampling=1 = 4:2:0 chroma — ~20% smaller files vs default
+                img.save(buf, format="JPEG", quality=QUALITY, subsampling=1, optimize=False)
                 frame_data = buf.getvalue()
+
                 # Send as binary: 1-byte type (0x01 = frame) + jpeg data
                 if ws_conn:
                     ws_conn.send(b'\x01' + frame_data, opcode=websocket.ABNF.OPCODE_BINARY)
@@ -142,10 +170,9 @@ def audio_capture_loop():
     global running
     try:
         def audio_callback(indata, frames, time_info, status):
-            if not running or not ws_conn:
+            if not running or not ws_conn or viewer_count == 0:
                 return
             try:
-                # Convert float32 to int16 PCM
                 pcm16 = (indata * 32767).astype(np.int16)
                 raw = pcm16.tobytes()
                 ws_conn.send(b'\x02' + raw, opcode=websocket.ABNF.OPCODE_BINARY)
@@ -169,8 +196,6 @@ def audio_capture_loop():
 
 def scale_coords(data):
     """Scale from image coordinates (sent by viewer) to actual screen coordinates."""
-    # The viewer sends coords in the image's pixel space (max MAX_DIM wide).
-    # We need to map to actual screen resolution.
     if screen_w and img_w:
         sx = screen_w / img_w
         sy = screen_h / img_h
@@ -204,10 +229,8 @@ def handle_input(msg):
             shift = data.get("shift", False)
             alt = data.get("alt", False)
             meta = data.get("meta", False)
-            # Skip modifier-only keys — they're tracked as modifiers on combos
             if key in ("ctrl", "shift", "alt", "command"):
                 return
-            # Build hotkey combo if modifiers are held
             mods = []
             if ctrl:  mods.append("ctrl")
             if shift:  mods.append("shift")
@@ -224,7 +247,7 @@ def handle_input(msg):
                 pyautogui.press(key, _pause=False)
 
         elif t == "keyup":
-            pass  # handled by keydown
+            pass
 
         elif t == "scroll":
             x, y = scale_coords(data)
@@ -239,21 +262,22 @@ def handle_input(msg):
 
 def handle_settings(data):
     """Update stream settings from the viewer."""
-    global QUALITY, MAX_DIM, FPS
+    global QUALITY, MAX_DIM, FPS, _last_frame_hash
     if "quality" in data:
         QUALITY = max(10, min(95, int(data["quality"])))
     if "maxDim" in data:
         MAX_DIM = int(data["maxDim"])  # 0 means native (no scaling)
     if "fps" in data:
         FPS = max(1, min(60, int(data["fps"])))
+    _last_frame_hash = None  # force next frame to send after settings change
     print(f"  [settings] quality={QUALITY} resolution={MAX_DIM or 'native'} fps={FPS}")
 
 
 def on_message(ws, message):
+    global room_code, viewer_count, capture_started
     if isinstance(message, str):
         data = json.loads(message)
         if data.get("type") == "room_created":
-            global room_code
             room_code = data["code"]
             print(f"\n{'='*50}")
             print(f"  ROOM CODE:  {room_code}")
@@ -262,14 +286,18 @@ def on_message(ws, message):
             print(f"  They open: {SERVER.replace('wss://','https://').replace('ws://','http://')}/remote")
             print(f"{'='*50}\n")
         elif data.get("type") == "viewer_joined":
-            print(">> Viewer connected! Streaming screen...")
-            t = threading.Thread(target=capture_loop, daemon=True)
-            t.start()
-            if audio_device is not None:
-                at = threading.Thread(target=audio_capture_loop, daemon=True)
-                at.start()
+            viewer_count = data.get("viewerCount", viewer_count + 1)
+            print(f">> Viewer connected! ({viewer_count} watching) Streaming screen...")
+            if not capture_started:
+                capture_started = True
+                t = threading.Thread(target=capture_loop, daemon=True)
+                t.start()
+                if audio_device is not None:
+                    at = threading.Thread(target=audio_capture_loop, daemon=True)
+                    at.start()
         elif data.get("type") == "viewer_left":
-            print(">> Viewer disconnected.")
+            viewer_count = data.get("viewerCount", max(0, viewer_count - 1))
+            print(f">> Viewer disconnected. ({viewer_count} watching)")
         elif data.get("type") == "settings":
             handle_settings(data)
         elif data.get("type") == "input":
@@ -291,7 +319,6 @@ def on_close(ws, close_status_code, close_msg):
 def on_open(ws):
     global ws_conn
     ws_conn = ws
-    # Register as host and request a room
     ws.send(json.dumps({"type": "host_create"}))
     print("Connected to server. Creating room...")
 
@@ -302,8 +329,6 @@ def check_permissions():
     if platform.system() != "Darwin":
         return
     try:
-        import subprocess
-        # Try a tiny mouse move to trigger the permission prompt
         pyautogui.moveTo(pyautogui.position()[0], pyautogui.position()[1], _pause=False)
         print("[ok] Input control available.")
     except Exception as e:
@@ -326,7 +351,6 @@ def main():
         on_error=on_error,
         on_close=on_close,
     )
-    # Use default SSL context; fall back to unverified if certs aren't installed (common on macOS)
     try:
         import certifi
         sslopt = {"ca_certs": certifi.where()}

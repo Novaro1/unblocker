@@ -429,7 +429,8 @@ fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply
 
 // ── Remote Desktop ────────────────────────────────────────────────────────────
 const remoteWss = new WebSocketServer({ noServer: true });
-const remoteRooms = new Map(); // code -> { host, viewer, createdAt }
+const remoteRooms = new Map(); // code -> { host, viewers: Set, createdAt }
+const MAX_VIEWERS_PER_ROOM = 20;
 
 // Clean up stale rooms every 10 minutes
 setInterval(() => {
@@ -437,7 +438,7 @@ setInterval(() => {
   for (const [code, room] of remoteRooms) {
     if (now - room.createdAt > 3600000) { // 1 hour
       try { room.host?.close(); } catch {}
-      try { room.viewer?.close(); } catch {}
+      for (const v of room.viewers) try { v.close(); } catch {}
       remoteRooms.delete(code);
     }
   }
@@ -456,11 +457,15 @@ remoteWss.on("connection", (ws) => {
   let roomCode = null;
 
   ws.on("message", (data, isBinary) => {
-    // Binary messages from host: forward frame to viewer
+    // Binary messages from host: broadcast frame to all viewers with backpressure
     if (isBinary && role === "host" && roomCode) {
       const room = remoteRooms.get(roomCode);
-      if (room?.viewer?.readyState === 1) {
-        room.viewer.send(data, { binary: true });
+      if (!room) return;
+      for (const viewer of room.viewers) {
+        if (viewer.readyState !== 1) continue;
+        // Skip viewer if their send buffer is backing up (>2 frames worth, ~600KB)
+        if (viewer.bufferedAmount > 600000) continue;
+        viewer.send(data, { binary: true });
       }
       return;
     }
@@ -470,35 +475,37 @@ remoteWss.on("connection", (ws) => {
     try { msg = JSON.parse(data.toString()); } catch { return; }
 
     if (msg.type === "host_create") {
-      // Host wants to create a room
       let code;
       do { code = genRoomCode(); } while (remoteRooms.has(code));
       roomCode = code;
       role = "host";
-      remoteRooms.set(code, { host: ws, viewer: null, createdAt: Date.now() });
+      remoteRooms.set(code, { host: ws, viewers: new Set(), createdAt: Date.now() });
       ws.send(JSON.stringify({ type: "room_created", code }));
 
     } else if (msg.type === "viewer_join") {
-      // Viewer wants to join a room
       const code = String(msg.code || "").toUpperCase();
       const room = remoteRooms.get(code);
       if (!room) return ws.send(JSON.stringify({ type: "error", message: "Room not found. Check the code and try again." }));
-      if (room.viewer) return ws.send(JSON.stringify({ type: "error", message: "Room already has a viewer." }));
+      if (room.viewers.size >= MAX_VIEWERS_PER_ROOM) return ws.send(JSON.stringify({ type: "error", message: "Room is full." }));
       roomCode = code;
       role = "viewer";
-      room.viewer = ws;
-      ws.send(JSON.stringify({ type: "joined" }));
-      room.host.send(JSON.stringify({ type: "viewer_joined" }));
+      room.viewers.add(ws);
+      ws.send(JSON.stringify({ type: "joined", viewerCount: room.viewers.size }));
+      room.host.send(JSON.stringify({ type: "viewer_joined", viewerCount: room.viewers.size }));
+      // Notify other viewers of new count
+      for (const v of room.viewers) {
+        if (v !== ws && v.readyState === 1) v.send(JSON.stringify({ type: "viewer_count", count: room.viewers.size }));
+      }
 
     } else if (msg.type === "settings" && role === "viewer" && roomCode) {
-      // Cap settings to safe limits before forwarding to host
-      const MAX_RES = 1280;
-      const MAX_FPS = 20;
-      const MAX_QUALITY = 70;
-      if (msg.resolution && msg.resolution !== "native") {
-        msg.resolution = Math.min(parseInt(msg.resolution) || MAX_RES, MAX_RES);
-      } else if (msg.resolution === "native") {
-        msg.resolution = MAX_RES;
+      // Cap settings to prevent OOM — max 1920p, 30fps, quality 85
+      const MAX_DIM = 1920;
+      const MAX_FPS = 30;
+      const MAX_QUALITY = 85;
+      if (msg.maxDim !== undefined) {
+        const dim = parseInt(msg.maxDim) || 0;
+        // 0 means native — cap to MAX_DIM to prevent giant frames
+        msg.maxDim = dim === 0 ? MAX_DIM : Math.min(dim, MAX_DIM);
       }
       if (msg.fps)     msg.fps     = Math.min(parseInt(msg.fps)     || MAX_FPS,     MAX_FPS);
       if (msg.quality) msg.quality = Math.min(parseInt(msg.quality) || MAX_QUALITY, MAX_QUALITY);
@@ -517,14 +524,18 @@ remoteWss.on("connection", (ws) => {
     if (!room) return;
 
     if (role === "host") {
-      if (room.viewer?.readyState === 1) {
-        room.viewer.send(JSON.stringify({ type: "host_left" }));
+      for (const v of room.viewers) {
+        if (v.readyState === 1) v.send(JSON.stringify({ type: "host_left" }));
       }
       remoteRooms.delete(roomCode);
     } else if (role === "viewer") {
-      room.viewer = null;
+      room.viewers.delete(ws);
+      const count = room.viewers.size;
       if (room.host?.readyState === 1) {
-        room.host.send(JSON.stringify({ type: "viewer_left" }));
+        room.host.send(JSON.stringify({ type: "viewer_left", viewerCount: count }));
+      }
+      for (const v of room.viewers) {
+        if (v.readyState === 1) v.send(JSON.stringify({ type: "viewer_count", count }));
       }
     }
   });

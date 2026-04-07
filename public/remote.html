@@ -73,6 +73,7 @@
     }
     .toolbar button:hover { background: rgba(248,113,113,0.3); }
     .fps-counter { color: var(--muted); font-size: 11px; font-family: monospace; }
+    .viewer-count { color: var(--muted); font-size: 11px; }
     .fullscreen-btn {
       background: rgba(99,102,241,0.15) !important; color: var(--accent-lighter) !important;
       border: 1px solid rgba(99,102,241,0.3) !important;
@@ -202,6 +203,7 @@
   <div class="toolbar">
     <span>Room: <span class="room-code" id="toolbarCode"></span></span>
     <span class="fps-counter" id="fpsCounter">-- fps</span>
+    <span class="viewer-count" id="viewerCount"></span>
     <button class="settings-btn" id="settingsBtn">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Settings
@@ -226,10 +228,10 @@
     <div class="setting-row">
       <label>Resolution</label>
       <select id="setResolution">
+        <option value="720">720p (fastest)</option>
         <option value="960">960p (fast)</option>
         <option value="1280" selected>1280p</option>
         <option value="1920">1920p (Full HD)</option>
-        <option value="0">Native (no scaling)</option>
       </select>
     </div>
     <div class="setting-row">
@@ -262,6 +264,7 @@ let imgW = 0, imgH = 0;  // actual image dimensions from host
 let frameCount = 0;
 let lastFpsTime = Date.now();
 let frameRendering = false; // backpressure: skip frames if still rendering
+const viewerCountEl = $("viewerCount");
 
 // ── Audio playback ───────────────────────
 let audioCtx = null;
@@ -301,7 +304,10 @@ function connect() {
         joinScreen.style.display = "none";
         remoteScreen.style.display = "block";
         toolbarCode.textContent = code;
+        if (msg.viewerCount > 1) viewerCountEl.textContent = `${msg.viewerCount} watching`;
         canvas.focus();
+      } else if (msg.type === "viewer_count") {
+        viewerCountEl.textContent = msg.count > 1 ? `${msg.count} watching` : "";
       } else if (msg.type === "host_left") {
         setStatus("Host disconnected.", true);
         showJoin();
@@ -317,17 +323,16 @@ function connect() {
         if (frameRendering) return;
         frameRendering = true;
         const blob = new Blob([buf.slice(1)], { type: "image/jpeg" });
-        const url = URL.createObjectURL(blob);
-        const img = new Image();
-        img.onload = () => {
-          if (canvas.width !== img.width || canvas.height !== img.height) {
-            canvas.width = img.width;
-            canvas.height = img.height;
-            imgW = img.width;
-            imgH = img.height;
+        // createImageBitmap decodes off the main thread — much faster than new Image()
+        createImageBitmap(blob).then(bitmap => {
+          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            imgW = bitmap.width;
+            imgH = bitmap.height;
           }
-          ctx.drawImage(img, 0, 0);
-          URL.revokeObjectURL(url);
+          ctx.drawImage(bitmap, 0, 0);
+          bitmap.close();
           frameRendering = false;
           frameCount++;
           const now = Date.now();
@@ -336,9 +341,7 @@ function connect() {
             frameCount = 0;
             lastFpsTime = now;
           }
-        };
-        img.onerror = () => { URL.revokeObjectURL(url); frameRendering = false; };
-        img.src = url;
+        }).catch(() => { frameRendering = false; });
       } else if (type === 0x02) {
         // Audio chunk: 16-bit PCM stereo @ 48kHz
         if (!audioCtx) {
