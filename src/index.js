@@ -429,16 +429,17 @@ fastify.post("/github-webhook", { config: { rawBody: true } }, async (req, reply
 
 // ── Remote Desktop ────────────────────────────────────────────────────────────
 const remoteWss = new WebSocketServer({ noServer: true });
-const remoteRooms = new Map(); // code -> { host, viewers: Set, createdAt }
+// code -> { host: ws, viewers: Map<viewerId, ws>, mode: "webrtc"|"jpeg", createdAt }
+const remoteRooms = new Map();
 const MAX_VIEWERS_PER_ROOM = 20;
 
 // Clean up stale rooms every 10 minutes
 setInterval(() => {
   const now = Date.now();
   for (const [code, room] of remoteRooms) {
-    if (now - room.createdAt > 3600000) { // 1 hour
+    if (now - room.createdAt > 3600000) {
       try { room.host?.close(); } catch {}
-      for (const v of room.viewers) try { v.close(); } catch {}
+      for (const v of room.viewers.values()) try { v.close(); } catch {}
       remoteRooms.delete(code);
     }
   }
@@ -455,22 +456,21 @@ function genRoomCode() {
 remoteWss.on("connection", (ws) => {
   let role = null;   // "host" | "viewer"
   let roomCode = null;
+  let viewerId = null;
 
   ws.on("message", (data, isBinary) => {
-    // Binary messages from host: broadcast frame to all viewers with backpressure
+    // Binary: legacy JPEG relay (used when agent can't run WebRTC)
     if (isBinary && role === "host" && roomCode) {
       const room = remoteRooms.get(roomCode);
       if (!room) return;
-      for (const viewer of room.viewers) {
+      for (const viewer of room.viewers.values()) {
         if (viewer.readyState !== 1) continue;
-        // Skip viewer if their send buffer is backing up (>2 frames worth, ~600KB)
-        if (viewer.bufferedAmount > 600000) continue;
+        if (viewer.bufferedAmount > 600000) continue; // backpressure
         viewer.send(data, { binary: true });
       }
       return;
     }
 
-    // Text messages
     let msg;
     try { msg = JSON.parse(data.toString()); } catch { return; }
 
@@ -479,7 +479,8 @@ remoteWss.on("connection", (ws) => {
       do { code = genRoomCode(); } while (remoteRooms.has(code));
       roomCode = code;
       role = "host";
-      remoteRooms.set(code, { host: ws, viewers: new Set(), createdAt: Date.now() });
+      const mode = msg.mode === "webrtc" ? "webrtc" : "jpeg";
+      remoteRooms.set(code, { host: ws, viewers: new Map(), mode, createdAt: Date.now() });
       ws.send(JSON.stringify({ type: "room_created", code }));
 
     } else if (msg.type === "viewer_join") {
@@ -489,22 +490,44 @@ remoteWss.on("connection", (ws) => {
       if (room.viewers.size >= MAX_VIEWERS_PER_ROOM) return ws.send(JSON.stringify({ type: "error", message: "Room is full." }));
       roomCode = code;
       role = "viewer";
-      room.viewers.add(ws);
-      ws.send(JSON.stringify({ type: "joined", viewerCount: room.viewers.size }));
-      room.host.send(JSON.stringify({ type: "viewer_joined", viewerCount: room.viewers.size }));
-      // Notify other viewers of new count
-      for (const v of room.viewers) {
-        if (v !== ws && v.readyState === 1) v.send(JSON.stringify({ type: "viewer_count", count: room.viewers.size }));
+      viewerId = randomBytes(8).toString("hex");
+      room.viewers.set(viewerId, ws);
+      const count = room.viewers.size;
+      ws.send(JSON.stringify({ type: "joined", viewerId, viewerCount: count, mode: room.mode }));
+      if (room.host?.readyState === 1) {
+        room.host.send(JSON.stringify({ type: "viewer_joined", viewerId, viewerCount: count }));
+      }
+      for (const [vid, v] of room.viewers) {
+        if (vid !== viewerId && v.readyState === 1) v.send(JSON.stringify({ type: "viewer_count", count }));
       }
 
+    // ── WebRTC signaling relay ─────────────────────────────────────────────
+    } else if (msg.type === "offer" && role === "host" && roomCode) {
+      // Host sends WebRTC offer to a specific viewer
+      const room = remoteRooms.get(roomCode);
+      const vws = room?.viewers.get(msg.viewerId);
+      if (vws?.readyState === 1) vws.send(JSON.stringify(msg));
+
+    } else if (msg.type === "answer" && role === "viewer" && roomCode) {
+      // Viewer sends WebRTC answer back to host
+      const room = remoteRooms.get(roomCode);
+      if (room?.host?.readyState === 1) room.host.send(JSON.stringify({ ...msg, viewerId }));
+
+    } else if (msg.type === "ice_candidate" && roomCode) {
+      const room = remoteRooms.get(roomCode);
+      if (!room) return;
+      if (role === "host") {
+        const vws = room.viewers.get(msg.viewerId);
+        if (vws?.readyState === 1) vws.send(JSON.stringify(msg));
+      } else if (role === "viewer" && room.host?.readyState === 1) {
+        room.host.send(JSON.stringify({ ...msg, viewerId }));
+      }
+
+    // ── Settings and input (both modes) ───────────────────────────────────
     } else if (msg.type === "settings" && role === "viewer" && roomCode) {
-      // Cap settings to prevent OOM — max 1920p, 30fps, quality 85
-      const MAX_DIM = 1920;
-      const MAX_FPS = 30;
-      const MAX_QUALITY = 85;
+      const MAX_DIM = 1920, MAX_FPS = 30, MAX_QUALITY = 85;
       if (msg.maxDim !== undefined) {
         const dim = parseInt(msg.maxDim) || 0;
-        // 0 means native — cap to MAX_DIM to prevent giant frames
         msg.maxDim = dim === 0 ? MAX_DIM : Math.min(dim, MAX_DIM);
       }
       if (msg.fps)     msg.fps     = Math.min(parseInt(msg.fps)     || MAX_FPS,     MAX_FPS);
@@ -524,17 +547,17 @@ remoteWss.on("connection", (ws) => {
     if (!room) return;
 
     if (role === "host") {
-      for (const v of room.viewers) {
+      for (const v of room.viewers.values()) {
         if (v.readyState === 1) v.send(JSON.stringify({ type: "host_left" }));
       }
       remoteRooms.delete(roomCode);
     } else if (role === "viewer") {
-      room.viewers.delete(ws);
+      room.viewers.delete(viewerId);
       const count = room.viewers.size;
       if (room.host?.readyState === 1) {
-        room.host.send(JSON.stringify({ type: "viewer_left", viewerCount: count }));
+        room.host.send(JSON.stringify({ type: "viewer_left", viewerId, viewerCount: count }));
       }
-      for (const v of room.viewers) {
+      for (const v of room.viewers.values()) {
         if (v.readyState === 1) v.send(JSON.stringify({ type: "viewer_count", count }));
       }
     }

@@ -1,363 +1,515 @@
 #!/usr/bin/env python3
 """
 Veil Remote Desktop – Host Agent
-Run this on the computer you want to share.
+WebRTC mode (default): video/audio goes peer-to-peer, zero server RAM used for media.
+JPEG fallback: used automatically if aiortc can't be installed.
+
 Usage:  python agent.py [server_url]
-   eg:  python agent.py wss://secure.brightpathlearning.website
 """
 
-import sys, json, time, threading, io, ssl, hashlib
+import sys, json, time, threading, io, ssl, hashlib, fractions
+
+def pip(pkg):
+    import subprocess
+    print(f"Installing {pkg}...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", pkg],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+try: import mss
+except ImportError: pip("mss"); import mss
+
+try: import pyautogui
+except ImportError: pip("pyautogui"); import pyautogui
+
+try: from PIL import Image, ImageDraw
+except ImportError: pip("Pillow"); from PIL import Image, ImageDraw
+
+try: import numpy as np
+except ImportError: pip("numpy"); import numpy as np
+
+try: import sounddevice as sd
+except ImportError: pip("sounddevice"); import sounddevice as sd
+
+# Try WebRTC stack
+WEBRTC = False
 try:
-    import websocket
+    import av
+    from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack
+    from aiortc.sdp import candidate_from_sdp
+    WEBRTC = True
 except ImportError:
-    print("Installing websocket-client..."); import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "websocket-client"])
-    import websocket
-try:
-    import mss
-except ImportError:
-    print("Installing mss..."); import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "mss"])
-    import mss
-try:
-    import pyautogui
-except ImportError:
-    print("Installing pyautogui..."); import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyautogui"])
-    import pyautogui
-try:
-    from PIL import Image, ImageDraw
-except ImportError:
-    print("Installing Pillow..."); import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow"])
-    from PIL import Image, ImageDraw
-try:
-    import sounddevice as sd
-except ImportError:
-    print("Installing sounddevice..."); import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "sounddevice"])
-    import sounddevice as sd
-import numpy as np
-try:
-    np.zeros(1)
-except Exception:
-    print("Installing numpy..."); import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "numpy"])
-    import numpy as np
+    pip("aiortc")
+    try:
+        import av
+        from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack
+        from aiortc.sdp import candidate_from_sdp
+        WEBRTC = True
+    except Exception as e:
+        print(f"[!] WebRTC unavailable ({e}), using JPEG fallback (video will relay through server)")
 
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0
 
 SERVER = sys.argv[1] if len(sys.argv) > 1 else "wss://secure.brightpathlearning.website"
-QUALITY = 40       # JPEG quality (lower = faster)
-MAX_DIM = 1280     # max width for captured frames (0 = native, server caps to 1920)
-FPS = 15           # target frames per second
 
-room_code = None
-ws_conn = None
-running = True
-viewer_count = 0
-capture_started = False
-screen_w = 0
-screen_h = 0
-img_w = 0    # width of the JPEG frames we send (after scaling)
-img_h = 0
-audio_device = None  # BlackHole device index (None = no audio)
-AUDIO_SAMPLE_RATE = 48000
-AUDIO_CHANNELS = 2
-AUDIO_CHUNK = 4800  # 100ms chunks at 48kHz
+# ── Shared mutable settings (updated by viewer settings messages) ─────────────
+MAX_DIM = 1280
+FPS = 15
+QUALITY = 40
 
-# Frame dedup: skip frame if screen hasn't changed
-_last_frame_hash = None
+# ── Shared screen capture (one background thread, all viewers read from it) ───
+_latest_raw_frame = None   # av.VideoFrame when WEBRTC, PIL Image when JPEG
+_capture_lock = threading.Lock()
+_capture_running = False
 
+def start_capture():
+    global _capture_running
+    if _capture_running:
+        return
+    _capture_running = True
+    threading.Thread(target=_capture_thread, daemon=True).start()
 
-def quick_hash(raw_bytes):
-    """Sample every 200th byte for a fast 'did screen change' check."""
-    return hashlib.md5(raw_bytes[::200]).digest()
-
-
-def capture_loop():
-    """Continuously capture screen and send JPEG frames."""
-    global screen_w, screen_h, img_w, img_h, _last_frame_hash
+def _capture_thread():
+    global _latest_raw_frame
+    last_hash = None
     with mss.mss() as sct:
-        monitor = sct.monitors[1]  # primary monitor
-        screen_w = monitor["width"]
-        screen_h = monitor["height"]
-        while running and ws_conn and viewer_count > 0:
-            interval = 1.0 / FPS  # re-read each frame so settings changes apply
+        monitor = sct.monitors[1]
+        while _capture_running:
             t0 = time.time()
             try:
                 shot = sct.grab(monitor)
                 raw = bytes(shot.raw)
-
-                # Skip frame if screen hasn't changed
-                h = quick_hash(raw)
-                if h == _last_frame_hash:
-                    elapsed = time.time() - t0
-                    sleep_time = interval - elapsed
-                    if sleep_time > 0:
-                        time.sleep(sleep_time)
-                    continue
-                _last_frame_hash = h
-
-                img = Image.frombytes("RGB", (shot.width, shot.height), shot.rgb)
-
-                # Draw cursor onto the frame
-                try:
-                    mx, my = pyautogui.position()
-                    mx = max(0, min(mx - monitor["left"], shot.width - 1))
-                    my = max(0, min(my - monitor["top"], shot.height - 1))
-                    draw = ImageDraw.Draw(img)
-                    cs = 20
-                    cursor_poly = [
-                        (mx, my),
-                        (mx, my + cs),
-                        (mx + cs * 0.35, my + cs * 0.7),
-                        (mx + cs * 0.55, my + cs * 1.05),
-                        (mx + cs * 0.4, my + cs * 1.1),
-                        (mx + cs * 0.2, my + cs * 0.75),
-                        (mx - cs * 0.05, my + cs * 1.05),
-                    ]
-                    cursor_poly = [(int(x), int(y)) for x, y in cursor_poly]
-                    draw.polygon(cursor_poly, fill="white", outline="black")
-                except Exception:
-                    pass
-
-                # Scale down if MAX_DIM is set (0 = native, no scaling)
-                if MAX_DIM > 0 and img.width > MAX_DIM:
-                    ratio = MAX_DIM / img.width
-                    # BILINEAR is 3-5x faster than LANCZOS with minimal quality loss at speed
-                    img = img.resize((MAX_DIM, int(img.height * ratio)), Image.BILINEAR)
-
-                img_w = img.width
-                img_h = img.height
-                buf = io.BytesIO()
-                # subsampling=1 = 4:2:0 chroma — ~20% smaller files vs default
-                img.save(buf, format="JPEG", quality=QUALITY, subsampling=1, optimize=False)
-                frame_data = buf.getvalue()
-
-                # Send as binary: 1-byte type (0x01 = frame) + jpeg data
-                if ws_conn:
-                    ws_conn.send(b'\x01' + frame_data, opcode=websocket.ABNF.OPCODE_BINARY)
+                # Quick hash of sampled bytes — skip frame if screen hasn't changed
+                h = hashlib.md5(raw[::200]).digest()
+                if h != last_hash:
+                    last_hash = h
+                    img = Image.frombytes("RGB", (shot.width, shot.height), shot.rgb)
+                    # Draw cursor
+                    try:
+                        mx, my = pyautogui.position()
+                        mx = max(0, min(mx - monitor["left"], shot.width - 1))
+                        my = max(0, min(my - monitor["top"], shot.height - 1))
+                        draw = ImageDraw.Draw(img)
+                        cs = 20
+                        poly = [
+                            (mx, my), (mx, my + cs),
+                            (mx + cs * .35, my + cs * .7), (mx + cs * .55, my + cs * 1.05),
+                            (mx + cs * .4, my + cs * 1.1), (mx + cs * .2, my + cs * .75),
+                            (mx - cs * .05, my + cs * 1.05),
+                        ]
+                        draw.polygon([(int(x), int(y)) for x, y in poly], fill="white", outline="black")
+                    except Exception:
+                        pass
+                    # Scale — BILINEAR is 3-5x faster than LANCZOS
+                    if MAX_DIM > 0 and img.width > MAX_DIM:
+                        img = img.resize((MAX_DIM, int(img.height * MAX_DIM / img.width)), Image.BILINEAR)
+                    with _capture_lock:
+                        _latest_raw_frame = av.VideoFrame.from_image(img) if WEBRTC else img
             except Exception as e:
-                if running:
-                    print(f"Capture error: {e}")
+                print(f"[capture] {e}")
             elapsed = time.time() - t0
-            sleep_time = interval - elapsed
-            if sleep_time > 0:
-                time.sleep(sleep_time)
+            time.sleep(max(0, 1 / 30 - elapsed))  # capture at up to 30fps
 
+# ── Audio: one stream, broadcast to multiple per-viewer queues ────────────────
+_audio_queues: dict = {}   # viewer_id -> asyncio.Queue
+_audio_lock = threading.Lock()
 
 def find_audio_device():
-    """Find BlackHole or similar loopback audio device."""
     try:
-        devices = sd.query_devices()
-        for i, d in enumerate(devices):
+        for i, d in enumerate(sd.query_devices()):
             name = d["name"].lower()
-            if d["max_input_channels"] >= 2 and any(k in name for k in ["blackhole", "loopback", "soundflower", "virtual"]):
-                print(f"[audio] Found loopback device: {d['name']} (index {i})")
+            if d["max_input_channels"] >= 2 and any(
+                k in name for k in ["blackhole", "loopback", "soundflower", "virtual"]
+            ):
+                print(f"[audio] Found: {d['name']}")
                 return i
-        print("[audio] No loopback audio device found (BlackHole not installed).")
-        print("[audio] Install BlackHole from https://existential.audio/blackhole/ for audio streaming.")
-        return None
     except Exception as e:
-        print(f"[audio] Could not query audio devices: {e}")
-        return None
+        print(f"[audio] {e}")
+    print("[audio] No loopback device found (install BlackHole for audio streaming).")
+    return None
 
+def start_audio_broadcast(device):
+    def callback(indata, frames, time_info, status):
+        pcm = (indata * 32767).astype(np.int16).copy()
+        with _audio_lock:
+            for q in list(_audio_queues.values()):
+                try:
+                    q.put_nowait(pcm)
+                except Exception:
+                    pass  # queue full — drop chunk for this viewer
 
-def audio_capture_loop():
-    """Capture system audio via BlackHole and send to viewer."""
-    global running
+    def run():
+        with sd.InputStream(device=device, samplerate=48000, channels=2,
+                            blocksize=960, dtype="float32", callback=callback):
+            while _capture_running:
+                time.sleep(1)
+
+    threading.Thread(target=run, daemon=True).start()
+    print("[audio] Streaming audio...")
+
+# ── Input handling ─────────────────────────────────────────────────────────────
+def handle_input_sync(event):
     try:
-        def audio_callback(indata, frames, time_info, status):
-            if not running or not ws_conn or viewer_count == 0:
-                return
-            try:
-                pcm16 = (indata * 32767).astype(np.int16)
-                raw = pcm16.tobytes()
-                ws_conn.send(b'\x02' + raw, opcode=websocket.ABNF.OPCODE_BINARY)
-            except Exception:
-                pass
-
-        with sd.InputStream(
-            device=audio_device,
-            samplerate=AUDIO_SAMPLE_RATE,
-            channels=AUDIO_CHANNELS,
-            blocksize=AUDIO_CHUNK,
-            dtype="float32",
-            callback=audio_callback,
-        ):
-            print("[audio] Streaming audio...")
-            while running and ws_conn:
-                time.sleep(0.1)
-    except Exception as e:
-        print(f"[audio] Audio capture error: {e}")
-
-
-def scale_coords(data):
-    """Scale from image coordinates (sent by viewer) to actual screen coordinates."""
-    if screen_w and img_w:
-        sx = screen_w / img_w
-        sy = screen_h / img_h
-    else:
-        sx = sy = 1
-    return int(data.get("x", 0) * sx), int(data.get("y", 0) * sy)
-
-
-def handle_input(msg):
-    """Process input events from the viewer."""
-    try:
-        data = json.loads(msg)
-        t = data.get("type")
-
+        t = event.get("type")
         if t == "mousemove":
-            x, y = scale_coords(data)
-            pyautogui.moveTo(x, y, _pause=False)
-
+            pyautogui.moveTo(event["x"], event["y"], _pause=False)
         elif t == "mousedown":
-            x, y = scale_coords(data)
-            btn = "left" if data.get("button", 0) == 0 else "right" if data.get("button") == 2 else "middle"
-            print(f"  [click] {btn} @ ({x}, {y})")
-            pyautogui.click(x, y, button=btn, _pause=False)
-
-        elif t == "mouseup":
-            pass  # click handles press+release
-
+            btn = ["left", "middle", "right"][min(event.get("button", 0), 2)]
+            pyautogui.click(event["x"], event["y"], button=btn, _pause=False)
+        elif t == "scroll":
+            pyautogui.moveTo(event["x"], event["y"], _pause=False)
+            dy = event.get("deltaY", 0)
+            pyautogui.scroll(max(1, abs(int(dy / 120))) * (-1 if dy > 0 else 1), _pause=False)
         elif t == "keydown":
-            key = data.get("key", "")
-            ctrl = data.get("ctrl", False)
-            shift = data.get("shift", False)
-            alt = data.get("alt", False)
-            meta = data.get("meta", False)
+            key = event.get("key", "")
             if key in ("ctrl", "shift", "alt", "command"):
                 return
-            mods = []
-            if ctrl:  mods.append("ctrl")
-            if shift:  mods.append("shift")
-            if alt:    mods.append("alt")
-            if meta:   mods.append("command")
+            mods = [m for m, f in [
+                ("ctrl", event.get("ctrl")), ("shift", event.get("shift")),
+                ("alt", event.get("alt")),   ("command", event.get("meta")),
+            ] if f]
             if mods:
-                combo = "+".join(mods + [key])
-                print(f"  [hotkey] {combo}")
                 pyautogui.hotkey(*mods, key, _pause=False)
             elif len(key) == 1:
                 pyautogui.typewrite(key, interval=0, _pause=False)
             else:
-                print(f"  [key] {key}")
                 pyautogui.press(key, _pause=False)
-
-        elif t == "keyup":
-            pass
-
-        elif t == "scroll":
-            x, y = scale_coords(data)
-            pyautogui.moveTo(x, y, _pause=False)
-            dy = data.get("deltaY", 0)
-            clicks = max(1, abs(int(dy / 120))) * (-1 if dy > 0 else 1)
-            pyautogui.scroll(clicks, _pause=False)
-
     except Exception as e:
-        print(f"  [input error] {e}")
+        print(f"[input] {e}")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# WebRTC mode
+# ─────────────────────────────────────────────────────────────────────────────
+if WEBRTC:
+    import asyncio
 
-def handle_settings(data):
-    """Update stream settings from the viewer."""
-    global QUALITY, MAX_DIM, FPS, _last_frame_hash
-    if "quality" in data:
-        QUALITY = max(10, min(95, int(data["quality"])))
-    if "maxDim" in data:
-        MAX_DIM = int(data["maxDim"])  # 0 means native (no scaling)
-    if "fps" in data:
-        FPS = max(1, min(60, int(data["fps"])))
-    _last_frame_hash = None  # force next frame to send after settings change
-    print(f"  [settings] quality={QUALITY} resolution={MAX_DIM or 'native'} fps={FPS}")
+    class ScreenTrack(MediaStreamTrack):
+        """Video track that reads from the shared capture thread."""
+        kind = "video"
+        _CLOCK = 90000
 
+        def __init__(self):
+            super().__init__()
+            self._ts = 0
+            self._start = None
 
-def on_message(ws, message):
-    global room_code, viewer_count, capture_started
-    if isinstance(message, str):
+        async def recv(self):
+            ptime = 1.0 / FPS
+            if self._start is None:
+                self._start = time.time()
+            else:
+                self._ts += int(ptime * self._CLOCK)
+                wait = self._start + (self._ts / self._CLOCK) - time.time()
+                if wait > 0:
+                    await asyncio.sleep(wait)
+
+            with _capture_lock:
+                f = _latest_raw_frame
+
+            if f is None:
+                blank = av.VideoFrame(width=MAX_DIM or 1280, height=720, format="yuv420p")
+                blank.pts = self._ts
+                blank.time_base = fractions.Fraction(1, self._CLOCK)
+                return blank
+
+            yuv = f.reformat(format="yuv420p").copy()
+            yuv.pts = self._ts
+            yuv.time_base = fractions.Fraction(1, self._CLOCK)
+            return yuv
+
+    class AudioTrack(MediaStreamTrack):
+        """Audio track per viewer that reads from its own queue."""
+        kind = "audio"
+
+        def __init__(self, viewer_id):
+            super().__init__()
+            self._vid = viewer_id
+            self._q = asyncio.Queue(maxsize=30)
+            with _audio_lock:
+                _audio_queues[viewer_id] = self._q
+            self._ts = 0
+
+        def stop(self):
+            super().stop()
+            with _audio_lock:
+                _audio_queues.pop(self._vid, None)
+
+        async def recv(self):
+            pcm = await self._q.get()
+            frame = av.AudioFrame.from_ndarray(pcm.T.reshape(2, -1), format="s16", layout="stereo")
+            frame.sample_rate = 48000
+            frame.pts = self._ts
+            frame.time_base = fractions.Fraction(1, 48000)
+            self._ts += frame.samples
+            return frame
+
+    async def run_webrtc(audio_dev):
+        global MAX_DIM, FPS, QUALITY
+
+        try:
+            import websockets
+        except ImportError:
+            pip("websockets>=12")
+            import websockets
+
+        ws_url = SERVER.rstrip("/") + "/remote-ws"
+        try:
+            import certifi
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            ssl_ctx = ssl.create_default_context()
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
+
+        pcs: dict = {}  # viewer_id -> RTCPeerConnection
+
+        print(f"Connecting to {SERVER}...")
+        connect_kwargs = {"ssl": ssl_ctx} if ws_url.startswith("wss") else {}
+        async with websockets.connect(ws_url, **connect_kwargs) as ws:
+            await ws.send(json.dumps({"type": "host_create", "mode": "webrtc"}))
+            if audio_dev is not None:
+                start_audio_broadcast(audio_dev)
+
+            async for raw in ws:
+                msg = json.loads(raw)
+                mt = msg.get("type")
+
+                if mt == "room_created":
+                    code = msg["code"]
+                    print(f"\n{'='*50}")
+                    print(f"  ROOM CODE:  {code}")
+                    print(f"{'='*50}")
+                    print(f"  Open: {SERVER.replace('wss://','https://').replace('ws://','http://')}/remote")
+                    print(f"{'='*50}\n")
+                    start_capture()
+
+                elif mt == "viewer_joined":
+                    vid = msg["viewerId"]
+                    count = msg.get("viewerCount", 1)
+                    print(f">> Viewer {vid[:8]} joined ({count} watching) — creating WebRTC connection")
+
+                    pc = RTCPeerConnection()
+                    pcs[vid] = pc
+                    pc.addTrack(ScreenTrack())
+                    if audio_dev is not None:
+                        pc.addTrack(AudioTrack(vid))
+
+                    @pc.on("icecandidate")
+                    async def on_ice(c, v=vid):
+                        if c:
+                            await ws.send(json.dumps({
+                                "type": "ice_candidate", "viewerId": v,
+                                "candidate": {
+                                    "candidate": c.to_sdp(),
+                                    "sdpMid": c.sdpMid,
+                                    "sdpMLineIndex": c.sdpMLineIndex,
+                                },
+                            }))
+
+                    offer = await pc.createOffer()
+                    await pc.setLocalDescription(offer)
+                    await ws.send(json.dumps({
+                        "type": "offer", "viewerId": vid,
+                        "sdp": pc.localDescription.sdp,
+                        "sdpType": pc.localDescription.type,
+                    }))
+
+                elif mt == "answer":
+                    vid = msg.get("viewerId")
+                    pc = pcs.get(vid)
+                    if pc:
+                        await pc.setRemoteDescription(RTCSessionDescription(
+                            sdp=msg["sdp"], type=msg["sdpType"]
+                        ))
+                        print(f">> P2P connected to viewer {vid[:8]}")
+
+                elif mt == "ice_candidate":
+                    vid = msg.get("viewerId")
+                    pc = pcs.get(vid)
+                    if pc and msg.get("candidate"):
+                        c = msg["candidate"]
+                        sdp_str = c.get("candidate", "")
+                        if sdp_str.startswith("candidate:"):
+                            sdp_str = sdp_str[len("candidate:"):]
+                        try:
+                            cand = candidate_from_sdp(sdp_str)
+                            cand.sdpMid = c.get("sdpMid")
+                            cand.sdpMLineIndex = c.get("sdpMLineIndex")
+                            await pc.addIceCandidate(cand)
+                        except Exception as e:
+                            print(f"[ice] {e}")
+
+                elif mt == "settings":
+                    if "maxDim" in msg:
+                        MAX_DIM = int(msg["maxDim"])
+                    if "fps" in msg:
+                        FPS = max(1, min(60, int(msg["fps"])))
+                    if "quality" in msg:
+                        QUALITY = max(10, min(95, int(msg["quality"])))
+                    print(f"  [settings] maxDim={MAX_DIM} fps={FPS}")
+
+                elif mt == "input":
+                    handle_input_sync(msg.get("event", {}))
+
+                elif mt == "viewer_left":
+                    vid = msg.get("viewerId")
+                    pc = pcs.pop(vid, None)
+                    if pc:
+                        await pc.close()
+                    print(f">> Viewer left ({msg.get('viewerCount', 0)} watching)")
+
+                elif mt == "error":
+                    print(f"Error: {msg.get('message')}")
+
+        for pc in pcs.values():
+            await pc.close()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JPEG fallback mode (used when aiortc unavailable)
+# ─────────────────────────────────────────────────────────────────────────────
+def run_jpeg(audio_dev):
+    global MAX_DIM, FPS, QUALITY
+
+    try:
+        import websocket as ws_lib
+    except ImportError:
+        pip("websocket-client")
+        import websocket as ws_lib
+
+    ws_conn = None
+    running = True
+    viewer_count = 0
+    capture_started = False
+    screen_w = screen_h = img_w = img_h = 0
+    audio_started = False
+
+    def jpeg_capture():
+        nonlocal img_w, img_h, screen_w, screen_h
+        with mss.mss() as sct:
+            monitor = sct.monitors[1]
+            screen_w, screen_h = monitor["width"], monitor["height"]
+            last_hash = None
+            while running and ws_conn and viewer_count > 0:
+                t0 = time.time()
+                try:
+                    shot = sct.grab(monitor)
+                    raw = bytes(shot.raw)
+                    h = hashlib.md5(raw[::200]).digest()
+                    if h == last_hash:
+                        time.sleep(max(0, 1 / FPS - (time.time() - t0)))
+                        continue
+                    last_hash = h
+                    img = Image.frombytes("RGB", (shot.width, shot.height), shot.rgb)
+                    try:
+                        mx, my = pyautogui.position()
+                        mx = max(0, min(mx - monitor["left"], shot.width - 1))
+                        my = max(0, min(my - monitor["top"], shot.height - 1))
+                        draw = ImageDraw.Draw(img)
+                        cs = 20
+                        poly = [
+                            (mx, my), (mx, my + cs),
+                            (mx + cs * .35, my + cs * .7), (mx + cs * .55, my + cs * 1.05),
+                            (mx + cs * .4, my + cs * 1.1), (mx + cs * .2, my + cs * .75),
+                            (mx - cs * .05, my + cs * 1.05),
+                        ]
+                        draw.polygon([(int(x), int(y)) for x, y in poly], fill="white", outline="black")
+                    except Exception:
+                        pass
+                    if MAX_DIM > 0 and img.width > MAX_DIM:
+                        img = img.resize((MAX_DIM, int(img.height * MAX_DIM / img.width)), Image.BILINEAR)
+                    img_w, img_h = img.width, img.height
+                    buf = io.BytesIO()
+                    img.save(buf, format="JPEG", quality=QUALITY, subsampling=1, optimize=False)
+                    if ws_conn:
+                        ws_conn.send(b'\x01' + buf.getvalue(), opcode=ws_lib.ABNF.OPCODE_BINARY)
+                except Exception as e:
+                    if running:
+                        print(f"[capture] {e}")
+                time.sleep(max(0, 1 / FPS - (time.time() - t0)))
+
+    def jpeg_audio():
+        def callback(indata, frames, time_info, status):
+            if not running or not ws_conn or viewer_count == 0:
+                return
+            try:
+                pcm = (indata * 32767).astype(np.int16)
+                ws_conn.send(b'\x02' + pcm.tobytes(), opcode=ws_lib.ABNF.OPCODE_BINARY)
+            except Exception:
+                pass
+        try:
+            with sd.InputStream(device=audio_dev, samplerate=48000, channels=2,
+                                blocksize=4800, dtype="float32", callback=callback):
+                while running and ws_conn:
+                    time.sleep(0.1)
+        except Exception as e:
+            print(f"[audio] {e}")
+
+    def on_message(ws, message):
+        nonlocal viewer_count, capture_started, audio_started
+        if not isinstance(message, str):
+            return
         data = json.loads(message)
-        if data.get("type") == "room_created":
-            room_code = data["code"]
-            print(f"\n{'='*50}")
-            print(f"  ROOM CODE:  {room_code}")
-            print(f"{'='*50}")
-            print(f"  Share this code with the viewer.")
-            print(f"  They open: {SERVER.replace('wss://','https://').replace('ws://','http://')}/remote")
-            print(f"{'='*50}\n")
-        elif data.get("type") == "viewer_joined":
+        mt = data.get("type")
+        if mt == "room_created":
+            print(f"\n{'='*50}\n  ROOM CODE:  {data['code']}\n{'='*50}")
+            print(f"  Open: {SERVER.replace('wss://','https://').replace('ws://','http://')}/remote\n{'='*50}\n")
+        elif mt == "viewer_joined":
             viewer_count = data.get("viewerCount", viewer_count + 1)
-            print(f">> Viewer connected! ({viewer_count} watching) Streaming screen...")
+            print(f">> Viewer connected ({viewer_count} watching)")
             if not capture_started:
                 capture_started = True
-                t = threading.Thread(target=capture_loop, daemon=True)
-                t.start()
-                if audio_device is not None:
-                    at = threading.Thread(target=audio_capture_loop, daemon=True)
-                    at.start()
-        elif data.get("type") == "viewer_left":
+                threading.Thread(target=jpeg_capture, daemon=True).start()
+            if not audio_started and audio_dev is not None:
+                audio_started = True
+                threading.Thread(target=jpeg_audio, daemon=True).start()
+        elif mt == "viewer_left":
             viewer_count = data.get("viewerCount", max(0, viewer_count - 1))
-            print(f">> Viewer disconnected. ({viewer_count} watching)")
-        elif data.get("type") == "settings":
-            handle_settings(data)
-        elif data.get("type") == "input":
-            handle_input(json.dumps(data.get("event", {})))
-        elif data.get("type") == "error":
+            print(f">> Viewer left ({viewer_count} watching)")
+        elif mt == "settings":
+            global MAX_DIM, FPS, QUALITY
+            if "maxDim" in data: MAX_DIM = int(data["maxDim"])
+            if "fps"    in data: FPS     = max(1, min(60, int(data["fps"])))
+            if "quality" in data: QUALITY = max(10, min(95, int(data["quality"])))
+        elif mt == "input":
+            handle_input_sync(data.get("event", {}))
+        elif mt == "error":
             print(f"Error: {data.get('message')}")
 
+    def on_error(ws, error): print(f"Connection error: {error}")
+    def on_close(ws, *a):
+        nonlocal running
+        running = False
+        print("Disconnected.")
+    def on_open(ws):
+        nonlocal ws_conn
+        ws_conn = ws
+        ws.send(json.dumps({"type": "host_create", "mode": "jpeg"}))
+        print("Connected. Creating room...")
 
-def on_error(ws, error):
-    print(f"Connection error: {error}")
-
-
-def on_close(ws, close_status_code, close_msg):
-    global running
-    running = False
-    print("Disconnected from server.")
-
-
-def on_open(ws):
-    global ws_conn
-    ws_conn = ws
-    ws.send(json.dumps({"type": "host_create"}))
-    print("Connected to server. Creating room...")
-
-
-def check_permissions():
-    """Check macOS accessibility permissions needed for input control."""
-    import platform
-    if platform.system() != "Darwin":
-        return
-    try:
-        pyautogui.moveTo(pyautogui.position()[0], pyautogui.position()[1], _pause=False)
-        print("[ok] Input control available.")
-    except Exception as e:
-        print(f"[!] Input control may not work: {e}")
-        print("[!] Go to System Settings > Privacy & Security > Accessibility")
-        print("[!] and grant permission to Terminal (or your terminal app).")
-
-
-def main():
-    global audio_device
-    print(f"Veil Remote Desktop Agent")
-    check_permissions()
-    audio_device = find_audio_device()
-    print(f"Connecting to {SERVER}...")
-    ws_url = SERVER.rstrip("/") + "/remote-ws"
-    ws = websocket.WebSocketApp(
-        ws_url,
-        on_open=on_open,
-        on_message=on_message,
-        on_error=on_error,
-        on_close=on_close,
-    )
     try:
         import certifi
         sslopt = {"ca_certs": certifi.where()}
     except ImportError:
         sslopt = {"cert_reqs": ssl.CERT_NONE}
-    ws.run_forever(sslopt=sslopt)
 
+    app = ws_lib.WebSocketApp(
+        SERVER.rstrip("/") + "/remote-ws",
+        on_open=on_open, on_message=on_message,
+        on_error=on_error, on_close=on_close,
+    )
+    app.run_forever(sslopt=sslopt)
+
+# ─────────────────────────────────────────────────────────────────────────────
+def main():
+    print("Veil Remote Desktop Agent")
+    audio_dev = find_audio_device()
+    if WEBRTC:
+        import asyncio
+        print("[WebRTC] Peer-to-peer — video/audio won't pass through the server")
+        asyncio.run(run_webrtc(audio_dev))
+    else:
+        print("[JPEG] Relay mode — video passes through server (aiortc not available)")
+        run_jpeg(audio_dev)
 
 if __name__ == "__main__":
     main()

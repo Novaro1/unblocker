@@ -51,11 +51,12 @@
       position: relative; overflow: hidden;
       cursor: none !important;
     }
-    .remote-screen canvas {
+    .remote-screen canvas, .remote-screen video {
       display: block; width: 100%; height: 100%;
       object-fit: contain;
       cursor: none !important;
     }
+    #videoEl { display: none; }
     .toolbar {
       position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
       background: rgba(14,14,30,0.92); border: 1px solid var(--border);
@@ -245,32 +246,33 @@
     </div>
   </div>
   <canvas id="canvas"></canvas>
+  <video id="videoEl" autoplay playsinline muted></video>
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
-const joinScreen  = $("joinScreen");
+const joinScreen   = $("joinScreen");
 const remoteScreen = $("remoteScreen");
-const codeInput   = $("codeInput");
-const joinBtn     = $("joinBtn");
-const statusMsg   = $("statusMsg");
-const canvas      = $("canvas");
-const ctx         = canvas.getContext("2d");
-const fpsCounter  = $("fpsCounter");
-const toolbarCode = $("toolbarCode");
-
-let ws = null;
-let imgW = 0, imgH = 0;  // actual image dimensions from host
-let frameCount = 0;
-let lastFpsTime = Date.now();
-let frameRendering = false; // backpressure: skip frames if still rendering
+const codeInput    = $("codeInput");
+const joinBtn      = $("joinBtn");
+const statusMsg    = $("statusMsg");
+const canvas       = $("canvas");
+const ctx          = canvas.getContext("2d");
+const videoEl      = $("videoEl");
+const fpsCounter   = $("fpsCounter");
+const toolbarCode  = $("toolbarCode");
 const viewerCountEl = $("viewerCount");
 
-// ── Audio playback ───────────────────────
-let audioCtx = null;
-let audioNextTime = 0;
-const AUDIO_SAMPLE_RATE = 48000;
-const AUDIO_CHANNELS = 2;
+let ws = null;
+let pc = null;        // RTCPeerConnection (WebRTC mode)
+let sessionMode = "webrtc";  // "webrtc" | "jpeg"
+let imgW = 0, imgH = 0;
+let frameCount = 0, lastFpsTime = Date.now();
+let frameRendering = false;
+
+// ── Legacy JPEG audio ─────────────────────
+let audioCtx = null, audioNextTime = 0;
+const AUDIO_SR = 48000, AUDIO_CH = 2;
 
 // ── Join ──────────────────────────────────
 codeInput.addEventListener("keydown", e => { if (e.key === "Enter") joinBtn.click(); });
@@ -284,52 +286,28 @@ function setStatus(msg, isError) {
 function connect() {
   const code = codeInput.value.trim().toUpperCase();
   if (code.length < 4) return setStatus("Enter the room code from the host.", true);
-
   setStatus("Connecting...");
   joinBtn.disabled = true;
 
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   ws = new WebSocket(`${proto}//${location.host}/remote-ws`);
   ws.binaryType = "arraybuffer";
+  ws.onopen = () => ws.send(JSON.stringify({ type: "viewer_join", code }));
 
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ type: "viewer_join", code }));
-  };
-
-  ws.onmessage = (e) => {
-    if (typeof e.data === "string") {
-      const msg = JSON.parse(e.data);
-      if (msg.type === "joined") {
-        setStatus("");
-        joinScreen.style.display = "none";
-        remoteScreen.style.display = "block";
-        toolbarCode.textContent = code;
-        if (msg.viewerCount > 1) viewerCountEl.textContent = `${msg.viewerCount} watching`;
-        canvas.focus();
-      } else if (msg.type === "viewer_count") {
-        viewerCountEl.textContent = msg.count > 1 ? `${msg.count} watching` : "";
-      } else if (msg.type === "host_left") {
-        setStatus("Host disconnected.", true);
-        showJoin();
-      } else if (msg.type === "error") {
-        setStatus(msg.message, true);
-        joinBtn.disabled = false;
-      }
-    } else {
+  ws.onmessage = async (e) => {
+    // ── Binary: JPEG legacy mode ──────────────────────────────────────────
+    if (typeof e.data !== "string") {
+      if (sessionMode !== "jpeg") return;
       const buf = e.data;
       const type = new Uint8Array(buf, 0, 1)[0];
       if (type === 0x01) {
-        // Video frame — drop if previous frame still rendering (backpressure)
         if (frameRendering) return;
         frameRendering = true;
         const blob = new Blob([buf.slice(1)], { type: "image/jpeg" });
-        // createImageBitmap decodes off the main thread — much faster than new Image()
         createImageBitmap(blob).then(bitmap => {
           if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
-            canvas.width = bitmap.width;
-            canvas.height = bitmap.height;
-            imgW = bitmap.width;
-            imgH = bitmap.height;
+            canvas.width = bitmap.width; canvas.height = bitmap.height;
+            imgW = bitmap.width; imgH = bitmap.height;
           }
           ctx.drawImage(bitmap, 0, 0);
           bitmap.close();
@@ -338,34 +316,123 @@ function connect() {
           const now = Date.now();
           if (now - lastFpsTime >= 1000) {
             fpsCounter.textContent = frameCount + " fps";
-            frameCount = 0;
-            lastFpsTime = now;
+            frameCount = 0; lastFpsTime = now;
           }
         }).catch(() => { frameRendering = false; });
       } else if (type === 0x02) {
-        // Audio chunk: 16-bit PCM stereo @ 48kHz
         if (!audioCtx) {
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: AUDIO_SAMPLE_RATE });
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: AUDIO_SR });
           audioNextTime = 0;
         }
         const pcm16 = new Int16Array(buf.slice(1));
-        const numFrames = Math.floor(pcm16.length / AUDIO_CHANNELS);
-        if (numFrames === 0) return;
-        const audioBuffer = audioCtx.createBuffer(AUDIO_CHANNELS, numFrames, AUDIO_SAMPLE_RATE);
-        for (let ch = 0; ch < AUDIO_CHANNELS; ch++) {
-          const channelData = audioBuffer.getChannelData(ch);
-          for (let i = 0; i < numFrames; i++) {
-            channelData[i] = pcm16[i * AUDIO_CHANNELS + ch] / 32768;
-          }
+        const frames = Math.floor(pcm16.length / AUDIO_CH);
+        if (!frames) return;
+        const ab = audioCtx.createBuffer(AUDIO_CH, frames, AUDIO_SR);
+        for (let ch = 0; ch < AUDIO_CH; ch++) {
+          const cd = ab.getChannelData(ch);
+          for (let i = 0; i < frames; i++) cd[i] = pcm16[i * AUDIO_CH + ch] / 32768;
         }
-        const source = audioCtx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioCtx.destination);
+        const src = audioCtx.createBufferSource();
+        src.buffer = ab; src.connect(audioCtx.destination);
         const now = audioCtx.currentTime;
-        if (audioNextTime < now) audioNextTime = now + 0.02; // small buffer
-        source.start(audioNextTime);
-        audioNextTime += audioBuffer.duration;
+        if (audioNextTime < now) audioNextTime = now + 0.02;
+        src.start(audioNextTime);
+        audioNextTime += ab.duration;
       }
+      return;
+    }
+
+    // ── Text messages ─────────────────────────────────────────────────────
+    const msg = JSON.parse(e.data);
+
+    if (msg.type === "joined") {
+      sessionMode = msg.mode || "webrtc";
+      setStatus(sessionMode === "webrtc" ? "Establishing P2P connection..." : "");
+      joinScreen.style.display = "none";
+      remoteScreen.style.display = "block";
+      toolbarCode.textContent = code;
+      if (msg.viewerCount > 1) viewerCountEl.textContent = `${msg.viewerCount} watching`;
+      // Show the right display element
+      if (sessionMode === "webrtc") {
+        canvas.style.display = "none";
+        videoEl.style.display = "block";
+      } else {
+        canvas.style.display = "block";
+        videoEl.style.display = "none";
+        canvas.focus();
+      }
+
+    } else if (msg.type === "offer") {
+      // ── WebRTC: receive offer, create answer ───────────────────────────
+      pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+
+      pc.ontrack = (ev) => {
+        if (ev.track.kind === "video") {
+          videoEl.srcObject = ev.streams[0] || new MediaStream([ev.track]);
+          videoEl.play().catch(() => {});
+          videoEl.addEventListener("loadedmetadata", () => {
+            imgW = videoEl.videoWidth; imgH = videoEl.videoHeight;
+          }, { once: true });
+          // FPS counter
+          if ("requestVideoFrameCallback" in videoEl) {
+            const tick = () => {
+              frameCount++;
+              const now = Date.now();
+              if (now - lastFpsTime >= 1000) {
+                fpsCounter.textContent = frameCount + " fps";
+                frameCount = 0; lastFpsTime = now;
+              }
+              videoEl.requestVideoFrameCallback(tick);
+            };
+            videoEl.requestVideoFrameCallback(tick);
+          }
+          setStatus("");
+        }
+        // Audio track: browser plays automatically through videoEl (it's in the same stream)
+      };
+
+      pc.onicecandidate = (ev) => {
+        if (ev.candidate) {
+          ws.send(JSON.stringify({
+            type: "ice_candidate",
+            candidate: {
+              candidate: ev.candidate.candidate,
+              sdpMid: ev.candidate.sdpMid,
+              sdpMLineIndex: ev.candidate.sdpMLineIndex,
+            },
+          }));
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === "failed") setStatus("P2P connection failed.", true);
+      };
+
+      await pc.setRemoteDescription({ type: msg.sdpType, sdp: msg.sdp });
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      ws.send(JSON.stringify({
+        type: "answer",
+        sdp: pc.localDescription.sdp,
+        sdpType: pc.localDescription.type,
+      }));
+
+    } else if (msg.type === "ice_candidate") {
+      if (pc && msg.candidate) {
+        try { await pc.addIceCandidate(msg.candidate); } catch {}
+      }
+
+    } else if (msg.type === "viewer_count") {
+      viewerCountEl.textContent = msg.count > 1 ? `${msg.count} watching` : "";
+
+    } else if (msg.type === "host_left") {
+      setStatus("Host disconnected.", true);
+      if (pc) { pc.close(); pc = null; }
+      showJoin();
+
+    } else if (msg.type === "error") {
+      setStatus(msg.message, true);
+      joinBtn.disabled = false;
     }
   };
 
@@ -377,6 +444,7 @@ function showJoin() {
   remoteScreen.style.display = "none";
   joinScreen.style.display = "flex";
   joinBtn.disabled = false;
+  if (pc) { pc.close(); pc = null; }
   if (ws) { ws.close(); ws = null; }
 }
 
@@ -386,85 +454,71 @@ $("fullscreenBtn").addEventListener("click", () => {
   else remoteScreen.requestFullscreen();
 });
 
-// ── Settings ──────────────────────────────
+// ── Settings ─────────────────────────────
 const settingsPanel = $("settingsPanel");
-const settingsBtn = $("settingsBtn");
-settingsBtn.addEventListener("click", () => settingsPanel.classList.toggle("open"));
-// Close settings when clicking outside
+settingsPanel;
+$("settingsBtn").addEventListener("click", () => settingsPanel.classList.toggle("open"));
 document.addEventListener("click", e => {
-  if (!settingsPanel.contains(e.target) && e.target !== settingsBtn && !settingsBtn.contains(e.target)) {
+  if (!settingsPanel.contains(e.target) && e.target !== $("settingsBtn") && !$("settingsBtn").contains(e.target))
     settingsPanel.classList.remove("open");
-  }
 });
 
 const qualityMap = { low: 25, medium: 40, high: 65, ultra: 85 };
 function sendSettings() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  const quality = qualityMap[$("setQuality").value] || 40;
-  const maxDim = parseInt($("setResolution").value) || 0;
-  const fps = parseInt($("setFps").value) || 15;
-  ws.send(JSON.stringify({ type: "settings", quality, maxDim, fps }));
+  ws.send(JSON.stringify({
+    type: "settings",
+    quality: qualityMap[$("setQuality").value] || 40,
+    maxDim: parseInt($("setResolution").value) || 1280,
+    fps: parseInt($("setFps").value) || 15,
+  }));
 }
 $("setQuality").addEventListener("change", sendSettings);
 $("setResolution").addEventListener("change", sendSettings);
 $("setFps").addEventListener("change", sendSettings);
 
-// ── Input forwarding ──────────────────────
-function canvasCoords(e) {
-  const rect = canvas.getBoundingClientRect();
-  // object-fit:contain letterboxes — compute the actual rendered image area
-  const canvasAspect = imgW / imgH;
+// ── Input coordinate mapping ──────────────
+function getDisplayCoords(e) {
+  // Works for both canvas (JPEG) and video (WebRTC) — same object-fit:contain logic
+  const el = sessionMode === "webrtc" ? videoEl : canvas;
+  const rect = el.getBoundingClientRect();
+  const aspect = imgW / imgH;
   const elemAspect = rect.width / rect.height;
-  let renderW, renderH, offsetX, offsetY;
-  if (canvasAspect > elemAspect) {
-    // Image is wider than element — bars on top/bottom
-    renderW = rect.width;
-    renderH = rect.width / canvasAspect;
-    offsetX = 0;
-    offsetY = (rect.height - renderH) / 2;
+  let rW, rH, ox, oy;
+  if (aspect > elemAspect) {
+    rW = rect.width; rH = rect.width / aspect; ox = 0; oy = (rect.height - rH) / 2;
   } else {
-    // Image is taller than element — bars on left/right
-    renderH = rect.height;
-    renderW = rect.height * canvasAspect;
-    offsetX = (rect.width - renderW) / 2;
-    offsetY = 0;
+    rH = rect.height; rW = rect.height * aspect; ox = (rect.width - rW) / 2; oy = 0;
   }
-  const relX = e.clientX - rect.left - offsetX;
-  const relY = e.clientY - rect.top - offsetY;
-  const x = Math.round((relX / renderW) * imgW);
-  const y = Math.round((relY / renderH) * imgH);
+  const x = Math.round(((e.clientX - rect.left - ox) / rW) * imgW);
+  const y = Math.round(((e.clientY - rect.top  - oy) / rH) * imgH);
   return { x: Math.max(0, Math.min(x, imgW - 1)), y: Math.max(0, Math.min(y, imgH - 1)) };
 }
 
 function sendInput(evt) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
+  if (ws && ws.readyState === WebSocket.OPEN)
     ws.send(JSON.stringify({ type: "input", event: evt }));
-  }
 }
 
-canvas.addEventListener("mousemove", e => {
-  const c = canvasCoords(e);
-  sendInput({ type: "mousemove", x: c.x, y: c.y });
+// Attach mouse events to both display elements
+[canvas, videoEl].forEach(el => {
+  el.addEventListener("mousemove", e => {
+    const c = getDisplayCoords(e); sendInput({ type: "mousemove", x: c.x, y: c.y });
+  });
+  el.addEventListener("mousedown", e => {
+    e.preventDefault();
+    const c = getDisplayCoords(e); sendInput({ type: "mousedown", x: c.x, y: c.y, button: e.button });
+  });
+  el.addEventListener("mouseup", e => {
+    const c = getDisplayCoords(e); sendInput({ type: "mouseup", x: c.x, y: c.y, button: e.button });
+  });
+  el.addEventListener("wheel", e => {
+    e.preventDefault();
+    const c = getDisplayCoords(e); sendInput({ type: "scroll", x: c.x, y: c.y, deltaY: e.deltaY });
+  }, { passive: false });
+  el.addEventListener("contextmenu", e => e.preventDefault());
+  el.tabIndex = 0;
 });
-
-canvas.addEventListener("mousedown", e => {
-  e.preventDefault();
-  const c = canvasCoords(e);
-  sendInput({ type: "mousedown", x: c.x, y: c.y, button: e.button });
-});
-
-canvas.addEventListener("mouseup", e => {
-  const c = canvasCoords(e);
-  sendInput({ type: "mouseup", x: c.x, y: c.y, button: e.button });
-});
-
-canvas.addEventListener("wheel", e => {
-  e.preventDefault();
-  const c = canvasCoords(e);
-  sendInput({ type: "scroll", x: c.x, y: c.y, deltaY: e.deltaY });
-}, { passive: false });
-
-canvas.addEventListener("contextmenu", e => e.preventDefault());
 
 document.addEventListener("keydown", e => {
   if (remoteScreen.style.display !== "block") return;
@@ -474,39 +528,31 @@ document.addEventListener("keydown", e => {
   sendInput({ type: "keydown", key: mapKey(e.key), code: e.code,
     ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, meta: e.metaKey });
 });
-
 document.addEventListener("keyup", e => {
   if (remoteScreen.style.display !== "block") return;
   sendInput({ type: "keyup", key: mapKey(e.key), code: e.code,
     ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, meta: e.metaKey });
 });
 
-// Map browser key names to pyautogui key names
 function mapKey(key) {
-  const map = {
-    "Control": "ctrl", "Shift": "shift", "Alt": "alt", "Meta": "command",
-    "Enter": "enter", "Backspace": "backspace", "Delete": "delete",
-    "Tab": "tab", "Escape": "escape", "ArrowUp": "up", "ArrowDown": "down",
-    "ArrowLeft": "left", "ArrowRight": "right", " ": "space",
-    "Home": "home", "End": "end", "PageUp": "pageup", "PageDown": "pagedown",
-    "F1": "f1", "F2": "f2", "F3": "f3", "F4": "f4", "F5": "f5", "F6": "f6",
-    "F7": "f7", "F8": "f8", "F9": "f9", "F10": "f10", "F11": "f11", "F12": "f12",
-    "CapsLock": "capslock",
-  };
-  return map[key] || key;
+  return {
+    "Control":"ctrl","Shift":"shift","Alt":"alt","Meta":"command",
+    "Enter":"enter","Backspace":"backspace","Delete":"delete","Tab":"tab",
+    "Escape":"escape","ArrowUp":"up","ArrowDown":"down","ArrowLeft":"left","ArrowRight":"right",
+    " ":"space","Home":"home","End":"end","PageUp":"pageup","PageDown":"pagedown",
+    "F1":"f1","F2":"f2","F3":"f3","F4":"f4","F5":"f5","F6":"f6",
+    "F7":"f7","F8":"f8","F9":"f9","F10":"f10","F11":"f11","F12":"f12","CapsLock":"capslock",
+  }[key] || key;
 }
 
-// Keep canvas focusable for keyboard
-canvas.tabIndex = 0;
-
-// ── Ambassador: unlock Ultra quality & 30fps ──────────
+// ── Ambassador ────────────────────────────
 (function() {
   const isAmb = !!JSON.parse(localStorage.getItem("veil_ambassador_v1") || "null");
   if (!isAmb) return;
   const ultra = $("setQuality").querySelector('option[value="ultra"]');
   const fps30 = $("setFps").querySelector('option[value="30"]');
-  if (ultra) { ultra.disabled = false; ultra.textContent = "Ultra (Ambassador)"; }
-  if (fps30) { fps30.disabled = false; fps30.textContent = "30 fps (Ambassador)"; }
+  if (ultra) { ultra.disabled = false; ultra.textContent = "Ultra"; }
+  if (fps30)  { fps30.disabled  = false; fps30.textContent  = "30 fps"; }
 })();
 </script>
 </body>
