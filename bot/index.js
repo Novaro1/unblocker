@@ -1073,6 +1073,74 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return interaction.reply({ content: `Removed **${url}** from the links list.` });
   }
 
+  // /cleanlinks
+  if (commandName === "cleanlinks") {
+    const dryRun = interaction.options.getBoolean("dry_run") ?? false;
+    await interaction.deferReply();
+
+    const links = loadLinks();
+    if (!links.length) {
+      return interaction.editReply({ content: "No links to check." });
+    }
+
+    // Check all links concurrently (max 5 at once to avoid flooding)
+    const CONCURRENCY = 5;
+    const results = [];
+    for (let i = 0; i < links.length; i += CONCURRENCY) {
+      const batch = links.slice(i, i + CONCURRENCY);
+      const checked = await Promise.all(
+        batch.map(async (link) => {
+          const status = await checkStatus(link.url);
+          return { link, online: status.online, code: status.code };
+        })
+      );
+      results.push(...checked);
+    }
+
+    const dead = results.filter((r) => !r.online || (r.code && r.code >= 400));
+    const alive = results.filter((r) => r.online && (!r.code || r.code < 400));
+
+    if (!dead.length) {
+      return interaction.editReply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0x22c55e)
+            .setTitle("All links are healthy")
+            .setDescription(`Checked **${links.length}** links — all are online.`)
+            .setTimestamp(),
+        ],
+      });
+    }
+
+    if (!dryRun) {
+      const deadUrls = new Set(dead.map((r) => r.link.url));
+      const surviving = links.filter((l) => !deadUrls.has(l.url));
+      saveLinks(surviving);
+      for (const { link } of dead) {
+        await deleteLinkMessage(link.url);
+      }
+    }
+
+    const deadList = dead
+      .map((r) => `• \`${r.link.url}\` — ${r.online ? `HTTP ${r.code}` : "unreachable"}`)
+      .join("\n")
+      .slice(0, 3800);
+
+    const embed = new EmbedBuilder()
+      .setColor(dryRun ? 0xf59e0b : 0xef4444)
+      .setTitle(dryRun ? `Dead Links Preview (${dead.length})` : `Removed ${dead.length} Dead Link${dead.length !== 1 ? "s" : ""}`)
+      .setDescription(deadList)
+      .addFields(
+        { name: "Checked",  value: String(links.length),   inline: true },
+        { name: "Healthy",  value: String(alive.length),   inline: true },
+        { name: "Dead",     value: String(dead.length),    inline: true },
+      )
+      .setFooter({ text: dryRun ? "Run without dry_run to actually remove them." : `${alive.length} links remaining` })
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [embed] });
+  }
+
   // /status
   if (commandName === "status") {
     await interaction.deferReply();

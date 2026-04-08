@@ -85,6 +85,14 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
+    .setName("cleanlinks")
+    .setDescription("Check all links and remove dead ones (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addBooleanOption((o) =>
+      o.setName("dry_run").setDescription("Preview dead links without removing them (default: false)").setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
     .setName("status")
     .setDescription("Check if the Veil server is online"),
 
