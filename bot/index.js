@@ -124,17 +124,25 @@ function saveLinks(links) {
 }
 
 // ── Server status check ────────────────────────────────────────────────────
-function checkStatus(url) {
+function checkStatus(url, timeoutMs = 8000) {
   return new Promise((resolve) => {
     const start = Date.now();
-    https
-      .get(url, (res) => {
+    let done = false;
+    const finish = (result) => { if (!done) { done = true; resolve(result); } };
+    const timer = setTimeout(() => finish({ online: false, ms: timeoutMs }), timeoutMs);
+    let req;
+    try {
+      req = https.get(url, (res) => {
+        clearTimeout(timer);
         res.resume();
-        resolve({ online: true, code: res.statusCode, ms: Date.now() - start });
-      })
-      .on("error", () => {
-        resolve({ online: false, ms: Date.now() - start });
+        finish({ online: true, code: res.statusCode, ms: Date.now() - start });
       });
+      req.setTimeout(timeoutMs, () => { req.destroy(); });
+      req.on("error", () => { clearTimeout(timer); finish({ online: false, ms: Date.now() - start }); });
+    } catch {
+      clearTimeout(timer);
+      finish({ online: false, ms: 0 });
+    }
   });
 }
 
@@ -1077,6 +1085,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "cleanlinks") {
     const dryRun = interaction.options.getBoolean("dry_run") ?? false;
     await interaction.deferReply();
+    try {
 
     const links = loadLinks();
     if (!links.length) {
@@ -1139,6 +1148,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setTimestamp();
 
     return interaction.editReply({ embeds: [embed] });
+    } catch (err) {
+      console.error("[cleanlinks]", err);
+      return interaction.editReply({ content: `Error while checking links: ${err.message}` });
+    }
   }
 
   // /status
