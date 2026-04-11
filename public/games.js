@@ -202,8 +202,8 @@
     }
 
     tile.addEventListener("click", () => {
-      if (isLocal)        { navigateLocal("/games/play?src=" + encodeURIComponent(game.url)); }
-
+      if (game.direct)    { navigateLocal(game.url); }
+      else if (isLocal)   { navigateLocal("/games/play?src=" + encodeURIComponent(game.url)); }
       else                { navigateTo(game.url); }
     });
     return tile;
@@ -232,7 +232,7 @@
     }
 
     // ── Veil Music featured tile ───────────────────────────────────────────
-    const musicTile = makeTile({ name: "Veil Music", hue: 240, url: "/music.html", svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' }, true);
+    const musicTile = makeTile({ name: "Veil Music", hue: 240, url: "/music.html", direct: true, svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' }, true);
     musicTile.classList.add("gs-featured");
     grid.appendChild(musicTile);
 
