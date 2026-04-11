@@ -91,7 +91,7 @@ function openBlankCloak() {
 // Button
 document.getElementById("blank-cloak-btn")?.addEventListener("click", openBlankCloak);
 
-// Auto toggle
+// Manual "about:blank" button auto toggle (legacy setting, kept for compat)
 const autoCheckbox = document.getElementById("blank-cloak-auto");
 if (autoCheckbox) {
   autoCheckbox.checked = localStorage.getItem(BLANK_CLOAK_AUTO_KEY) === "1";
@@ -100,7 +100,73 @@ if (autoCheckbox) {
   });
 }
 
-// Auto-open on load if enabled — only when not already in a blank cloak
-if (localStorage.getItem(BLANK_CLOAK_AUTO_KEY) === "1" && window.top === window) {
+// ── Stealth entry — defaults ON ─────────────────────────────────────────────
+const STEALTH_ENTRY_KEY = "veil_stealth_entry";
+
+function isStealthEntryOn() {
+  const v = localStorage.getItem(STEALTH_ENTRY_KEY);
+  return v === null ? true : v === "1"; // default ON
+}
+
+const stealthEntryToggle = document.getElementById("stealth-entry-toggle");
+if (stealthEntryToggle) {
+  stealthEntryToggle.checked = isStealthEntryOn();
+  stealthEntryToggle.addEventListener("change", () => {
+    localStorage.setItem(STEALTH_ENTRY_KEY, stealthEntryToggle.checked ? "1" : "0");
+  });
+}
+
+// Trigger on every fresh top-level load.
+// Skip if already inside a blank-cloak iframe (window !== window.top)
+// or if loaded inside any iframe (parent check).
+const _isTopWindow = window === window.top && window.self === window.top;
+if (isStealthEntryOn() && _isTopWindow) {
   openBlankCloak();
+} else if (localStorage.getItem(BLANK_CLOAK_AUTO_KEY) === "1" && _isTopWindow) {
+  // Legacy auto-open setting
+  openBlankCloak();
+}
+
+// ── DevTools blocking ────────────────────────────────────────────────────────
+const BLOCK_DT_KEY = "veil_block_devtools";
+
+function isBlockDevToolsOn() {
+  const v = localStorage.getItem(BLOCK_DT_KEY);
+  return v === null ? true : v === "1"; // default ON
+}
+
+const blockDevToolsToggle = document.getElementById("block-devtools-toggle");
+if (blockDevToolsToggle) {
+  blockDevToolsToggle.checked = isBlockDevToolsOn();
+  blockDevToolsToggle.addEventListener("change", () => {
+    localStorage.setItem(BLOCK_DT_KEY, blockDevToolsToggle.checked ? "1" : "0");
+  });
+}
+
+if (isBlockDevToolsOn()) {
+  // Block keyboard shortcuts for devtools and view-source
+  document.addEventListener("keydown", (e) => {
+    const ctrl = e.ctrlKey || e.metaKey;
+    // F12
+    if (e.key === "F12") { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    // Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C (DevTools)
+    if (ctrl && e.shiftKey && ["i", "I", "j", "J", "c", "C"].includes(e.key)) {
+      e.preventDefault(); e.stopImmediatePropagation(); return;
+    }
+    // Ctrl+U (View Source)
+    if (ctrl && (e.key === "u" || e.key === "U")) {
+      e.preventDefault(); e.stopImmediatePropagation(); return;
+    }
+    // Ctrl+S (Save page)
+    if (ctrl && (e.key === "s" || e.key === "S")) {
+      e.preventDefault(); e.stopImmediatePropagation(); return;
+    }
+  }, true);
+
+  // Block right-click context menu on home screen (not inside the proxy frame)
+  document.addEventListener("contextmenu", (e) => {
+    const frame = document.getElementById("sj-frame-container");
+    if (frame && frame.style.display === "flex") return; // allow inside proxy
+    e.preventDefault();
+  }, true);
 }
