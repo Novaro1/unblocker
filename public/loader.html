@@ -632,8 +632,27 @@
     },
   ];
 
-  // ── On first visit: redirect to a real educational site ────────
-  // Pick the real redirect target based on domain keywords, same logic as before
+  // ── Access logic ────────────────────────────────────────────
+  // Users share the link with #veil appended (e.g. https://domain/#veil)
+  // Hash fragments are never sent to the server or visible in network logs.
+  // Once authenticated, v_ok is set in localStorage so future bare visits work.
+  // Admins visiting the bare URL with no hash and no v_ok get redirected.
+
+  const SECRET_HASH = "veil";
+
+  const hash = location.hash.replace("#", "").toLowerCase();
+  const hasAccess = localStorage.getItem(KEY) === "1";
+
+  if (hash === SECRET_HASH || hasAccess) {
+    // Grant access — set flag and strip hash from URL so it's not visible
+    localStorage.setItem(KEY, "1");
+    history.replaceState(null, "", location.pathname + location.search);
+    // Redirect to /go (the actual Veil launcher)
+    window.location.replace("/go");
+    return;
+  }
+
+  // No access — redirect to a real educational site based on domain keywords
   const host = location.hostname.toLowerCase();
 
   const REDIRECT_URLS = {
@@ -650,14 +669,8 @@
   for (const t of T) {
     if (t.keywords.some(k => host.includes(k))) { redirectId = t.id; break; }
   }
-  if (!redirectId) {
-    const cached = localStorage.getItem("v_tpl_" + host);
-    if (cached) redirectId = cached;
-  }
 
   const redirectUrl = REDIRECT_URLS[redirectId] || "https://classroom.google.com";
-
-  // Redirect immediately — the real site is indistinguishable from a normal visit
   window.location.replace(redirectUrl);
 })();
 </script>
