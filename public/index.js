@@ -424,7 +424,17 @@ form.addEventListener("submit", async (event) => {
     overlay.style.display = "none";
   }
 
+  const fab = document.getElementById("bug-fab");
   openBtn?.addEventListener("click", open);
+  fab?.addEventListener("click", open);
+
+  // Hide FAB when the proxy browser chrome is active
+  const frameContainer = document.getElementById("sj-frame-container");
+  if (fab && frameContainer) {
+    const syncFab = () => { fab.style.display = frameContainer.style.display === "flex" ? "none" : "flex"; };
+    syncFab();
+    new MutationObserver(syncFab).observe(frameContainer, { attributes: true, attributeFilter: ["style"] });
+  }
   closeBtn?.addEventListener("click", close);
   overlay?.addEventListener("click", close);
 
