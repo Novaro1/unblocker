@@ -176,19 +176,6 @@
       }
       #ps-home-link:hover { color: var(--text, #ecedf8); background: rgba(255,255,255,0.04); }
 
-      /* Nav gear button */
-      .page-nav-gear {
-        margin-left: auto;
-        background: none; border: none; cursor: pointer;
-        color: rgba(236,237,248,0.45);
-        padding: 0.25rem 0.5rem; border-radius: 5px;
-        display: flex; align-items: center;
-        transition: color 0.15s, background 0.15s;
-      }
-      .page-nav-gear:hover {
-        color: var(--text, #ecedf8);
-        background: rgba(99,102,241,0.10);
-      }
     `;
     document.head.appendChild(style);
 
@@ -227,8 +214,8 @@
     `;
     document.body.appendChild(overlay);
 
-    // Gear button in page-nav
-    const nav = document.querySelector(".page-nav");
+    // Gear button in page-nav (home uses .page-nav class, others use #page-nav id)
+    const nav = document.querySelector("#page-nav, .page-nav, .site-nav");
     if (nav) {
       const gear = document.createElement("button");
       gear.className = "page-nav-gear";
