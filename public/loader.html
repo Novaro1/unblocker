@@ -390,12 +390,6 @@
   const KEY = "v_ok";
   const cloak = document.getElementById("cloak");
 
-  if (localStorage.getItem(KEY)) {
-    cloak.remove();
-    document.title = "Veil";
-    return;
-  }
-
   // ── Templates ──────────────────────────────────────────────
   const T = [
     {
