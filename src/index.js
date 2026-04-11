@@ -151,12 +151,24 @@ fastify.addContentTypeParser("application/json", { parseAs: "buffer" }, (req, bo
 // to Google Classroom immediately — before any JS runs.
 fastify.get("/", (req, reply) => {
   const ua = req.headers["user-agent"] || "";
-  const hasCookie = req.headers.cookie?.includes("v_ok=1");
+  const cookies = req.headers.cookie || "";
+  const hasCookie = cookies.includes("v_ok=1");
+  const isPoisoned = cookies.includes("v_poison=1");
   const isDesktop = /Windows NT|Macintosh/.test(ua);
   const isChromebook = /CrOS/.test(ua);
 
+  // Poisoned: student activated panic mode — clear everything and redirect to Google Classroom
+  if (isPoisoned) {
+    reply
+      .header("Set-Cookie", [
+        "v_poison=; Max-Age=0; Path=/; SameSite=Lax",
+        "v_ok=; Max-Age=0; Path=/; SameSite=Lax",
+      ])
+      .code(302).header("Location", "https://classroom.google.com").send();
+    return;
+  }
+
   // Windows/Mac with no prior access cookie → serve decoy page
-  // (looks like a redirect to Google Classroom but listens for secret key hold)
   if (isDesktop && !isChromebook && !hasCookie) {
     return reply.type("text/html").sendFile("decoy.html");
   }

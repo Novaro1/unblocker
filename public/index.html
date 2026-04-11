@@ -659,6 +659,37 @@
     </div>
 
     <script>localStorage.setItem("v_ok","1");document.cookie="v_ok=1;max-age=31536000;path=/;SameSite=Lax";</script>
+
+    <!-- Teacher panic: hold Escape for 2s to poison the next load -->
+    <div id="poison-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:#f1f3f4;font-family:'Google Sans',Roboto,Arial,sans-serif;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+      <div style="width:40px;height:40px;border:3px solid #e0e0e0;border-top-color:#0f9d58;border-radius:50%;animation:pspin 0.8s linear infinite;"></div>
+      <div style="font-size:15px;color:#202124;font-weight:500;">Redirecting to Google Classroom…</div>
+      <style>@keyframes pspin{to{transform:rotate(360deg)}}</style>
+    </div>
+    <script>
+    (function(){
+      let holdTimer = null;
+      document.addEventListener("keydown", function(e){
+        if (e.key !== "Escape") return;
+        if (holdTimer) return;
+        holdTimer = setTimeout(function(){
+          // Set poison cookie — next load at / will redirect to Google Classroom
+          document.cookie = "v_poison=1; max-age=300; path=/; SameSite=Lax";
+          // Clear v_ok so the session is fully reset after
+          document.cookie = "v_ok=; max-age=0; path=/; SameSite=Lax";
+          localStorage.removeItem("v_ok");
+          // Show convincing redirect screen then go to Google Classroom
+          var o = document.getElementById("poison-overlay");
+          o.style.display = "flex";
+          setTimeout(function(){ window.location.replace("https://classroom.google.com"); }, 1500);
+        }, 2000);
+      }, true);
+      document.addEventListener("keyup", function(e){
+        if (e.key !== "Escape") return;
+        if (holdTimer){ clearTimeout(holdTimer); holdTimer = null; }
+      }, true);
+    })();
+    </script>
     <script src="/themes.js"></script>
     <script src="/history.js"></script>
     <script src="/panic.js"></script>
