@@ -431,7 +431,7 @@ form.addEventListener("submit", async (event) => {
   // Hide FAB when the proxy browser chrome is active
   const frameContainer = document.getElementById("sj-frame-container");
   if (fab && frameContainer) {
-    const syncFab = () => { fab.style.display = frameContainer.style.display === "flex" ? "none" : "flex"; };
+    const syncFab = () => { fab.classList.toggle("fab-hidden", frameContainer.style.display === "flex"); };
     syncFab();
     new MutationObserver(syncFab).observe(frameContainer, { attributes: true, attributeFilter: ["style"] });
   }
