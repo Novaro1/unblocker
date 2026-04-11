@@ -781,7 +781,7 @@ footer a:hover { opacity: 1; text-decoration: underline; }
   position: fixed;
   bottom: 1.25rem;
   right: 1.25rem;
-  z-index: 900;
+  z-index: 1002;
   display: flex;
   align-items: center;
   gap: 0.45rem;
