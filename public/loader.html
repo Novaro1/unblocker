@@ -633,45 +633,13 @@
   ];
 
   // ── Access logic ────────────────────────────────────────────
-  // Users share the link with #veil appended (e.g. https://domain/#veil)
-  // Hash fragments are never sent to the server or visible in network logs.
-  // Once authenticated, v_ok is set in localStorage so future bare visits work.
-  // Admins visiting the bare URL with no hash and no v_ok get redirected.
-
-  const SECRET_HASH = "veil";
-
-  const hash = location.hash.replace("#", "").toLowerCase();
-  const hasAccess = localStorage.getItem(KEY) === "1";
-
-  if (hash === SECRET_HASH || hasAccess) {
-    // Grant access — set flag and strip hash from URL so it's not visible
-    localStorage.setItem(KEY, "1");
-    history.replaceState(null, "", location.pathname + location.search);
-    // Redirect to /go (the actual Veil launcher)
-    window.location.replace("/go");
-    return;
-  }
-
-  // No access — redirect to a real educational site based on domain keywords
-  const host = location.hostname.toLowerCase();
-
-  const REDIRECT_URLS = {
-    study:   "https://www.khanacademy.org",
-    math:    "https://www.desmos.com/calculator",
-    science: "https://phet.colorado.edu",
-    writing: "https://docs.google.com",
-    code:    "https://code.org",
-    health:  "https://www.khanacademy.org/khan-labs",
-    docs:    "https://docs.google.com",
-  };
-
-  let redirectId = null;
-  for (const t of T) {
-    if (t.keywords.some(k => host.includes(k))) { redirectId = t.id; break; }
-  }
-
-  const redirectUrl = REDIRECT_URLS[redirectId] || "https://classroom.google.com";
-  window.location.replace(redirectUrl);
+  // Server already blocks Windows/Mac without a v_ok cookie.
+  // If we're here, user is on a Chromebook or has prior access.
+  // Set the v_ok cookie (1 year) so the server recognises them on future visits,
+  // then go straight to Veil.
+  document.cookie = "v_ok=1; max-age=31536000; path=/; SameSite=Lax";
+  localStorage.setItem(KEY, "1");
+  window.location.replace("/go");
 })();
 </script>
 </body>

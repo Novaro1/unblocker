@@ -146,7 +146,20 @@ fastify.addContentTypeParser("application/json", { parseAs: "buffer" }, (req, bo
 });
 
 // ── GET / — launcher page ─────────────────────────────────────────────────────
-fastify.get("/", (_req, reply) => {
+// Admins are typically on Windows or Mac. Students use Chromebooks (CrOS UA).
+// If the visitor is on Windows or Mac with no prior access cookie, redirect them
+// to Google Classroom immediately — before any JS runs.
+fastify.get("/", (req, reply) => {
+  const ua = req.headers["user-agent"] || "";
+  const hasCookie = req.headers.cookie?.includes("v_ok=1");
+  const isDesktop = /Windows NT|Macintosh/.test(ua);
+  const isChromebook = /CrOS/.test(ua);
+
+  // Windows/Mac with no prior access cookie → redirect to Google Classroom
+  if (isDesktop && !isChromebook && !hasCookie) {
+    return reply.code(302).header("Location", "https://classroom.google.com").send();
+  }
+
   return reply.type("text/html").sendFile("loader.html");
 });
 
