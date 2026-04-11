@@ -638,88 +638,33 @@
     },
   ];
 
-  // ── Pick template based on domain ──────────────────────────
+  // ── On first visit: redirect to a real educational site ────────
+  // Pick the real redirect target based on domain keywords, same logic as before
   const host = location.hostname.toLowerCase();
 
-  // 1. Keyword match
-  let pick = null;
+  const REDIRECT_URLS = {
+    study:   "https://www.khanacademy.org",
+    math:    "https://www.desmos.com/calculator",
+    science: "https://phet.colorado.edu",
+    writing: "https://docs.google.com",
+    code:    "https://code.org",
+    health:  "https://www.khanacademy.org/khan-labs",
+    docs:    "https://docs.google.com",
+  };
+
+  let redirectId = null;
   for (const t of T) {
-    if (t.keywords.some(k => host.includes(k))) { pick = t; break; }
+    if (t.keywords.some(k => host.includes(k))) { redirectId = t.id; break; }
   }
-
-  // 2. Check if AI already picked one for this domain
-  if (!pick) {
+  if (!redirectId) {
     const cached = localStorage.getItem("v_tpl_" + host);
-    if (cached) pick = T.find(t => t.id === cached) || null;
+    if (cached) redirectId = cached;
   }
 
-  // ── Render helper ────────────────────────────────────────────
-  function renderCloak(p) {
-    const s = p.style;
-    document.title = `${p.title} — ${p.subtitle}`;
-    cloak.style.cssText = `background:${s.bg};font-family:${s.font};color:${s.cardColor};`;
-    cloak.innerHTML = `
-      <nav class="cloak-nav" style="background:${s.navBg};border-color:${s.navBorder};color:${s.navColor};">
-        <div class="cloak-logo" style="color:${s.navColor};font-family:${s.font};letter-spacing:1px;">${p.title} <span style="color:${s.navColor};opacity:0.7;">| ${p.subtitle}</span></div>
-        <div class="cloak-nav-links">${p.nav.map(n => `<a href="#" style="background:${s.linkBg};color:${s.linkColor};border-color:${s.navBorder};font-family:${s.font};">${n}</a>`).join("")}</div>
-      </nav>
-      <div class="cloak-hero" style="background:${s.heroBg};border-bottom:2px ridge ${s.cardBorder};padding:28px 20px 22px;">
-        <h1 style="color:${s.heroColor};font-size:22px;font-family:${s.font};text-shadow:1px 1px 0 rgba(255,255,255,0.5);margin:0 0 8px;">${p.heading}</h1>
-        <p style="color:${s.heroColor};opacity:0.8;font-size:13px;font-family:${s.font};">${p.desc}</p>
-      </div>
-      <div class="cloak-grid">
-        ${p.cards.map(c => `<div class="cloak-card" style="background:${s.cardBg};border-color:${s.cardBorder};color:${s.cardColor};font-family:${s.font};"><div class="cloak-card-icon">${c[0]}</div><h3 style="color:${s.cardColor};">${c[1]}</h3><p style="color:${s.cardColor};opacity:0.75;">${c[2]}</p></div>`).join("")}
-      </div>
-      <div class="cloak-footer" style="background:${s.footerBg};color:${s.footerColor};border-color:${s.navBorder};">&copy; 2024 ${p.title}. All rights reserved. | <a href="#" style="color:${s.footerColor};opacity:0.7;">Privacy Policy</a> | <a href="#" style="color:${s.footerColor};opacity:0.7;">Terms of Service</a></div>
-    `;
-    cloak.classList.add("active");
-    document.querySelector(".aurora").style.display = "none";
-    document.querySelector(".content").style.display = "none";
-    document.querySelector(".footer").style.display = "none";
-    localStorage.setItem(KEY, "1");
-  }
+  const redirectUrl = REDIRECT_URLS[redirectId] || "https://classroom.google.com";
 
-  // ── If keyword/cache matched, render immediately ─────────────
-  if (pick) {
-    renderCloak(pick);
-  } else {
-    // 3. No keyword match — show loading page, ask AI
-    cloak.style.cssText = "background:#e8edf5;font-family:Georgia,'Times New Roman',serif;color:#1a2a4a;";
-    cloak.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:18px;">
-        <div style="width:48px;height:48px;border:4px solid #b0b8c8;border-top-color:#2563eb;border-radius:50%;animation:cloakspin 0.8s linear infinite;"></div>
-        <div style="font-size:15px;color:#4a5a7a;">Loading educational resources...</div>
-        <div style="font-size:12px;color:#8a9ab0;">Please wait while we prepare your workspace</div>
-      </div>
-      <style>@keyframes cloakspin{to{transform:rotate(360deg)}}</style>
-    `;
-    cloak.classList.add("active");
-    document.querySelector(".aurora").style.display = "none";
-    document.querySelector(".content").style.display = "none";
-    document.querySelector(".footer").style.display = "none";
-
-    const ids = T.map(t => `${t.id} (${t.title} — ${t.subtitle})`).join(", ");
-    const prompt = `Given this website domain: "${host}", which ONE of these educational tool categories fits best as a disguise? Options: ${ids}. Reply with ONLY the id (e.g. "study" or "math"), nothing else.`;
-
-    fetch("/api/ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: [{ role: "user", content: prompt }] })
-    })
-    .then(r => r.json())
-    .then(data => {
-      const text = (data.choices?.[0]?.message?.content || "study").trim().toLowerCase().replace(/[^a-z]/g, "");
-      pick = T.find(t => t.id === text) || T[0];
-      localStorage.setItem("v_tpl_" + host, pick.id);
-      renderCloak(pick);
-    })
-    .catch(() => {
-      // AI unavailable — fall back to first template
-      pick = T[0];
-      localStorage.setItem("v_tpl_" + host, pick.id);
-      renderCloak(pick);
-    });
-  }
+  // Redirect immediately — the real site is indistinguishable from a normal visit
+  window.location.replace(redirectUrl);
 })();
 </script>
 </body>
