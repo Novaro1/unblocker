@@ -160,7 +160,9 @@ fastify.get("/", (req, reply) => {
     return reply.code(302).header("Location", "https://classroom.google.com").send();
   }
 
-  return reply.type("text/html").sendFile("loader.html");
+  // Set the access cookie and serve Veil directly
+  reply.header("Set-Cookie", "v_ok=1; Max-Age=31536000; Path=/; SameSite=Lax");
+  return reply.type("text/html").sendFile("index.html");
 });
 
 // ── GET /go — proxy / unblocker ───────────────────────────────────────────────
