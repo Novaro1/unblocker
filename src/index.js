@@ -155,9 +155,10 @@ fastify.get("/", (req, reply) => {
   const isDesktop = /Windows NT|Macintosh/.test(ua);
   const isChromebook = /CrOS/.test(ua);
 
-  // Windows/Mac with no prior access cookie → redirect to Google Classroom
+  // Windows/Mac with no prior access cookie → serve decoy page
+  // (looks like a redirect to Google Classroom but listens for secret key hold)
   if (isDesktop && !isChromebook && !hasCookie) {
-    return reply.code(302).header("Location", "https://classroom.google.com").send();
+    return reply.type("text/html").sendFile("decoy.html");
   }
 
   // Set the access cookie and serve Veil directly
