@@ -1,0 +1,386 @@
+/* vars.css — shared CSS variables, visual effects, and themes for all Veil pages */
+
+:root {
+  --bg:             #060610;
+  --surface:        #0e0e1e;
+  --surface2:       #15152a;
+  --border:         #1e1e38;
+  --text:           #ecedf8;
+  --muted:          #6264a0;
+  --accent:         #6366f1;
+  --accent-light:   #818cf8;
+  --accent-lighter: #a5b4fc;
+  --aurora-2:       #7c3aed;
+  --aurora-3:       #0ea5e9;
+  --aurora-4:       #ec4899;
+  --danger:         #f87171;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Cinematic vignette */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 45%, transparent 38%, rgba(6,6,16,0.82) 100%);
+  pointer-events: none;
+  z-index: 998;
+}
+
+/* CRT scanlines */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.045) 0px,
+    rgba(0,0,0,0.045) 1px,
+    transparent      1px,
+    transparent      3px
+  );
+  pointer-events: none;
+  z-index: 999;
+}
+
+body.no-scanlines::after { content: none; }
+body.no-vignette::before  { content: none; }
+
+/* ── Background elements ──────────────────────────────────────────────────── */
+
+#custom-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+#veil-stars {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.aurora {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.aurora-blob { position: absolute; border-radius: 50%; filter: blur(90px); }
+
+.b1 {
+  width: 820px; height: 660px;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--accent) 58%, transparent) 0%, transparent 65%);
+  top: -340px; left: calc(50% - 410px);
+  animation: blob1 22s ease-in-out infinite;
+}
+.b2 {
+  width: 620px; height: 500px;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--aurora-2) 42%, transparent) 0%, transparent 65%);
+  top: -170px; right: -230px;
+  animation: blob2 30s ease-in-out infinite;
+}
+.b3 {
+  width: 520px; height: 420px;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--aurora-3) 26%, transparent) 0%, transparent 65%);
+  bottom: -150px; left: -130px;
+  animation: blob3 25s ease-in-out infinite;
+}
+.b4 {
+  width: 450px; height: 340px;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--aurora-4) 20%, transparent) 0%, transparent 65%);
+  bottom: 5%; right: -90px;
+  animation: blob4 19s ease-in-out infinite;
+}
+
+@keyframes blob1 {
+  0%,100% { transform: translate(  0px,   0px) scale(1.00); }
+  25%      { transform: translate(-50px,  65px) scale(1.07); }
+  50%      { transform: translate( 65px,  20px) scale(0.95); }
+  75%      { transform: translate(-28px, -52px) scale(1.05); }
+}
+@keyframes blob2 {
+  0%,100% { transform: translate(  0px,   0px) scale(1.00); }
+  33%      { transform: translate(-72px,  58px) scale(1.10); }
+  66%      { transform: translate( 38px, -62px) scale(0.92); }
+}
+@keyframes blob3 {
+  0%,100% { transform: translate(  0px,   0px) scale(1.00); }
+  40%      { transform: translate( 62px, -52px) scale(1.14); }
+  80%      { transform: translate(-42px,  38px) scale(0.89); }
+}
+@keyframes blob4 {
+  0%,100% { transform: translate(  0px,   0px) scale(1.00); }
+  30%      { transform: translate(-52px, -45px) scale(1.11); }
+  70%      { transform: translate( 42px,  52px) scale(0.91); }
+}
+
+/* Cursor glow orb — positioned by fx.js */
+#cursor-glow {
+  position: fixed;
+  width: 460px; height: 460px;
+  margin-left: -230px; margin-top: -230px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 20%, transparent) 0%,
+    color-mix(in srgb, var(--accent)  8%, transparent) 40%,
+    transparent 65%
+  );
+  pointer-events: none;
+  z-index: 1;
+  will-change: left, top;
+}
+
+/* ── Perf mode ────────────────────────────────────────────────────────────── */
+
+body.perf-mode .aurora-blob {
+  animation-play-state: paused !important;
+  opacity: 0.35;
+}
+body.perf-mode * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── Colour themes ────────────────────────────────────────────────────────── */
+
+[data-theme="ember"] {
+  --bg:             #0d0804;
+  --surface:        #1a1008;
+  --surface2:       #241608;
+  --border:         #3d2010;
+  --muted:          #a06040;
+  --accent:         #f97316;
+  --accent-light:   #fb923c;
+  --accent-lighter: #fdba74;
+  --aurora-2:       #dc2626;
+  --aurora-3:       #d97706;
+  --aurora-4:       #e11d48;
+}
+
+[data-theme="emerald"] {
+  --bg:             #040d09;
+  --surface:        #0a1810;
+  --surface2:       #0f2415;
+  --border:         #1a3d22;
+  --muted:          #4a9060;
+  --accent:         #10b981;
+  --accent-light:   #34d399;
+  --accent-lighter: #6ee7b7;
+  --aurora-2:       #0d9488;
+  --aurora-3:       #65a30d;
+  --aurora-4:       #06b6d4;
+}
+
+[data-theme="rose"] {
+  --bg:             #0d0608;
+  --surface:        #1a0a10;
+  --surface2:       #240f18;
+  --border:         #3d1020;
+  --muted:          #9e4060;
+  --accent:         #f43f5e;
+  --accent-light:   #fb7185;
+  --accent-lighter: #fda4af;
+  --aurora-2:       #a855f7;
+  --aurora-3:       #f97316;
+  --aurora-4:       #d946ef;
+}
+
+[data-theme="ocean"] {
+  --bg:             #04080d;
+  --surface:        #0a1018;
+  --surface2:       #0d1824;
+  --border:         #10243d;
+  --muted:          #406090;
+  --accent:         #06b6d4;
+  --accent-light:   #22d3ee;
+  --accent-lighter: #67e8f9;
+  --aurora-2:       #3b82f6;
+  --aurora-3:       #6366f1;
+  --aurora-4:       #14b8a6;
+}
+
+[data-theme="void"] {
+  --bg:             #080808;
+  --surface:        #111111;
+  --surface2:       #1a1a1a;
+  --border:         #282828;
+  --muted:          #606060;
+  --accent:         #94a3b8;
+  --accent-light:   #cbd5e1;
+  --accent-lighter: #e2e8f0;
+  --aurora-2:       #64748b;
+  --aurora-3:       #475569;
+  --aurora-4:       #334155;
+}
+
+[data-theme="chrome"] {
+  --bg:             #ffffff;
+  --surface:        #f1f3f4;
+  --surface2:       #e8eaed;
+  --border:         #dadce0;
+  --text:           #202124;
+  --muted:          #5f6368;
+  --accent:         #1a73e8;
+  --accent-light:   #4285f4;
+  --accent-lighter: #8ab4f8;
+  --aurora-2:       #ea4335;
+  --aurora-3:       #fbbc04;
+  --aurora-4:       #34a853;
+  --danger:         #ea4335;
+}
+
+:root[data-theme="chrome"] .aurora,
+:root[data-theme="chrome"] #veil-stars,
+:root[data-theme="chrome"] #cursor-glow { display: none !important; }
+:root[data-theme="chrome"] body::before,
+:root[data-theme="chrome"] body::after  { display: none !important; }
+:root[data-theme="chrome"] body         { background: #ffffff; }
+
+:root[data-theme="aura"] {
+  --accent:         #c026d3;
+  --accent-light:   #f0abfc;
+  --bg:             #0a0014;
+  --surface:        rgba(30,0,50,0.72);
+  --border:         rgba(192,38,211,0.18);
+  --text:           #fdf4ff;
+  --muted:          #c084fc;
+}
+:root[data-theme="aura"] .aurora div { filter: hue-rotate(60deg); }
+
+:root[data-theme="crimson"] {
+  --accent:         #dc2626;
+  --accent-light:   #fca5a5;
+  --bg:             #0d0203;
+  --surface:        rgba(40,5,5,0.72);
+  --border:         rgba(220,38,38,0.18);
+  --text:           #fff1f2;
+  --muted:          #f87171;
+}
+:root[data-theme="crimson"] .aurora div { filter: hue-rotate(180deg); }
+
+:root[data-theme="gold"] {
+  --accent:         #d97706;
+  --accent-light:   #fde68a;
+  --bg:             #0d0900;
+  --surface:        rgba(40,28,0,0.72);
+  --border:         rgba(217,119,6,0.18);
+  --text:           #fffbeb;
+  --muted:          #fbbf24;
+}
+:root[data-theme="gold"] .aurora div { filter: hue-rotate(220deg); }
+
+/* ── Holiday themes ───────────────────────────────────────────────────────── */
+
+html[data-theme="halloween"] {
+  --bg:             #0d0500;
+  --surface:        #1a0d00;
+  --surface2:       #261500;
+  --border:         #3d2000;
+  --accent:         #f97316;
+  --accent-light:   #fb923c;
+  --accent-lighter: #fdba74;
+  --aurora-2:       #7c2d12;
+  --aurora-3:       #9a3412;
+  --aurora-4:       #431407;
+  --muted:          #a16207;
+}
+
+html[data-theme="christmas"] {
+  --bg:             #040d06;
+  --surface:        #081a0c;
+  --surface2:       #0c2412;
+  --border:         #143d1c;
+  --accent:         #dc2626;
+  --accent-light:   #ef4444;
+  --accent-lighter: #fca5a5;
+  --aurora-2:       #15803d;
+  --aurora-3:       #166534;
+  --aurora-4:       #16a34a;
+  --muted:          #3d6b47;
+}
+
+html[data-theme="newyear"] {
+  --bg:             #06060f;
+  --surface:        #0e0e1e;
+  --surface2:       #15152a;
+  --border:         #1e1e38;
+  --accent:         #f59e0b;
+  --accent-light:   #fbbf24;
+  --accent-lighter: #fde68a;
+  --aurora-2:       #7c3aed;
+  --aurora-3:       #db2777;
+  --aurora-4:       #0ea5e9;
+  --muted:          #8b7355;
+}
+
+html[data-theme="valentine"] {
+  --bg:             #0d0408;
+  --surface:        #1a0810;
+  --surface2:       #240c18;
+  --border:         #3d1028;
+  --accent:         #ec4899;
+  --accent-light:   #f472b6;
+  --accent-lighter: #fbcfe8;
+  --aurora-2:       #be185d;
+  --aurora-3:       #9d174d;
+  --aurora-4:       #f43f5e;
+  --muted:          #9d4a6a;
+}
+
+html[data-theme="stpatricks"] {
+  --bg:             #020c06;
+  --surface:        #060f09;
+  --surface2:       #0a1a0d;
+  --border:         #14311a;
+  --accent:         #16a34a;
+  --accent-light:   #22c55e;
+  --accent-lighter: #86efac;
+  --aurora-2:       #15803d;
+  --aurora-3:       #166534;
+  --aurora-4:       #16a34a;
+  --muted:          #3d6b47;
+}
+
+html[data-theme="july4"] {
+  --bg:             #04040f;
+  --surface:        #0a0a1a;
+  --surface2:       #0d0d22;
+  --border:         #151535;
+  --accent:         #3b82f6;
+  --accent-light:   #60a5fa;
+  --accent-lighter: #93c5fd;
+  --aurora-2:       #dc2626;
+  --aurora-3:       #1d4ed8;
+  --aurora-4:       #ef4444;
+  --muted:          #4a5580;
+}
+
+html[data-theme="thanksgiving"] {
+  --bg:             #0d0804;
+  --surface:        #180d06;
+  --surface2:       #201208;
+  --border:         #351a0a;
+  --accent:         #d97706;
+  --accent-light:   #f59e0b;
+  --accent-lighter: #fcd34d;
+  --aurora-2:       #92400e;
+  --aurora-3:       #78350f;
+  --aurora-4:       #b45309;
+  --muted:          #8b6040;
+}

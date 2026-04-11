@@ -5,27 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI — Veil</title>
   <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/vars.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script src="/page-init.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    :root {
-      --bg:             #060610;
-      --surface:        #0e0e1e;
-      --surface2:       #15152a;
-      --border:         #1e1e38;
-      --text:           #ecedf8;
-      --muted:          #6264a0;
-      --accent:         #6366f1;
-      --accent-light:   #818cf8;
-      --accent-lighter: #a5b4fc;
-    }
-
     body {
       font-family: ui-rounded, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
       height: 100vh;
       display: flex;
       flex-direction: column;
@@ -428,6 +416,15 @@
   </style>
 </head>
 <body>
+<div id="custom-bg" aria-hidden="true"></div>
+<div class="aurora" aria-hidden="true">
+  <div class="aurora-blob b1"></div>
+  <div class="aurora-blob b2"></div>
+  <div class="aurora-blob b3"></div>
+  <div class="aurora-blob b4"></div>
+</div>
+<canvas id="veil-stars" aria-hidden="true"></canvas>
+<div id="cursor-glow" aria-hidden="true"></div>
 
 <!-- Header -->
 <header class="site-header">
@@ -827,5 +824,8 @@
     };
   })();
 </script>
+<script src="/fx.js"></script>
+<script src="/themes.js"></script>
+<script src="/page-settings.js"></script>
 </body>
 </html>
