@@ -116,14 +116,8 @@ if (stealthEntryToggle) {
   });
 }
 
-// Trigger on every fresh top-level load.
-// Skip if already inside a blank-cloak iframe (window !== window.top)
-// or if loaded inside any iframe (parent check).
-const _isTopWindow = window === window.top && window.self === window.top;
-if (isStealthEntryOn() && _isTopWindow) {
-  openBlankCloak();
-} else if (localStorage.getItem(BLANK_CLOAK_AUTO_KEY) === "1" && _isTopWindow) {
-  // Legacy auto-open setting
+// Auto-open on load if the legacy setting is enabled
+if (localStorage.getItem(BLANK_CLOAK_AUTO_KEY) === "1" && window.top === window) {
   openBlankCloak();
 }
 
