@@ -502,6 +502,8 @@
   // ── Panic trigger ───────────────────────────────────────────────────────
   let capturing = false;
 
+  window._veilTriggerPanic = function() { if (!overlayVisible) triggerPanic(); };
+
   function triggerPanic() {
     const s = loadSettings();
     const panicMode = s.panicMode || "stealth";

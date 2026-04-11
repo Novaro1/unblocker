@@ -592,6 +592,35 @@
             </label>
           </div>
           <p class="settings-section-desc" style="margin-top:-0.3rem;">Disables F12, Ctrl+Shift+I, and View Source shortcuts so admins can't inspect the page.</p>
+
+          <div class="settings-row">
+            <span class="settings-label">Tab-Switch Cloak</span>
+            <label class="toggle">
+              <input type="checkbox" id="tab-switch-cloak-toggle" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <p class="settings-section-desc" style="margin-top:-0.3rem;">Instantly shows your panic cloak when you switch tabs or windows.</p>
+
+          <div class="settings-row">
+            <span class="settings-label">Poison History</span>
+            <label class="toggle">
+              <input type="checkbox" id="poison-history-toggle" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <p class="settings-section-desc" style="margin-top:-0.3rem;">Replaces Veil URLs in browser history with Google Classroom so teachers can't spot them.</p>
+
+          <div class="settings-row">
+            <label class="settings-label" for="auto-poison-delay">Auto-Cloak on Idle</label>
+            <select id="auto-poison-delay" class="settings-select">
+              <option value="0">Off</option>
+              <option value="2">2 minutes</option>
+              <option value="5" selected>5 minutes</option>
+              <option value="10">10 minutes</option>
+            </select>
+          </div>
+          <p class="settings-section-desc" style="margin-top:-0.3rem;">Automatically activates teacher panic mode after this much idle time.</p>
         </section>
 
         <!-- Privacy -->

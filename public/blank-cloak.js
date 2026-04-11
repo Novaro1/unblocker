@@ -138,29 +138,107 @@ if (blockDevToolsToggle) {
 }
 
 if (isBlockDevToolsOn()) {
-  // Block keyboard shortcuts for devtools and view-source
   document.addEventListener("keydown", (e) => {
     const ctrl = e.ctrlKey || e.metaKey;
-    // F12
     if (e.key === "F12") { e.preventDefault(); e.stopImmediatePropagation(); return; }
-    // Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C (DevTools)
-    if (ctrl && e.shiftKey && ["i", "I", "j", "J", "c", "C"].includes(e.key)) {
-      e.preventDefault(); e.stopImmediatePropagation(); return;
-    }
-    // Ctrl+U (View Source)
-    if (ctrl && (e.key === "u" || e.key === "U")) {
-      e.preventDefault(); e.stopImmediatePropagation(); return;
-    }
-    // Ctrl+S (Save page)
-    if (ctrl && (e.key === "s" || e.key === "S")) {
-      e.preventDefault(); e.stopImmediatePropagation(); return;
-    }
+    if (ctrl && e.shiftKey && ["i","I","j","J","c","C"].includes(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (ctrl && (e.key === "u" || e.key === "U")) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (ctrl && (e.key === "s" || e.key === "S")) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    // Block Print (Ctrl+P) and PrintScreen
+    if (ctrl && (e.key === "p" || e.key === "P")) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (e.key === "PrintScreen") { e.preventDefault(); e.stopImmediatePropagation(); return; }
   }, true);
 
-  // Block right-click context menu on home screen (not inside the proxy frame)
   document.addEventListener("contextmenu", (e) => {
     const frame = document.getElementById("sj-frame-container");
-    if (frame && frame.style.display === "flex") return; // allow inside proxy
+    if (frame && frame.style.display === "flex") return;
     e.preventDefault();
   }, true);
 }
+
+// ── History poisoning — replace Veil URLs in history with Google Classroom ──
+const POISON_HIST_KEY = "veil_poison_history";
+
+function isPoisonHistoryOn() {
+  const v = localStorage.getItem(POISON_HIST_KEY);
+  return v === null ? true : v === "1";
+}
+
+const poisonHistoryToggle = document.getElementById("poison-history-toggle");
+if (poisonHistoryToggle) {
+  poisonHistoryToggle.checked = isPoisonHistoryOn();
+  poisonHistoryToggle.addEventListener("change", () => {
+    localStorage.setItem(POISON_HIST_KEY, poisonHistoryToggle.checked ? "1" : "0");
+  });
+}
+
+if (isPoisonHistoryOn()) {
+  // Replace current history entry with Google Classroom URL
+  // so back/forward and history list show an innocent URL
+  try {
+    history.replaceState(null, "Google Classroom", "https://classroom.google.com");
+    // Push a few more innocent entries so the history stack looks normal
+    history.pushState(null, "Google Classroom", "https://classroom.google.com");
+    history.pushState(null, "Google Classroom", location.href);
+  } catch (_) {}
+}
+
+// ── Tab-switch cloak — show panic overlay when tab becomes hidden ────────────
+const TAB_SWITCH_KEY = "veil_tab_switch_cloak";
+
+function isTabSwitchCloakOn() {
+  const v = localStorage.getItem(TAB_SWITCH_KEY);
+  return v === null ? true : v === "1";
+}
+
+const tabSwitchToggle = document.getElementById("tab-switch-cloak-toggle");
+if (tabSwitchToggle) {
+  tabSwitchToggle.checked = isTabSwitchCloakOn();
+  tabSwitchToggle.addEventListener("change", () => {
+    localStorage.setItem(TAB_SWITCH_KEY, tabSwitchToggle.checked ? "1" : "0");
+  });
+}
+
+if (isTabSwitchCloakOn()) {
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      // Tab switched away — trigger panic key combo to show cloak
+      window._veilTriggerPanic?.();
+    }
+  });
+}
+
+// ── Auto-poison on idle ──────────────────────────────────────────────────────
+const AUTO_POISON_KEY = "veil_auto_poison_delay";
+
+const autoPoisonSelect = document.getElementById("auto-poison-delay");
+if (autoPoisonSelect) {
+  autoPoisonSelect.value = localStorage.getItem(AUTO_POISON_KEY) ?? "5";
+  autoPoisonSelect.addEventListener("change", () => {
+    localStorage.setItem(AUTO_POISON_KEY, autoPoisonSelect.value);
+    resetIdleTimer();
+  });
+}
+
+let idleTimer = null;
+
+function activateTeacherPanic() {
+  document.cookie = "v_poison=1; max-age=300; path=/; SameSite=Lax";
+  document.cookie = "v_ok=; max-age=0; path=/; SameSite=Lax";
+  localStorage.removeItem("v_ok");
+  const o = document.getElementById("poison-overlay");
+  if (o) o.style.display = "flex";
+  setTimeout(() => window.location.replace("https://classroom.google.com"), 1500);
+}
+
+function resetIdleTimer() {
+  if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+  const mins = parseInt(localStorage.getItem(AUTO_POISON_KEY) ?? "5", 10);
+  if (!mins) return;
+  idleTimer = setTimeout(activateTeacherPanic, mins * 60 * 1000);
+}
+
+["mousemove","mousedown","keydown","touchstart","scroll"].forEach(ev => {
+  document.addEventListener(ev, resetIdleTimer, { passive: true });
+});
+resetIdleTimer();
