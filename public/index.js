@@ -395,3 +395,78 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+// ── Bug report modal ──────────────────────────────────────────────────────────
+(function () {
+  const overlay   = document.getElementById("report-overlay");
+  const panel     = document.getElementById("report-panel");
+  const closeBtn  = document.getElementById("report-close");
+  const openBtn   = document.getElementById("btn-report-bug");
+  const submitBtn = document.getElementById("report-submit-btn");
+  const btnLabel  = document.getElementById("report-btn-label");
+  const spinner   = document.getElementById("report-btn-spinner");
+  const status    = document.getElementById("report-status");
+  const descEl    = document.getElementById("report-desc");
+  const typeEl    = document.getElementById("report-type");
+
+  function open() {
+    panel.setAttribute("aria-hidden", "false");
+    overlay.setAttribute("aria-hidden", "false");
+    panel.style.display = "flex";
+    overlay.style.display = "block";
+    descEl.focus();
+    status.style.display = "none";
+    status.textContent = "";
+  }
+  function close() {
+    panel.setAttribute("aria-hidden", "true");
+    overlay.setAttribute("aria-hidden", "true");
+    panel.style.display = "none";
+    overlay.style.display = "none";
+  }
+
+  openBtn?.addEventListener("click", open);
+  closeBtn?.addEventListener("click", close);
+  overlay?.addEventListener("click", close);
+
+  submitBtn?.addEventListener("click", async () => {
+    const desc = descEl.value.trim();
+    if (desc.length < 5) {
+      status.style.display = "block";
+      status.style.color = "var(--danger, #ef4444)";
+      status.textContent = "Please describe the issue in more detail.";
+      return;
+    }
+    btnLabel.style.display = "none";
+    spinner.style.display = "inline-block";
+    submitBtn.disabled = true;
+    status.style.display = "none";
+    try {
+      const res = await fetch("/api/report-bug", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: typeEl.value, description: desc, page: location.href }),
+      });
+      if (res.ok) {
+        status.style.color = "var(--accent, #6366f1)";
+        status.textContent = "Report sent! Thanks for the feedback.";
+        status.style.display = "block";
+        descEl.value = "";
+        setTimeout(close, 2000);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        status.style.color = "var(--danger, #ef4444)";
+        status.textContent = d.error || "Failed to send. Try again.";
+        status.style.display = "block";
+      }
+    } catch {
+      status.style.color = "var(--danger, #ef4444)";
+      status.textContent = "Network error. Try again.";
+      status.style.display = "block";
+    } finally {
+      btnLabel.style.display = "inline";
+      spinner.style.display = "none";
+      submitBtn.disabled = false;
+    }
+  });
+})();
+

@@ -224,7 +224,7 @@
       </section>
 
       <footer>
-        <p>Powered by <a href="https://github.com/MercuryWorkshop/scramjet" target="_blank">Scramjet</a></p>
+        <p>Powered by <a href="https://github.com/MercuryWorkshop/scramjet" target="_blank">Scramjet</a> &nbsp;·&nbsp; <button id="btn-report-bug" class="footer-report-btn">Report a Bug</button></p>
       </footer>
     </div>
 
@@ -595,6 +595,38 @@
 
     <!-- Panic / stealth overlay — filled by panic.js at runtime -->
     <div id="panic-overlay" style="display:none;"></div>
+
+    <!-- Bug report modal -->
+    <div id="report-overlay" aria-hidden="true"></div>
+    <div id="report-panel" role="dialog" aria-label="Report a Bug" aria-hidden="true">
+      <div class="settings-header">
+        <span class="settings-title">Report a Bug</span>
+        <button class="settings-close" id="report-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="settings-body">
+        <section class="settings-section" style="border:none;padding:0;">
+          <div class="settings-row">
+            <label class="settings-label" for="report-type">Type</label>
+            <select id="report-type" class="settings-select">
+              <option value="bug">Bug</option>
+              <option value="broken-site">Broken Site</option>
+              <option value="suggestion">Suggestion</option>
+            </select>
+          </div>
+          <div class="settings-row settings-row--col" style="margin-top:0.5rem;">
+            <label class="settings-label" for="report-desc">Description</label>
+            <textarea id="report-desc" class="settings-input" rows="5" placeholder="Describe the issue in detail…" style="resize:vertical;min-height:90px;font-family:inherit;"></textarea>
+          </div>
+          <div class="settings-row settings-row--actions" style="margin-top:0.75rem;">
+            <button class="settings-btn" id="report-submit-btn">
+              <span id="report-btn-label">Submit</span>
+              <span id="report-btn-spinner" class="spinner" style="display:none;"></span>
+            </button>
+          </div>
+          <p id="report-status" style="display:none;margin-top:0.5rem;font-size:0.8rem;text-align:center;"></p>
+        </section>
+      </div>
+    </div>
 
     <script src="/themes.js"></script>
     <script src="/history.js"></script>

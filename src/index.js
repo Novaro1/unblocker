@@ -613,6 +613,62 @@ iframe{width:100%;height:100%;border:none;display:block}
 
 fastify.get("/void", (_req, reply) => reply.type("text/html").sendFile("void.html"));
 
+// ── POST /api/report-bug — submit a bug report, forwarded to Discord ─────────
+const _bugLim = new Map(); // ip -> resetAt (5 reports per 10 min)
+fastify.post("/api/report-bug", async (req, reply) => {
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket?.remoteAddress || "x";
+  const now = Date.now();
+  const entry = _bugLim.get(ip);
+  if (entry && now < entry.resetAt && entry.count >= 5) {
+    return reply.code(429).send({ error: "Too many reports. Try again later." });
+  }
+  if (!entry || now > entry.resetAt) {
+    _bugLim.set(ip, { count: 1, resetAt: now + 10 * 60 * 1000 });
+  } else {
+    entry.count++;
+  }
+  if (_bugLim.size > 5000) { for (const [k, v] of _bugLim) { if (now > v.resetAt) _bugLim.delete(k); } }
+
+  const { type, description, page } = req.body || {};
+  if (!description || typeof description !== "string" || description.trim().length < 5) {
+    return reply.code(400).send({ error: "Description too short." });
+  }
+  const safeDesc = description.slice(0, 1000).replace(/`/g, "'");
+  const safePage = (page && typeof page === "string") ? page.slice(0, 200) : "unknown";
+  const safeType = ["bug", "suggestion", "broken-site"].includes(type) ? type : "bug";
+  const typeLabel = { bug: "Bug", suggestion: "Suggestion", "broken-site": "Broken Site" }[safeType];
+  const token = process.env.DISCORD_TOKEN;
+  const channelId = process.env.MOD_LOG_CHANNEL_ID;
+  if (!token || !channelId) return reply.send({ ok: true }); // silently succeed if not configured
+  try {
+    const body = JSON.stringify({
+      embeds: [{
+        title: `${typeLabel} Report`,
+        description: `\`\`\`\n${safeDesc}\n\`\`\``,
+        color: safeType === "bug" ? 0xef4444 : safeType === "suggestion" ? 0x6366f1 : 0xf59e0b,
+        fields: [{ name: "Page", value: safePage, inline: true }],
+        footer: { text: `via veil website` },
+        timestamp: new Date().toISOString(),
+      }]
+    });
+    const url = new URL(`https://discord.com/api/v10/channels/${channelId}/messages`);
+    const { default: https } = await import("node:https");
+    await new Promise((resolve, reject) => {
+      const req2 = https.request(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bot ${token}`, "Content-Length": Buffer.byteLength(body) }
+      }, (res) => { res.resume(); resolve(); });
+      req2.on("error", reject);
+      req2.setTimeout(5000, () => { req2.destroy(); reject(new Error("timeout")); });
+      req2.write(body);
+      req2.end();
+    });
+  } catch (e) {
+    console.error("[report-bug] discord post failed:", e.message);
+  }
+  return reply.send({ ok: true });
+});
+
 // Rate limit store for unlock endpoint — 1 attempt per IP per 10 minutes
 const _sLim = new Map();
 fastify.post("/api/s", (req, reply) => {
