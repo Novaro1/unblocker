@@ -1084,7 +1084,7 @@ footer a:hover { opacity: 1; text-decoration: underline; }
 /* ── Settings gear button (home screen) ─────────────────────────────────── */
 .settings-gear {
   position: absolute;
-  top: calc(1rem + 40px);
+  top: 1rem;
   right: 1rem;
   background: transparent;
   border: 1px solid rgba(255,255,255,0.08);
@@ -2029,7 +2029,7 @@ body.perf-mode .ql-tile:hover {
 /* History button on home screen */
 .history-home-btn {
   position: absolute;
-  top: calc(1rem + 40px);
+  top: 1rem;
   right: 3.5rem; /* sits left of the settings gear */
   background: transparent;
   border: 1px solid rgba(255,255,255,0.08);
@@ -2068,11 +2068,11 @@ body.perf-mode .ql-tile:hover {
 }
 
 .page-nav-link {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 500;
-  color: var(--muted);
+  color: rgba(236, 237, 248, 0.55);
   text-decoration: none;
-  padding: 0.25rem 0.6rem;
+  padding: 0.25rem 0.65rem;
   border-radius: 5px;
   transition: color 0.15s, background 0.15s;
   position: relative;
@@ -2082,19 +2082,22 @@ body.perf-mode .ql-tile:hover {
   content: '/';
   position: absolute;
   right: -1px;
-  color: rgba(99,102,241,0.18);
-  font-size: 0.62rem;
+  color: rgba(99,102,241,0.25);
+  font-size: 0.65rem;
   pointer-events: none;
 }
 
 .page-nav-link:last-child::after { display: none; }
 
 .page-nav-link:hover {
-  color: var(--accent-lighter);
-  background: rgba(99,102,241,0.08);
+  color: var(--text);
+  background: rgba(99,102,241,0.10);
 }
 
-.page-nav-link.active { color: var(--accent-light); }
+.page-nav-link.active {
+  color: var(--accent-lighter);
+  font-weight: 600;
+}
 
 .launcher-home-btn {
   position: absolute;
@@ -2465,7 +2468,7 @@ body.perf-mode .ql-tile:hover {
 /* ── Ambassador home star ────────────────────────────────────────────────── */
 #ambassador-home-star {
   position: absolute;
-  top: calc(0.9rem + 40px);
+  top: 0.9rem;
   left: 1.1rem;
   font-size: 1.1rem;
   line-height: 1;
