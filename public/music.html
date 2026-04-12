@@ -1140,11 +1140,9 @@ if (urlQ) { elSearch.value = urlQ; doSearch(urlQ); }
       if (!res.ok) return;
       const { data } = await res.json();
       if (!data?.title) return;
-      const searchInput = document.getElementById("mp-search-input");
-      if (searchInput) {
-        searchInput.value = data.artist ? `${data.title} ${data.artist}` : data.title;
-        searchInput.dispatchEvent(new Event("input"));
-      }
+      const q = data.artist ? `${data.title} ${data.artist}` : data.title;
+      const elSearch = document.getElementById("mp-search");
+      if (elSearch) { elSearch.value = q; doSearch(q); }
     } catch (e) {}
   })();
 </script>
