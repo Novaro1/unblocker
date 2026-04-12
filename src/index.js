@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "url";
 import { hostname } from "node:os";
@@ -815,6 +815,69 @@ fastify.get("/extension.zip", (_req, reply) => {
     if (!reply.sent) reply.code(500).send("zip unavailable");
   });
   zip.stdout.pipe(reply.raw);
+});
+
+// ── Share system ───────────────────────────────────────────────────────────
+const sharesPath = fileURLToPath(new URL("../shares.json", import.meta.url));
+const _shareLim  = new Map(); // ip -> resetAt
+
+let shares = {};
+try { if (existsSync(sharesPath)) shares = JSON.parse(readFileSync(sharesPath, "utf8")); } catch {}
+
+function saveShares() {
+  try { writeFileSync(sharesPath, JSON.stringify(shares)); } catch {}
+}
+
+function shareId() {
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let id = "";
+  const bytes = randomBytes(8);
+  for (const b of bytes) id += chars[b % chars.length];
+  return id;
+}
+
+// Prune shares older than 30 days on startup
+const SHARE_TTL = 30 * 24 * 60 * 60 * 1000;
+const now0 = Date.now();
+for (const [k, v] of Object.entries(shares)) {
+  if (now0 - v.ts > SHARE_TTL) delete shares[k];
+}
+saveShares();
+
+fastify.post("/api/share", async (req, reply) => {
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket?.remoteAddress || "x";
+  const now = Date.now();
+  const lim = _shareLim.get(ip);
+  if (lim && now < lim) return reply.code(429).send({ error: "Rate limited — wait before sharing again." });
+  _shareLim.set(ip, now + 30_000); // 1 share per 30s per IP
+  if (_shareLim.size > 5000) { for (const [k, v] of _shareLim) { if (now > v) _shareLim.delete(k); } }
+
+  const { type, data } = req.body || {};
+  const VALID = ["site", "ai", "music"];
+  if (!VALID.includes(type) || !data) return reply.code(400).send({ error: "Invalid share payload." });
+
+  const id = shareId();
+  shares[id] = { type, data, ts: now };
+  saveShares();
+
+  const base = `${req.protocol}://${req.hostname}`;
+  return reply.send({ id, url: `${base}/s/${id}` });
+});
+
+fastify.get("/api/share/:id", (req, reply) => {
+  const share = shares[req.params.id];
+  if (!share) return reply.code(404).send({ error: "Share not found or expired." });
+  return reply.send(share);
+});
+
+fastify.get("/s/:id", (req, reply) => {
+  const share = shares[req.params.id];
+  if (!share) return reply.code(404).type("text/html").sendFile("404.html");
+  const { type, data } = share;
+  if (type === "site")  return reply.redirect("/games/play?src=" + encodeURIComponent(data.url));
+  if (type === "ai")    return reply.redirect("/ai.html?share="   + req.params.id);
+  if (type === "music") return reply.redirect("/music.html?share=" + req.params.id);
+  return reply.redirect("/");
 });
 
 fastify.setNotFoundHandler((_req, reply) => {

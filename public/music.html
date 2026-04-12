@@ -546,6 +546,9 @@
       <button class="mp-btn" id="mp-repeat" title="Repeat">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       </button>
+      <button class="mp-btn" id="mp-share" title="Share this track">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      </button>
       <button class="mp-btn" id="mp-autoplay" title="Autoplay: AI finds similar songs when queue ends">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.4L19 9l-4.5 3.3 1.7 5.4L12 14.4l-4.2 3.3 1.7-5.4L5 9l5.2-1.6z" opacity=".6"/><path d="M19 2l.9 2.6L22 5.5l-2.1 1.5.8 2.5-2-1.5-2 1.5.8-2.5-2.1-1.5 2.1-.9z" opacity=".8"/><path d="M5 15l.7 2L7 17.7l-1.6 1.2.6 2-1.5-1.1-1.5 1.1.6-2L2 17.7l1.6-.7z"/></svg>
       </button>
@@ -1119,5 +1122,31 @@ if (urlQ) { elSearch.value = urlQ; doSearch(urlQ); }
 <script src="/fx.js"></script>
 <script src="/themes.js"></script>
 <script src="/page-settings.js"></script>
+<script src="/share.js"></script>
+<script>
+  document.getElementById("mp-share").addEventListener("click", function () {
+    const title  = document.getElementById("mp-title").textContent;
+    const artist = document.getElementById("mp-artist").textContent;
+    if (title === "Nothing playing") return;
+    window.veilShare("music", { title, artist });
+  });
+
+  // Load shared track on ?share=id
+  (async function () {
+    const id = new URLSearchParams(location.search).get("share");
+    if (!id) return;
+    try {
+      const res = await fetch("/api/share/" + id);
+      if (!res.ok) return;
+      const { data } = await res.json();
+      if (!data?.title) return;
+      const searchInput = document.getElementById("mp-search-input");
+      if (searchInput) {
+        searchInput.value = data.artist ? `${data.title} ${data.artist}` : data.title;
+        searchInput.dispatchEvent(new Event("input"));
+      }
+    } catch (e) {}
+  })();
+</script>
 </body>
 </html>

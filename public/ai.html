@@ -449,6 +449,9 @@
         <button class="amb-btn" id="amb-export-btn" title="Export conversation">Export</button>
         <button class="amb-btn" id="amb-prompt-toggle" title="Custom system prompt">Prompt</button>
       </div>
+      <button id="ai-share-btn" title="Share conversation" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:4px;border-radius:6px;display:flex;align-items:center;transition:color 0.15s;" onmouseover="this.style.color='var(--accent-lighter)'" onmouseout="this.style.color='var(--muted)'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      </button>
       <nav class="site-nav">
         <a class="site-nav-link" href="/">home</a>
         <a class="site-nav-link" href="/music.html">music</a>
@@ -827,5 +830,42 @@
 <script src="/fx.js"></script>
 <script src="/themes.js"></script>
 <script src="/page-settings.js"></script>
+<script src="/share.js"></script>
+<script>
+  // Share button
+  document.getElementById("ai-share-btn").addEventListener("click", function () {
+    const msgs = Array.from(document.querySelectorAll(".message")).map(m => ({
+      role: m.classList.contains("user") ? "user" : "assistant",
+      content: m.querySelector(".message-content")?.innerText || m.innerText
+    }));
+    const model = document.getElementById("model-select")?.value || "";
+    window.veilShare("ai", { messages: msgs, model });
+  });
+
+  // Load shared conversation on ?share=id
+  (async function () {
+    const id = new URLSearchParams(location.search).get("share");
+    if (!id) return;
+    try {
+      const res = await fetch("/api/share/" + id);
+      if (!res.ok) return;
+      const { data } = await res.json();
+      if (!data?.messages?.length) return;
+      const messagesEl = document.getElementById("messages");
+      const emptyState = document.getElementById("empty-state");
+      if (emptyState) emptyState.remove();
+      data.messages.forEach(msg => {
+        const div = document.createElement("div");
+        div.className = "message " + (msg.role === "user" ? "user" : "assistant");
+        div.innerHTML = `<div class="message-content">${msg.content.replace(/</g, "&lt;")}</div>`;
+        messagesEl.appendChild(div);
+      });
+      if (data.model) {
+        const sel = document.getElementById("model-select");
+        if (sel) sel.value = data.model;
+      }
+    } catch (e) {}
+  })();
+</script>
 </body>
 </html>

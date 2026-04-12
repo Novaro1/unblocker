@@ -291,6 +291,10 @@
           </svg>
         </button>
 
+        <button class="toolbar-btn" id="btn-share-url" title="Share this site">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        </button>
+
         <button class="toolbar-btn" id="btn-fullscreen" title="Fullscreen">
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
             <path class="fs-expand" d="M2 5V2h3M10 2h3v3M13 10v3h-3M5 13H2v-3"
@@ -736,5 +740,12 @@
     <script src="/settings.js"></script>
     <script src="/blank-cloak.js"></script>
     <script src="/ai-widget.js?v=6"></script>
+    <script src="/share.js"></script>
+    <script>
+      document.getElementById("btn-share-url").addEventListener("click", function () {
+        const url = document.getElementById("sj-url-bar").value;
+        if (url) window.veilShare("site", { url });
+      });
+    </script>
   </body>
 </html>
