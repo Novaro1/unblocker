@@ -1045,6 +1045,7 @@ async function doSearch(q) {
     const isActive = currentTrack && currentTrack.id === track.id;
     elResultsList.appendChild(makeSongEl(track, isActive));
   });
+  return results;
 }
 
 elSearchBtn.addEventListener("click", () => doSearch(elSearch.value));
@@ -1142,7 +1143,11 @@ if (urlQ) { elSearch.value = urlQ; doSearch(urlQ); }
       if (!data?.title) return;
       const q = data.artist ? `${data.title} ${data.artist}` : data.title;
       const elSearch = document.getElementById("mp-search");
-      if (elSearch) { elSearch.value = q; doSearch(q); }
+      if (elSearch) {
+        elSearch.value = q;
+        const found = await doSearch(q);
+        if (found && found.length) addToQueue(found[0], true);
+      }
     } catch (e) {}
   })();
 </script>
