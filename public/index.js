@@ -1,31 +1,5 @@
 "use strict";
 
-// — internal —
-window.veil = {
-  whisper() {
-    const b = 'color:#6366f1;font-weight:bold;font-size:13px;';
-    const d = 'color:#a5b4fc;font-size:13px;letter-spacing:0.1em;';
-    const f = 'color:rgba(255,255,255,0.25);font-size:11px;';
-    console.log('%c[VEIL] signal acquired', b);
-    console.log('%c↑  ↑  ↓  ↓  ←  →  ←  →  B  A', d);
-    console.log('%creturn to the home screen and enter the sequence', f);
-  }
-};
-(function () {
-  const _x = [1,1,3,3,0,2,0,2,29,28].map(v=>37+v);
-  let _p = 0;
-  document.addEventListener('keydown', function (e) {
-    _p = (e.keyCode === _x[_p]) ? _p + 1 : (e.keyCode === _x[0] ? 1 : 0);
-    if (_p === _x.length) {
-      _p = 0;
-      fetch('/api/s', { method: 'POST' })
-        .then(r => r.json())
-        .then(d => { location.href = '/claim?k=' + d.k; })
-        .catch(() => {});
-    }
-  });
-})();
-
 const form             = document.getElementById("sj-form");
 const address          = document.getElementById("sj-address");
 const searchEngineInput= document.getElementById("sj-search-engine");
