@@ -2092,23 +2092,29 @@ client.on(Events.InteractionCreate, async (interaction) => {
         c => c.type === ChannelType.GuildCategory && c.name === categoryName
       );
       if (!category) {
+        console.log(`[setupfilterchannels] creating category...`);
         category = await guild.channels.create({
           name: categoryName,
           type: ChannelType.GuildCategory,
           permissionOverwrites: [{ id: everyoneRole.id, deny: [PermissionFlagsBits.ViewChannel] }],
         });
+        console.log(`[setupfilterchannels] category created: ${category.id}`);
+      } else {
+        console.log(`[setupfilterchannels] category exists: ${category.id}`);
       }
 
       const created = [];
       const skipped = [];
 
       for (const f of FILTER_ROLES) {
-        if (f.id === "Other") continue; // skip generic Other
+        if (f.id === "Other") continue;
         const chanName = f.id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") + "-links";
         const existing = guild.channels.cache.find(c => c.name === chanName);
         if (existing) { skipped.push(chanName); continue; }
 
+        console.log(`[setupfilterchannels] ensuring role for ${f.id}...`);
         const filterRole = await ensureFilterRole(guild, f.id);
+        console.log(`[setupfilterchannels] creating channel ${chanName} with role ${filterRole.id}...`);
 
         await guild.channels.create({
           name: chanName,
@@ -2120,6 +2126,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] },
           ],
         });
+        console.log(`[setupfilterchannels] created ${chanName}`);
         created.push(chanName);
       }
 
