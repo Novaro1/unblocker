@@ -10,6 +10,8 @@ import {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   ChannelType,
   PermissionFlagsBits,
 } from "discord.js";
@@ -214,6 +216,45 @@ function getPingRole(guild, pingId) {
   const ping = PING_ROLES.find(p => p.id === pingId);
   if (!ping) return null;
   return guild.roles.cache.find(r => r.name === `Ping: ${ping.label}`) || null;
+}
+
+// ── Filter roles ─────────────────────────────────────────────────────────────
+const FILTER_ROLES = [
+  { id: "GoGuardian V2",  color: 0x4ade80 },
+  { id: "Lightspeed",     color: 0x60a5fa },
+  { id: "Securly",        color: 0xf472b6 },
+  { id: "Cisco Umbrella", color: 0xfbbf24 },
+  { id: "iBoss",          color: 0xa78bfa },
+  { id: "Barracuda",      color: 0xf87171 },
+  { id: "DNSFilter",      color: 0x34d399 },
+  { id: "FortiGuard",     color: 0xfb923c },
+  { id: "Linewize",       color: 0x38bdf8 },
+  { id: "Blocksi",        color: 0xe879f9 },
+  { id: "LanSchool",      color: 0x94a3b8 },
+  { id: "Qustodio",       color: 0xfd7e14 },
+  { id: "Sophos",         color: 0x22d3ee },
+  { id: "Palo Alto",      color: 0xf43f5e },
+  { id: "ContentKeeper",  color: 0x84cc16 },
+  { id: "Netsweeper",     color: 0x818cf8 },
+  { id: "Deledao",        color: 0xfcd34d },
+  { id: "Other",          color: 0x6b7280 },
+];
+
+const FILTER_ROLE_PREFIX = "Filter: ";
+
+async function ensureFilterRole(guild, filterId) {
+  const def = FILTER_ROLES.find(f => f.id === filterId);
+  const name = FILTER_ROLE_PREFIX + filterId;
+  let role = guild.roles.cache.find(r => r.name === name);
+  if (!role) {
+    role = await guild.roles.create({
+      name,
+      color: def?.color ?? 0x6b7280,
+      mentionable: false,
+      reason: "Auto-created filter role",
+    });
+  }
+  return role;
 }
 
 // ── Admin role ───────────────────────────────────────────────────────────────
@@ -565,6 +606,29 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.followUp({ content: `Error closing ticket: ${err.message}`, ephemeral: true });
     }
     return;
+  }
+
+  // ── Filter role select menu ───────────────────────────────────────────────
+  if (interaction.isStringSelectMenu() && interaction.customId === "filter_role_select") {
+    const chosen = interaction.values[0];
+    try {
+      // Remove any existing filter roles first
+      const toRemove = interaction.member.roles.cache.filter(r => r.name.startsWith(FILTER_ROLE_PREFIX));
+      for (const [, r] of toRemove) await interaction.member.roles.remove(r);
+
+      if (chosen === "none") {
+        return interaction.reply({ content: "Your filter role has been removed.", ephemeral: true });
+      }
+
+      const role = await ensureFilterRole(interaction.guild, chosen);
+      await interaction.member.roles.add(role);
+      return interaction.reply({
+        content: `Your filter is set to **${chosen}**. You'll be notified when links that work on your filter are added!`,
+        ephemeral: true,
+      });
+    } catch (err) {
+      return interaction.reply({ content: `Error setting filter role: ${err.message}`, ephemeral: true });
+    }
   }
 
   // ── Ping role toggle buttons ──────────────────────────────────────────────
@@ -1946,6 +2010,37 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // /uptime
+  // /setupfilterroles
+  if (commandName === "setupfilterroles") {
+    await interaction.deferReply({ ephemeral: true });
+    for (const f of FILTER_ROLES) await ensureFilterRole(interaction.guild, f.id);
+
+    const select = new StringSelectMenuBuilder()
+      .setCustomId("filter_role_select")
+      .setPlaceholder("Select your school's content filter…")
+      .addOptions(
+        FILTER_ROLES.map(f =>
+          new StringSelectMenuOptionBuilder().setLabel(f.id).setValue(f.id)
+        )
+      )
+      .addOptions(
+        new StringSelectMenuOptionBuilder().setLabel("None / Remove my filter").setValue("none")
+      );
+
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("What's your school's content filter?")
+      .setDescription(
+        "Select your filter from the dropdown below.\n\n" +
+        "This lets us notify you when new links that **work on your filter** are added, " +
+        "and helps you find links that will actually work at your school.\n\n" +
+        "Not sure what filter your school uses? Check `/findlink` or ask in the server."
+      );
+
+    await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(select)] });
+    return interaction.editReply({ content: "Filter role picker posted!" });
+  }
+
   // /setuppings
   if (commandName === "setuppings") {
     // Ensure all roles exist
