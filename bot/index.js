@@ -1315,7 +1315,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         "Or manually:\n" +
         "1. Go to [freedns.afraid.org](https://freedns.afraid.org) → create a free account\n" +
         "2. Click **Subdomains** → **Add**\n" +
-        "3. Set Type: `A` | Enter any subdomain name | Pick a domain | Destination: `16.59.60.231`\n" +
+        "3. Set Type: `A` | Enter any subdomain name | Pick a domain | Destination: `18.219.166.247`\n" +
         "4. Save — wait ~2 minutes for it to go live\n" +
         "5. Visit `https://yoursubdomain.domain.com`\n\n" +
         "Tip: Use `/freedns` to get random domain suggestions, or `/findlink` to find one already unblocked by your school filter.",
