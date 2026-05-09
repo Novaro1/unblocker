@@ -2102,37 +2102,43 @@ client.on(Events.InteractionCreate, async (interaction) => {
         console.log(`[setupfilterchannels] category exists: ${category.id}`);
       }
 
+      const botId = client.user.id;
       const created = [];
       const skipped = [];
+      const fixed = [];
+
+      const buildOverwrites = (filterRole) => [
+        { id: everyoneRole.id, deny:  [PermissionFlagsBits.ViewChannel] },
+        { id: botId,           allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels] },
+        { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory], deny: [PermissionFlagsBits.SendMessages] },
+      ];
 
       for (const f of FILTER_ROLES) {
         if (f.id === "Other") continue;
         const chanName = f.id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") + "-links";
         const existing = guild.channels.cache.find(c => c.name === chanName);
         if (existing) {
-          // Fix permissions on existing channels
-          const filterRole = await ensureFilterRole(guild, f.id);
-          await existing.permissionOverwrites.set([
-            { id: everyoneRole.id, deny:  [PermissionFlagsBits.ViewChannel] },
-            { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory], deny: [PermissionFlagsBits.SendMessages] },
-          ]);
-          skipped.push(chanName);
+          try {
+            const filterRole = await ensureFilterRole(guild, f.id);
+            await existing.permissionOverwrites.set(buildOverwrites(filterRole));
+            fixed.push(chanName);
+          } catch (e) {
+            console.error(`[setupfilterchannels] failed to fix ${chanName}:`, e.message);
+            skipped.push(chanName);
+          }
           continue;
         }
 
         console.log(`[setupfilterchannels] ensuring role for ${f.id}...`);
         const filterRole = await ensureFilterRole(guild, f.id);
-        console.log(`[setupfilterchannels] creating channel ${chanName} with role ${filterRole.id}...`);
+        console.log(`[setupfilterchannels] creating channel ${chanName}...`);
 
         await guild.channels.create({
           name: chanName,
           type: ChannelType.GuildText,
           parent: category.id,
           topic: `Links that bypass **${f.id}** — only visible to members with the ${f.id} filter role.`,
-          permissionOverwrites: [
-            { id: everyoneRole.id, deny:  [PermissionFlagsBits.ViewChannel] },
-            { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory], deny: [PermissionFlagsBits.SendMessages] },
-          ],
+          permissionOverwrites: buildOverwrites(filterRole),
         });
         console.log(`[setupfilterchannels] created ${chanName}`);
         created.push(chanName);
@@ -2140,7 +2146,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const lines = [];
       if (created.length) lines.push(`**Created (${created.length}):** ${created.map(c => `\`#${c}\``).join(", ")}`);
-      if (skipped.length) lines.push(`**Already existed (${skipped.length}):** ${skipped.map(c => `\`#${c}\``).join(", ")}`);
+      if (fixed.length)   lines.push(`**Fixed permissions (${fixed.length}):** ${fixed.map(c => `\`#${c}\``).join(", ")}`);
+      if (skipped.length) lines.push(`**Skipped (${skipped.length}):** ${skipped.map(c => `\`#${c}\``).join(", ")}`);
       return interaction.editReply({ content: lines.join("\n") || "Nothing to do." });
     } catch (err) {
       console.error("[setupfilterchannels] error:", err);
