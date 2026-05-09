@@ -2109,7 +2109,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (f.id === "Other") continue;
         const chanName = f.id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") + "-links";
         const existing = guild.channels.cache.find(c => c.name === chanName);
-        if (existing) { skipped.push(chanName); continue; }
+        if (existing) {
+          // Fix permissions on existing channels
+          const filterRole = await ensureFilterRole(guild, f.id);
+          await existing.permissionOverwrites.set([
+            { id: everyoneRole.id, deny:  [PermissionFlagsBits.ViewChannel] },
+            { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory], deny: [PermissionFlagsBits.SendMessages] },
+          ]);
+          skipped.push(chanName);
+          continue;
+        }
 
         console.log(`[setupfilterchannels] ensuring role for ${f.id}...`);
         const filterRole = await ensureFilterRole(guild, f.id);
@@ -2122,7 +2131,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           topic: `Links that bypass **${f.id}** — only visible to members with the ${f.id} filter role.`,
           permissionOverwrites: [
             { id: everyoneRole.id, deny:  [PermissionFlagsBits.ViewChannel] },
-            { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] },
+            { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory], deny: [PermissionFlagsBits.SendMessages] },
           ],
         });
         console.log(`[setupfilterchannels] created ${chanName}`);
