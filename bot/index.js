@@ -771,6 +771,73 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return interaction.showModal(modal);
   }
 
+  // ── Premium: Subscribe button ─────────────────────────────────────────────
+  if (interaction.customId === "premium_subscribe") {
+    const lines = [];
+    if (PREMIUM_CRYPTO) {
+      lines.push(
+        "**Step 1 — Send payment**",
+        `Send **$${PREMIUM_PRICE} USD** worth of ETH or USDC to this address on the **Base network**:`,
+        `\`\`\`${PREMIUM_CRYPTO}\`\`\``,
+        "> Open MetaMask (or any wallet), switch to **Base** network, and send to the address above.",
+        "",
+      );
+    }
+    if (PREMIUM_VENMO) {
+      lines.push(`Or pay via **${PREMIUM_VENMO}** — include your Discord username in the note.`, "");
+    }
+    lines.push(
+      "**Step 2 — Confirm your payment**",
+      "Click **I've Paid** below and paste your transaction ID (or screenshot info). A staff member will verify and grant your role within 24 hours.",
+    );
+
+    const embed = new EmbedBuilder()
+      .setColor(0xfbbf24)
+      .setTitle("✨ How to subscribe")
+      .setDescription(lines.join("\n"))
+      .setFooter({ text: "Your role is granted manually after payment is verified" });
+
+    const paidBtn = new ButtonBuilder()
+      .setCustomId("premium_paid")
+      .setLabel("I've Paid")
+      .setStyle(ButtonStyle.Success)
+      .setEmoji("✅");
+
+    return interaction.reply({
+      embeds: [embed],
+      components: [new ActionRowBuilder().addComponents(paidBtn)],
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  // ── Premium: I've Paid button → modal ─────────────────────────────────────
+  if (interaction.customId === "premium_paid") {
+    const modal = new ModalBuilder()
+      .setCustomId("premium_modal")
+      .setTitle("Confirm Your Payment");
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("premium_txn")
+          .setLabel("Transaction ID or proof of payment")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setPlaceholder("e.g. 0xabc123... or 'Venmo to @user, $3, May 9'"),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("premium_note")
+          .setLabel("Anything else? (optional)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setMaxLength(200)
+          .setPlaceholder("e.g. I paid with USDC on Base"),
+      ),
+    );
+    return interaction.showModal(modal);
+  }
+
   // FreeDNS captcha button
   if (interaction.customId === "freedns_captcha_btn") {
     const pending = pendingFreeDNS.get(interaction.user.id);
@@ -796,6 +863,46 @@ client.on(Events.InteractionCreate, async (interaction) => {
 // ── Modal submissions ──────────────────────────────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isModalSubmit()) return;
+
+  // ── Premium payment confirmation ───────────────────────────────────────────
+  if (interaction.customId === "premium_modal") {
+    const txn  = interaction.fields.getTextInputValue("premium_txn");
+    const note = interaction.fields.getTextInputValue("premium_note") || "—";
+
+    const notifyChannel = TICKETS_CHANNEL_ID
+      ? interaction.guild.channels.cache.get(TICKETS_CHANNEL_ID)
+      : null;
+
+    const staffRole = STAFF_ROLE_ID ? `<@&${STAFF_ROLE_ID}>` : "Staff";
+
+    const staffEmbed = new EmbedBuilder()
+      .setColor(0xfbbf24)
+      .setTitle("💰 Premium Payment — Needs Verification")
+      .setDescription(`${staffRole} — someone paid for Premium and needs their role.`)
+      .addFields(
+        { name: "User",           value: `${interaction.user} (${interaction.user.username})`, inline: true },
+        { name: "Amount",         value: `$${PREMIUM_PRICE}/month`,                            inline: true },
+        { name: "Transaction ID", value: txn },
+        { name: "Note",           value: note },
+      )
+      .setFooter({ text: `Run /grantpremium user:${interaction.user.username} note:${txn}` })
+      .setTimestamp();
+
+    if (notifyChannel) {
+      await notifyChannel.send({ content: staffRole, embeds: [staffEmbed] }).catch(() => {});
+    } else {
+      await modLog(interaction.guild, staffEmbed);
+    }
+
+    return interaction.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(0x22c55e)
+        .setTitle("✅ Payment received!")
+        .setDescription("Thanks! A staff member will verify your payment and grant your **Veil Premium** role within 24 hours.\n\nIf it takes longer, open a support ticket.")
+        .setFooter({ text: "Veil Premium" })],
+      flags: MessageFlags.Ephemeral,
+    });
+  }
 
   if (interaction.customId === "ticket_modal") {
     const issue = interaction.fields.getTextInputValue("ticket_issue");
@@ -2364,37 +2471,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // ── /premium ─────────────────────────────────────────────────────────────────
   if (commandName === "premium") {
-    const paymentLines = [];
-    if (PREMIUM_CRYPTO) paymentLines.push(`**Crypto (Base network — ETH/USDC):** \`${PREMIUM_CRYPTO}\``);
-    if (PREMIUM_VENMO)  paymentLines.push(`**Venmo:** ${PREMIUM_VENMO}`);
-    if (!paymentLines.length) paymentLines.push("Contact a staff member for payment info.");
-
     const embed = new EmbedBuilder()
       .setColor(0xfbbf24)
       .setTitle("✨ Veil Premium")
       .setDescription(`Support Veil and get perks for **$${PREMIUM_PRICE}/month**.\nAll money goes directly back into keeping Veil running.`)
-      .addFields(
-        {
-          name: "Perks",
-          value: [
-            "⭐ Gold **Veil Premium** role in Discord",
-            PREMIUM_CHANNEL_ID ? "🔒 Access to #premium-lounge" : null,
-            "🔔 Get pinged for **every** filter's new links (not just yours)",
-            "🧪 Early access to new beta features",
-            "🎟️ Priority support in tickets",
-          ].filter(Boolean).join("\n"),
-        },
-        {
-          name: "How to subscribe",
-          value: [
-            ...paymentLines,
-            "",
-            `After paying, open a ticket or DM a staff member with proof of payment and your Discord username. You'll get the role within 24 hours.`,
-          ].join("\n"),
-        },
-      )
-      .setFooter({ text: "Veil Premium • cancel any time by asking staff" });
-    return interaction.reply({ embeds: [embed] });
+      .addFields({
+        name: "What you get",
+        value: [
+          "⭐ Gold **Veil Premium** role in Discord",
+          PREMIUM_CHANNEL_ID ? "🔒 Access to **#premium-lounge**" : null,
+          "🔔 Pinged for **every** filter's new links — not just yours",
+          "🧪 Early access to new beta features",
+          "🎟️ Priority support in tickets",
+        ].filter(Boolean).join("\n"),
+      })
+      .setFooter({ text: `$${PREMIUM_PRICE}/month • cancel any time` });
+
+    const subscribeBtn = new ButtonBuilder()
+      .setCustomId("premium_subscribe")
+      .setLabel(`Subscribe — $${PREMIUM_PRICE}/mo`)
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji("✨");
+
+    return interaction.reply({
+      embeds: [embed],
+      components: [new ActionRowBuilder().addComponents(subscribeBtn)],
+    });
   }
 
   // ── /grantpremium ─────────────────────────────────────────────────────────────
