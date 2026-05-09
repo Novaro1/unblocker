@@ -2108,9 +2108,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const fixed = [];
 
       const buildOverwrites = (filterRole) => [
-        { id: everyoneRole.id, deny:  [PermissionFlagsBits.ViewChannel] },
-        { id: botId,           allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels] },
-        { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory], deny: [PermissionFlagsBits.SendMessages] },
+        { id: everyoneRole.id, deny:  [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+        { id: botId,           allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] },
+        { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] },
       ];
 
       for (const f of FILTER_ROLES) {
