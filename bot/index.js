@@ -1075,8 +1075,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /addlink
   if (commandName === "addlink") {
-    const url       = interaction.options.getString("url");
-    const name      = interaction.options.getString("name") || new URL(url).hostname;
+    let url = interaction.options.getString("url").trim();
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    const name = interaction.options.getString("name") || new URL(url).hostname;
     const linkType  = interaction.options.getString("type") || "full";
     const submitter = interaction.options.getUser("submitter");
     const links = loadLinks();
