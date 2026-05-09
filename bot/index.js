@@ -2119,14 +2119,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const existing = guild.channels.cache.find(c => c.name === chanName);
         if (existing) {
           try {
-            const filterRole = await ensureFilterRole(guild, f.id);
-            await existing.permissionOverwrites.set(buildOverwrites(filterRole));
-            fixed.push(chanName);
+            await existing.delete("Recreating with correct permissions");
           } catch (e) {
-            console.error(`[setupfilterchannels] failed to fix ${chanName}:`, e.message);
+            console.error(`[setupfilterchannels] failed to delete ${chanName}:`, e.message);
             skipped.push(chanName);
+            continue;
           }
-          continue;
         }
 
         console.log(`[setupfilterchannels] ensuring role for ${f.id}...`);
