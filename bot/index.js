@@ -995,7 +995,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
         totalChecked = results.length;
         passedFilters = results
-          .filter((r) => !r.blocked && !r.error)
+          .filter((r) => r && !r.blocked && !r.error)
           .map((r) => {
             const cat = r.category || "";
             if (UNCATEGORIZED.test(cat)) return `${r.name} (${cat.toLowerCase()})`;
