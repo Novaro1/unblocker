@@ -14,6 +14,7 @@ import {
   StringSelectMenuOptionBuilder,
   ChannelType,
   PermissionFlagsBits,
+  MessageFlags,
 } from "discord.js";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { randomUUID } from "crypto";
@@ -617,17 +618,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
       for (const [, r] of toRemove) await interaction.member.roles.remove(r);
 
       if (chosen === "none") {
-        return interaction.reply({ content: "Your filter role has been removed.", ephemeral: true });
+        return interaction.reply({ content: "Your filter role has been removed.", flags: MessageFlags.Ephemeral });
       }
 
       const role = await ensureFilterRole(interaction.guild, chosen);
       await interaction.member.roles.add(role);
       return interaction.reply({
         content: `Your filter is set to **${chosen}**. You'll be notified when links that work on your filter are added!`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     } catch (err) {
-      return interaction.reply({ content: `Error setting filter role: ${err.message}`, ephemeral: true });
+      return interaction.reply({ content: `Error setting filter role: ${err.message}`, flags: MessageFlags.Ephemeral });
     }
   }
 
@@ -2012,33 +2013,38 @@ client.on(Events.InteractionCreate, async (interaction) => {
   // /uptime
   // /setupfilterroles
   if (commandName === "setupfilterroles") {
-    await interaction.deferReply({ ephemeral: true });
-    for (const f of FILTER_ROLES) await ensureFilterRole(interaction.guild, f.id);
+    try {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      for (const f of FILTER_ROLES) await ensureFilterRole(interaction.guild, f.id);
 
-    const select = new StringSelectMenuBuilder()
-      .setCustomId("filter_role_select")
-      .setPlaceholder("Select your school's content filter…")
-      .addOptions(
-        FILTER_ROLES.map(f =>
-          new StringSelectMenuOptionBuilder().setLabel(f.id).setValue(f.id)
-        )
-      )
-      .addOptions(
-        new StringSelectMenuOptionBuilder().setLabel("None / Remove my filter").setValue("none")
+      const select = new StringSelectMenuBuilder()
+        .setCustomId("filter_role_select")
+        .setPlaceholder("Select your school's content filter…")
+        .addOptions([
+          ...FILTER_ROLES.map(f =>
+            new StringSelectMenuOptionBuilder().setLabel(f.id).setValue(f.id)
+          ),
+          new StringSelectMenuOptionBuilder().setLabel("None / Remove my filter").setValue("none"),
+        ]);
+
+      const embed = new EmbedBuilder()
+        .setColor(0x6366f1)
+        .setTitle("What's your school's content filter?")
+        .setDescription(
+          "Select your filter from the dropdown below.\n\n" +
+          "This lets us notify you when new links that **work on your filter** are added, " +
+          "and helps you find links that will actually work at your school.\n\n" +
+          "Not sure what filter your school uses? Check `/findlink` or ask in the server."
+        );
+
+      await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(select)] });
+      return interaction.editReply({ content: "Filter role picker posted!" });
+    } catch (err) {
+      console.error("[setupfilterroles] error:", err);
+      return interaction.editReply({ content: `Error: ${err.message}` }).catch(() =>
+        interaction.reply({ content: `Error: ${err.message}`, flags: MessageFlags.Ephemeral })
       );
-
-    const embed = new EmbedBuilder()
-      .setColor(0x6366f1)
-      .setTitle("What's your school's content filter?")
-      .setDescription(
-        "Select your filter from the dropdown below.\n\n" +
-        "This lets us notify you when new links that **work on your filter** are added, " +
-        "and helps you find links that will actually work at your school.\n\n" +
-        "Not sure what filter your school uses? Check `/findlink` or ask in the server."
-      );
-
-    await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(select)] });
-    return interaction.editReply({ content: "Filter role picker posted!" });
+    }
   }
 
   // /setuppings
