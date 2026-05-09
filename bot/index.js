@@ -203,7 +203,7 @@ async function ensurePingRole(guild, ping) {
   if (!role) {
     role = await guild.roles.create({
       name: roleName,
-      color: ping.color,
+      colors: [ping.color],
       mentionable: true,
       reason: "Auto-created ping role for notification system",
     });
@@ -249,7 +249,7 @@ async function ensureFilterRole(guild, filterId) {
   if (!role) {
     role = await guild.roles.create({
       name,
-      color: def?.color ?? 0x6b7280,
+      colors: [def?.color ?? 0x6b7280],
       mentionable: false,
       reason: "Auto-created filter role",
     });
@@ -265,7 +265,7 @@ async function ensureAdminRole(guild) {
     // Create with no permissions first, then set what the bot can grant
     role = await guild.roles.create({
       name: ADMIN_ROLE_NAME,
-      color: 0xf59e0b,
+      colors: [0xf59e0b],
       permissions: [],
       hoist: true,
       mentionable: true,
