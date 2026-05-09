@@ -345,6 +345,11 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   new SlashCommandBuilder()
+    .setName("setupfilterchannels")
+    .setDescription("Create filter-specific link channels under a Filter Links category (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+
+  new SlashCommandBuilder()
     .setName("setuppings")
     .setDescription("Post the notification role picker panel in this channel (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),

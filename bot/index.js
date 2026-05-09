@@ -2075,6 +2075,68 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
+  // /setupfilterchannels
+  if (commandName === "setupfilterchannels") {
+    try {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+      const guild = interaction.guild;
+      await guild.roles.fetch();
+      await guild.channels.fetch();
+
+      const everyoneRole = guild.roles.everyone;
+
+      // Find or create the category
+      const categoryName = "Filter Links";
+      let category = guild.channels.cache.find(
+        c => c.type === ChannelType.GuildCategory && c.name === categoryName
+      );
+      if (!category) {
+        category = await guild.channels.create({
+          name: categoryName,
+          type: ChannelType.GuildCategory,
+          permissionOverwrites: [{ id: everyoneRole.id, deny: [PermissionFlagsBits.ViewChannel] }],
+        });
+      }
+
+      const created = [];
+      const skipped = [];
+
+      for (const f of FILTER_ROLES) {
+        if (f.id === "Other") continue; // skip generic Other
+        const chanName = f.id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") + "-links";
+        const existing = guild.channels.cache.find(c => c.name === chanName);
+        if (existing) { skipped.push(chanName); continue; }
+
+        const filterRole = await ensureFilterRole(guild, f.id);
+        const staffRole  = guild.roles.cache.find(r => r.id === process.env.STAFF_ROLE_ID);
+
+        const overwrites = [
+          { id: everyoneRole.id, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] },
+        ];
+        if (staffRole) overwrites.push({ id: staffRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.SendMessages] });
+
+        await guild.channels.create({
+          name: chanName,
+          type: ChannelType.GuildText,
+          parent: category.id,
+          topic: `Links that bypass **${f.id}** — only visible to members with the ${f.id} filter role.`,
+          permissionOverwrites: overwrites,
+        });
+        created.push(chanName);
+      }
+
+      const lines = [];
+      if (created.length) lines.push(`**Created (${created.length}):** ${created.map(c => `\`#${c}\``).join(", ")}`);
+      if (skipped.length) lines.push(`**Already existed (${skipped.length}):** ${skipped.map(c => `\`#${c}\``).join(", ")}`);
+      return interaction.editReply({ content: lines.join("\n") || "Nothing to do." });
+    } catch (err) {
+      console.error("[setupfilterchannels] error:", err);
+      return interaction.editReply({ content: `Error: ${err.message}` });
+    }
+  }
+
   // /setuppings
   if (commandName === "setuppings") {
     // Ensure all roles exist
