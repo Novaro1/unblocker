@@ -352,6 +352,26 @@ async function postLinkMessage(link) {
     if (!cfg.linksMessageMap) cfg.linksMessageMap = {};
     cfg.linksMessageMap[link.url] = msg.id;
     saveConfig(cfg);
+
+    // Ping matching filter roles in their filter-specific channels
+    if (Array.isArray(link.unblocked) && link.unblocked.length > 0) {
+      await guild.channels.fetch();
+      for (const filterName of link.unblocked) {
+        // Match filter name to a FILTER_ROLES entry (strip category suffix like " (uncategorized)")
+        const baseName = filterName.replace(/\s*\(.*\)$/, "").trim();
+        const filterDef = FILTER_ROLES.find(f => f.id.toLowerCase() === baseName.toLowerCase());
+        if (!filterDef) continue;
+
+        const chanName = filterDef.id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") + "-links";
+        const filterCh = guild.channels.cache.find(c => c.name === chanName);
+        if (!filterCh) continue;
+
+        const filterRole = guild.roles.cache.find(r => r.name === FILTER_ROLE_PREFIX + filterDef.id);
+        const ping = filterRole ? `<@&${filterRole.id}>` : "";
+        filterCh.send({ content: `${ping} New link added that works on **${filterDef.id}**:`, embeds: [buildLinkEmbed(link, idx)] })
+          .catch(e => console.error(`[filter-ping] failed to post to ${chanName}:`, e.message));
+      }
+    }
   } catch (e) { console.error("[livelinks] post error:", e.message); }
 }
 
