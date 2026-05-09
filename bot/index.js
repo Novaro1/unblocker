@@ -243,6 +243,19 @@ const FILTER_ROLES = [
 
 const FILTER_ROLE_PREFIX = "Filter: ";
 
+// Filters that should be treated as equivalent
+const FILTER_ALIASES = {
+  "goguardian v2": ["goguardian", "goguardian v2"],
+  "goguardian":    ["goguardian", "goguardian v2"],
+};
+
+function filterMatches(linkFilterName, userFilterName) {
+  const a = linkFilterName.replace(/\s*\(.*\)$/, "").trim().toLowerCase();
+  const b = userFilterName.toLowerCase();
+  const aliases = FILTER_ALIASES[b] ?? [b];
+  return aliases.includes(a);
+}
+
 async function ensureFilterRole(guild, filterId) {
   const def = FILTER_ROLES.find(f => f.id === filterId);
   const name = FILTER_ROLE_PREFIX + filterId;
@@ -1810,7 +1823,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const matches = links.filter(l => {
       if (!l.unblocked || !l.unblocked.length) return false;
       // Case-insensitive exact match on filter names
-      const hasFilter = l.unblocked.some(f => f.toLowerCase() === filterName.toLowerCase());
+      const hasFilter = l.unblocked.some(f => filterMatches(f, filterName));
       if (!hasFilter) return false;
       if (typeFilter === "full") return l.type !== "static";
       if (typeFilter === "static") return l.type === "static";
@@ -2197,7 +2210,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const links = loadLinks();
     const matched = links.filter(l =>
       Array.isArray(l.unblocked) && l.unblocked.some(f =>
-        f.replace(/\s*\(.*\)$/, "").trim().toLowerCase() === filterName.toLowerCase()
+        filterMatches(f, filterName)
       )
     );
 
