@@ -378,6 +378,33 @@ const commands = [
     .setName("setupadmin")
     .setDescription("Create the Veil Admin role if it doesn't exist (Owner only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
+  // ── Premium ─────────────────────────────────────────────────────────────────
+  new SlashCommandBuilder()
+    .setName("premium")
+    .setDescription("Show Veil Premium perks and how to subscribe"),
+
+  new SlashCommandBuilder()
+    .setName("grantpremium")
+    .setDescription("Grant Veil Premium to a user after payment (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    .addUserOption((o) =>
+      o.setName("user").setDescription("The user to grant premium").setRequired(true)
+    )
+    .addStringOption((o) =>
+      o.setName("note").setDescription("Payment note / transaction ID (for mod log)").setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("revokepremium")
+    .setDescription("Revoke Veil Premium from a user (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    .addUserOption((o) =>
+      o.setName("user").setDescription("The user to revoke premium from").setRequired(true)
+    )
+    .addStringOption((o) =>
+      o.setName("reason").setDescription("Reason for revocation").setRequired(false)
+    ),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);

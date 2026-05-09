@@ -170,12 +170,16 @@ const {
   TICKETS_CHANNEL_ID,
   STAFF_ROLE_ID,
   SERVER_URL = "https://secure.brightpathlearning.website",
+  PREMIUM_PRICE      = "3.00",
+  PREMIUM_CRYPTO     = "",  // e.g. "0xABC123..." or "bc1q..."
+  PREMIUM_VENMO      = "",  // e.g. "@your-venmo"
+  PREMIUM_CHANNEL_ID = "",  // optional: ID of #premium-lounge
 } = process.env;
 
 // Public commands that must be used in #bot-commands
 const PUBLIC_COMMANDS = new Set([
   "links", "status", "serverinfo", "uptime",
-  "leaderboard", "beta-status", "freedns", "findlink",
+  "leaderboard", "beta-status", "freedns", "findlink", "premium",
 ]);
 
 // Send a log embed to #mod-log
@@ -304,6 +308,22 @@ async function ensureAdminRole(guild) {
     if (grantable.length) {
       await role.setPermissions(grantable, "Setting admin permissions");
     }
+  }
+  return role;
+}
+
+// ── Premium role ─────────────────────────────────────────────────────────────
+const PREMIUM_ROLE_NAME = "Veil Premium";
+async function ensurePremiumRole(guild) {
+  let role = guild.roles.cache.find(r => r.name === PREMIUM_ROLE_NAME);
+  if (!role) {
+    role = await guild.roles.create({
+      name: PREMIUM_ROLE_NAME,
+      colors: [0xfbbf24],   // gold
+      hoist: true,
+      mentionable: false,
+      reason: "Veil Premium role — created by bot",
+    });
   }
   return role;
 }
@@ -2340,6 +2360,120 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setDescription(`🕐 **${hours}h ${minutes}m ${seconds}s**`)
       .setFooter({ text: `Started at ${new Date(BOT_START).toUTCString()}` });
     return interaction.reply({ embeds: [embed] });
+  }
+
+  // ── /premium ─────────────────────────────────────────────────────────────────
+  if (commandName === "premium") {
+    const paymentLines = [];
+    if (PREMIUM_CRYPTO) paymentLines.push(`**Crypto:** \`${PREMIUM_CRYPTO}\``);
+    if (PREMIUM_VENMO)  paymentLines.push(`**Venmo:** ${PREMIUM_VENMO}`);
+    if (!paymentLines.length) paymentLines.push("Contact a staff member for payment info.");
+
+    const embed = new EmbedBuilder()
+      .setColor(0xfbbf24)
+      .setTitle("✨ Veil Premium")
+      .setDescription(`Support Veil and get perks for **$${PREMIUM_PRICE}/month**.\nAll money goes directly back into keeping Veil running.`)
+      .addFields(
+        {
+          name: "Perks",
+          value: [
+            "⭐ Gold **Veil Premium** role in Discord",
+            PREMIUM_CHANNEL_ID ? "🔒 Access to #premium-lounge" : null,
+            "🔔 Get pinged for **every** filter's new links (not just yours)",
+            "🧪 Early access to new beta features",
+            "🎟️ Priority support in tickets",
+          ].filter(Boolean).join("\n"),
+        },
+        {
+          name: "How to subscribe",
+          value: [
+            ...paymentLines,
+            "",
+            `After paying, open a ticket or DM a staff member with proof of payment and your Discord username. You'll get the role within 24 hours.`,
+          ].join("\n"),
+        },
+      )
+      .setFooter({ text: "Veil Premium • cancel any time by asking staff" });
+    return interaction.reply({ embeds: [embed] });
+  }
+
+  // ── /grantpremium ─────────────────────────────────────────────────────────────
+  if (commandName === "grantpremium") {
+    const target = interaction.options.getUser("user");
+    const note   = interaction.options.getString("note") || "no note";
+    try {
+      const role   = await ensurePremiumRole(interaction.guild);
+      const member = await interaction.guild.members.fetch(target.id);
+
+      if (member.roles.cache.has(role.id)) {
+        return interaction.reply({ content: `**${target.username}** already has Veil Premium.`, flags: MessageFlags.Ephemeral });
+      }
+      await member.roles.add(role);
+
+      // Give access to premium channel if configured
+      if (PREMIUM_CHANNEL_ID) {
+        const ch = interaction.guild.channels.cache.get(PREMIUM_CHANNEL_ID);
+        if (ch) await ch.permissionOverwrites.create(member, { ViewChannel: true }).catch(() => {});
+      }
+
+      // DM the user
+      await target.send({
+        embeds: [new EmbedBuilder()
+          .setColor(0xfbbf24)
+          .setTitle("✨ You're now a Veil Premium member!")
+          .setDescription(`Your payment was confirmed and you've been granted the **Veil Premium** role in the Veil Discord.\n\nThanks for supporting Veil — it means a lot.`)
+          .setFooter({ text: "Contact staff if you have any questions" })],
+      }).catch(() => {});
+
+      await modLog(interaction.guild, new EmbedBuilder()
+        .setColor(0xfbbf24)
+        .setTitle("Premium Granted")
+        .addFields(
+          { name: "User",    value: `${target} (${target.username})`, inline: true },
+          { name: "By",      value: interaction.user.username,        inline: true },
+          { name: "Note",    value: note },
+        )
+        .setTimestamp());
+
+      return interaction.reply({ content: `✨ Granted **Veil Premium** to ${target}.`, flags: MessageFlags.Ephemeral });
+    } catch (err) {
+      return interaction.reply({ content: `Error: ${err.message}`, flags: MessageFlags.Ephemeral });
+    }
+  }
+
+  // ── /revokepremium ─────────────────────────────────────────────────────────────
+  if (commandName === "revokepremium") {
+    const target = interaction.options.getUser("user");
+    const reason = interaction.options.getString("reason") || "no reason given";
+    try {
+      const role   = await ensurePremiumRole(interaction.guild);
+      const member = await interaction.guild.members.fetch(target.id);
+
+      if (!member.roles.cache.has(role.id)) {
+        return interaction.reply({ content: `**${target.username}** doesn't have Veil Premium.`, flags: MessageFlags.Ephemeral });
+      }
+      await member.roles.remove(role);
+
+      // Remove premium channel access if configured
+      if (PREMIUM_CHANNEL_ID) {
+        const ch = interaction.guild.channels.cache.get(PREMIUM_CHANNEL_ID);
+        if (ch) await ch.permissionOverwrites.delete(member).catch(() => {});
+      }
+
+      await modLog(interaction.guild, new EmbedBuilder()
+        .setColor(0xef4444)
+        .setTitle("Premium Revoked")
+        .addFields(
+          { name: "User",   value: `${target} (${target.username})`, inline: true },
+          { name: "By",     value: interaction.user.username,        inline: true },
+          { name: "Reason", value: reason },
+        )
+        .setTimestamp());
+
+      return interaction.reply({ content: `Removed **Veil Premium** from ${target}.`, flags: MessageFlags.Ephemeral });
+    } catch (err) {
+      return interaction.reply({ content: `Error: ${err.message}`, flags: MessageFlags.Ephemeral });
+    }
   }
 });
 
