@@ -116,6 +116,14 @@ function saveBetaFeatures(features) {
   writeFileSync(BETA_FEATURES_FILE, JSON.stringify(features, null, 2));
 }
 
+// ── Progress bar ───────────────────────────────────────────────────────────
+function buildProgressBar(current, total, width = 12) {
+  const pct = total > 0 ? current / total : 0;
+  const filled = Math.round(pct * width);
+  const empty  = width - filled;
+  return `\`[${"█".repeat(filled)}${"░".repeat(empty)}]\` ${Math.round(pct * 100)}%`;
+}
+
 // ── Link storage ───────────────────────────────────────────────────────────
 function loadLinks() {
   if (!existsSync(LINKS_FILE)) return [];
@@ -2151,14 +2159,43 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const pool = [...allDomains].sort(() => Math.random() - 0.5).slice(0, count);
 
+    const SCAN_FACTS = [
+      { icon: "🌐", text: "GoGuardian monitors over **5 million** student devices across the US." },
+      { icon: "🔒", text: "Lightspeed Systems was founded in 1999 — it's been blocking sites longer than most of you have been alive." },
+      { icon: "🕵️", text: "Most school filters use a mix of DNS blocking and SSL inspection. DNS is easier to bypass; SSL inspection is much harder." },
+      { icon: "📡", text: "FreeDNS (afraid.org) hosts over **100,000** free subdomains across thousands of shared domains." },
+      { icon: "🧠", text: "Content filters categorize sites using a mix of automated crawlers, user reports, and AI — which is why new domains stay uncategorized for weeks." },
+      { icon: "⚡", text: "Scramjet works by rewriting every URL in a page's HTML, CSS, and JS before it reaches your browser — entirely in the service worker." },
+      { icon: "🔬", text: "iBoss operates as a cloud proxy — your traffic is actually routed through their servers, not just DNS-filtered." },
+      { icon: "📊", text: "The average school filter blocks somewhere between **50,000 and 500,000** domains depending on the policy settings." },
+      { icon: "🚀", text: "Surge.sh deploys static sites to a global CDN in under 30 seconds — one of the fastest static hosts out there." },
+      { icon: "🎯", text: "Securly is one of the only filters that uses AI to analyze page *content* in real time, not just the domain name." },
+      { icon: "🌍", text: "The Base network (used for Veil Premium crypto payments) can process transactions in ~2 seconds for under $0.01." },
+      { icon: "🛡️", text: "FortiGuard maintains one of the largest URL databases in the world — over **550 million** categorized URLs." },
+      { icon: "🧩", text: "Service workers intercept network requests before they leave the browser — that's the core trick that makes client-side proxies possible." },
+      { icon: "📱", text: "LanSchool was originally built to mirror student screens onto a teacher's monitor — the web filter came later." },
+      { icon: "🔑", text: "DNS-over-HTTPS (DoH) bypasses DNS-level filters by encrypting DNS queries — which is why some filters now block DoH providers." },
+    ];
+
     const results = [];
     let done = 0;
+    let factIndex = Math.floor(Math.random() * SCAN_FACTS.length);
 
-    // Update progress every 10 checks
     const progressInterval = setInterval(async () => {
       if (done === 0) return;
-      await interaction.editReply({ content: `🔍 Scanning… **${done}/${pool.length}** domains checked so far.` }).catch(() => {});
-    }, 5000);
+      const fact = SCAN_FACTS[factIndex % SCAN_FACTS.length];
+      factIndex++;
+      const bar = buildProgressBar(done, pool.length, 14);
+      await interaction.editReply({
+        embeds: [new EmbedBuilder()
+          .setColor(0x6366f1)
+          .setTitle("🔍 Scanning domains…")
+          .setDescription(`${bar} **${done}/${pool.length}**`)
+          .addFields({ name: `${fact.icon} Did you know?`, value: fact.text })
+          .setFooter({ text: "Hang tight — results incoming" })
+        ],
+      }).catch(() => {});
+    }, 6000);
 
     for (const domain of pool) {
       try {
