@@ -869,6 +869,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setColor(0x22c55e)
         .setTitle("✅ You're verified! Welcome to Veil.")
         .setDescription(
+          "**How to access Veil at school:**\n" +
+          "When you click a link and it redirects to Google Classroom, **hold F** on your keyboard until the page loads — that's how you get through.\n\n" +
           "One last thing — what content filter does your school use?\n\n" +
           "This lets us notify you when new links that work on your filter are dropped, " +
           "and helps you find ones that will actually work. You can change this anytime."
