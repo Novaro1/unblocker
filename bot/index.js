@@ -2118,6 +2118,103 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
+  // /scandomains
+  if (commandName === "scandomains") {
+    if (!existsSync(FREEDNS_FILE)) {
+      return interaction.reply({
+        content: "The FreeDNS domain list hasn't been generated yet. Run `node scripts/freedns-list.js > freedns-domains.txt` on the server first.",
+        ephemeral: true,
+      });
+    }
+
+    const count        = interaction.options.getInteger("count");
+    const domainsOption = interaction.options.getString("domains") ?? "public";
+
+    await interaction.deferReply();
+
+    const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
+    const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous|parked|new url)/i;
+
+    // School filters we care about (matches FILTER_ROLES)
+    const SCHOOL_FILTER_KEYS = new Set([
+      "goguardian", "goguardianv2", "lightspeed", "securly", "cisco",
+      "iboss", "barracuda", "dnsfilter", "fortiguard", "linewize",
+      "blocksiweb", "blocksiai", "lanschool", "lanschoolair",
+      "contentkeeper", "netsweeper", "deledao",
+    ]);
+
+    const allDomains = readFileSync(FREEDNS_FILE, "utf-8")
+      .split("\n")
+      .map((line) => { const [d, type] = line.split("\t"); return { domain: d?.trim(), type: type?.trim() || "public" }; })
+      .filter(({ domain, type }) => domain && (domainsOption === "all" || type === "public"))
+      .map(({ domain }) => domain);
+
+    const pool = [...allDomains].sort(() => Math.random() - 0.5).slice(0, count);
+
+    const results = [];
+    let done = 0;
+
+    // Update progress every 10 checks
+    const progressInterval = setInterval(async () => {
+      if (done === 0) return;
+      await interaction.editReply({ content: `🔍 Scanning… **${done}/${pool.length}** domains checked so far.` }).catch(() => {});
+    }, 5000);
+
+    for (const domain of pool) {
+      try {
+        let filterResults = getCachedResults(domain);
+        if (!filterResults) {
+          const res = await fetch(
+            `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
+          );
+          const data = await res.json();
+          if (data.success) {
+            filterResults = data.results;
+            setCachedResults(domain, filterResults);
+          }
+        }
+        if (filterResults) {
+          const schoolResults = (filterResults || []).filter(r => r && SCHOOL_FILTER_KEYS.has(r.filter));
+          const passed = schoolResults.filter(r => !r.blocked && !r.error && !UNCATEGORIZED.test(r.category || ""));
+          const passedNames = passed.map(r => r.name);
+          results.push({ domain, passed: passedNames, total: passed.length });
+        }
+      } catch { /* skip */ }
+      done++;
+    }
+
+    clearInterval(progressInterval);
+
+    if (!results.length) {
+      return interaction.editReply({ content: "No results — all checks failed. Try again." });
+    }
+
+    // Sort by most filters passed descending
+    results.sort((a, b) => b.total - a.total);
+
+    const top = results.slice(0, 10);
+    const winner = top[0];
+
+    const lines = top.map((r, i) => {
+      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+      const filters = r.passed.length ? r.passed.join(", ") : "none";
+      return `${medal} \`${r.domain}\` — **${r.total}** filters: ${filters}`;
+    });
+
+    const embed = new EmbedBuilder()
+      .setColor(0x22c55e)
+      .setTitle(`Domain Scan Results — Top ${top.length} of ${results.length} checked`)
+      .setDescription(lines.join("\n\n"))
+      .addFields({
+        name: "Winner",
+        value: `\`${winner.domain}\` passed **${winner.total}** school filters\nRegister a subdomain at [FreeDNS](https://freedns.afraid.org/subdomain/edit.php)`,
+      })
+      .setFooter({ text: `Scanned ${pool.length} domains · school filters only` })
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [embed] });
+  }
+
   // /setuptickets
   if (commandName === "setuptickets") {
     await interaction.deferReply({ ephemeral: true });

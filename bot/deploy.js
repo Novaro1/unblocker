@@ -20,6 +20,27 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
+    .setName("scandomains")
+    .setDescription("Check N random FreeDNS domains and rank them by how many school filters they pass (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addIntegerOption((o) =>
+      o.setName("count")
+        .setDescription("How many domains to check (1–100)")
+        .setRequired(true)
+        .setMinValue(1)
+        .setMaxValue(100)
+    )
+    .addStringOption((o) =>
+      o.setName("domains")
+        .setDescription("Domain pool to use (default: public)")
+        .setRequired(false)
+        .addChoices(
+          { name: "Public only", value: "public" },
+          { name: "All (public + private)", value: "all" },
+        )
+    ),
+
+  new SlashCommandBuilder()
     .setName("addlink")
     .setDescription("Add a working link — auto-checks which school filters it bypasses")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
