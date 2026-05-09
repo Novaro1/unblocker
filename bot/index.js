@@ -2096,7 +2096,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         category = await guild.channels.create({
           name: categoryName,
           type: ChannelType.GuildCategory,
-          permissionOverwrites: [{ id: everyoneRole.id, deny: [PermissionFlagsBits.ViewChannel] }],
         });
         console.log(`[setupfilterchannels] category created: ${category.id}`);
       } else {
