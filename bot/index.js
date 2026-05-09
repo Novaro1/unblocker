@@ -2471,10 +2471,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // ── /premium ─────────────────────────────────────────────────────────────────
   if (commandName === "premium") {
+    const serverUrl = process.env.SERVER_URL || "https://secure.brightpathlearning.website";
     const embed = new EmbedBuilder()
       .setColor(0xfbbf24)
       .setTitle("✨ Veil Premium")
-      .setDescription(`Support Veil and get perks for **$${PREMIUM_PRICE}/month**.\nAll money goes directly back into keeping Veil running.`)
+      .setDescription(
+        `Support Veil and unlock perks for **$${PREMIUM_PRICE}/month**.\n\n` +
+        `Head to our website to subscribe — it only takes a minute:\n` +
+        `**[${serverUrl}/premium](${serverUrl}/premium)**`
+      )
       .addFields({
         name: "What you get",
         value: [
@@ -2488,9 +2493,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setFooter({ text: `$${PREMIUM_PRICE}/month • cancel any time` });
 
     const subscribeBtn = new ButtonBuilder()
-      .setCustomId("premium_subscribe")
+      .setURL(`${serverUrl}/premium`)
       .setLabel(`Subscribe — $${PREMIUM_PRICE}/mo`)
-      .setStyle(ButtonStyle.Primary)
+      .setStyle(ButtonStyle.Link)
       .setEmoji("✨");
 
     return interaction.reply({

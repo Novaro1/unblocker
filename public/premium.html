@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Veil Premium</title>
+  <link rel="stylesheet" href="/index.css" />
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 3rem 1.25rem 5rem;
+      background: var(--bg);
+    }
+
+    .page-wrap { width: 100%; max-width: 560px; position: relative; z-index: 1; }
+
+    /* ── Header ──────────────────────────────────────────────────────── */
+    .prem-header { text-align: center; margin-bottom: 2.5rem; }
+    .prem-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3);
+      color: #fbbf24; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; padding: 4px 12px; border-radius: 99px;
+      margin-bottom: 1rem;
+    }
+    .prem-title { font-size: clamp(2rem,6vw,2.8rem); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem; }
+    .prem-sub   { color: var(--muted); font-size: 1rem; }
+    .price-tag  { color: #fbbf24; font-weight: 700; }
+
+    /* ── Card ────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 1.75rem; margin-bottom: 1rem;
+    }
+    .card-title {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 1.1rem;
+    }
+
+    /* ── Perks ───────────────────────────────────────────────────────── */
+    .perks { list-style: none; display: flex; flex-direction: column; gap: 0.65rem; }
+    .perks li {
+      display: flex; align-items: center; gap: 0.75rem;
+      font-size: 0.95rem;
+    }
+    .perk-icon {
+      width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+      background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.2);
+      display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
+    }
+    .perk-icon.gold { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.25); }
+
+    /* ── Steps ───────────────────────────────────────────────────────── */
+    .steps { display: flex; flex-direction: column; gap: 1.1rem; }
+    .step  { display: flex; gap: 1rem; align-items: flex-start; }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3);
+      color: var(--accent-lighter); font-size: 0.8rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .step-body { flex: 1; padding-top: 3px; }
+    .step-label { font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; }
+    .step-desc  { font-size: 0.82rem; color: var(--muted); line-height: 1.55; }
+    .step-desc a { color: var(--accent-lighter); text-decoration: none; }
+    .step-desc a:hover { text-decoration: underline; }
+
+    /* ── Address block ───────────────────────────────────────────────── */
+    .address-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 1.25rem; margin: 1rem 0 0.5rem;
+    }
+    .qr-img {
+      width: 160px; height: 160px; border-radius: 14px;
+      border: 1px solid var(--border); display: block;
+      image-rendering: pixelated;
+    }
+    .address-row {
+      width: 100%; display: flex; align-items: center; gap: 0.5rem;
+    }
+    .address-box {
+      flex: 1; font-family: ui-monospace, monospace; font-size: 0.78rem;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.65rem 0.85rem;
+      color: var(--accent-lighter); word-break: break-all; line-height: 1.5;
+      cursor: pointer; transition: border-color 0.15s;
+    }
+    .address-box:hover { border-color: var(--accent); }
+    .copy-btn {
+      flex-shrink: 0; padding: 0.6rem 1rem; border-radius: 10px;
+      background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.25);
+      color: var(--accent-lighter); font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .copy-btn:hover { background: rgba(99,102,241,0.2); border-color: var(--accent); }
+    .copy-btn.copied { color: #4ade80; border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.08); }
+    .network-tag {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 0.75rem; color: var(--muted);
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 3px 9px;
+    }
+    .network-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; }
+
+    /* ── Form ────────────────────────────────────────────────────────── */
+    .form-group { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.9rem; }
+    .form-label { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+    .form-input {
+      width: 100%; padding: 0.7rem 0.9rem; border-radius: 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-size: 0.9rem; font-family: inherit;
+      transition: border-color 0.15s; box-sizing: border-box;
+    }
+    .form-input:focus { outline: none; border-color: var(--accent); }
+    .form-input::placeholder { color: var(--muted); opacity: 0.6; }
+    .submit-btn {
+      width: 100%; padding: 0.85rem; border-radius: 12px;
+      background: linear-gradient(135deg, #6366f1, #818cf8);
+      border: none; color: white; font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+      font-family: inherit;
+    }
+    .submit-btn:hover:not(:disabled) { opacity: 0.9; }
+    .submit-btn:active:not(:disabled) { transform: scale(0.98); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Success / error ─────────────────────────────────────────────── */
+    #form-result { display: none; border-radius: 12px; padding: 1rem 1.1rem; margin-top: 0.75rem; font-size: 0.9rem; }
+    #form-result.success { background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.25); color: #4ade80; }
+    #form-result.error   { background: rgba(239,68,68,0.08);  border: 1px solid rgba(239,68,68,0.25);  color: #f87171; }
+
+    /* ── Misc ────────────────────────────────────────────────────────── */
+    .divider { height: 1px; background: var(--border); margin: 0.25rem 0 1.25rem; }
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.82rem; color: var(--muted); text-decoration: none;
+      margin-bottom: 2rem; transition: color 0.15s;
+    }
+    .back-link:hover { color: var(--text); }
+
+    @media (min-width: 480px) {
+      .address-wrap { flex-direction: row; align-items: flex-start; }
+      .qr-img { flex-shrink: 0; }
+      .address-right { flex: 1; display: flex; flex-direction: column; gap: 0.75rem; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Aurora bg -->
+<div class="aurora" aria-hidden="true">
+  <div class="aurora-blob b1"></div>
+  <div class="aurora-blob b2"></div>
+  <div class="aurora-blob b3"></div>
+</div>
+
+<div class="page-wrap">
+
+  <a href="/" class="back-link">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Back to Veil
+  </a>
+
+  <!-- Header -->
+  <div class="prem-header">
+    <div class="prem-badge">
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l1.8 4H14l-3.4 2.6 1.3 4L8 9.3 4.1 11.6l1.3-4L2 5h4.2z"/></svg>
+      Premium
+    </div>
+    <h1 class="prem-title">Veil Premium</h1>
+    <p class="prem-sub">Support Veil for <span class="price-tag">$3/month</span> and get exclusive perks.</p>
+  </div>
+
+  <!-- Perks -->
+  <div class="card">
+    <div class="card-title">What you get</div>
+    <ul class="perks">
+      <li>
+        <div class="perk-icon gold">⭐</div>
+        <div>Gold <strong>Veil Premium</strong> role in Discord</div>
+      </li>
+      <li>
+        <div class="perk-icon">🔒</div>
+        <div>Access to <strong>#premium-lounge</strong> — links posted here first</div>
+      </li>
+      <li>
+        <div class="perk-icon">🔔</div>
+        <div>Pinged for <strong>every</strong> filter's new links, not just yours</div>
+      </li>
+      <li>
+        <div class="perk-icon">🧪</div>
+        <div><strong>Early access</strong> to new features before anyone else</div>
+      </li>
+      <li>
+        <div class="perk-icon">🎟️</div>
+        <div><strong>Priority support</strong> — your tickets jump the queue</div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- How to pay -->
+  <div class="card">
+    <div class="card-title">How to subscribe</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-label">Get USDC or ETH on Base network</div>
+          <div class="step-desc">
+            Don't have crypto? Download <a href="https://www.coinbase.com/wallet" target="_blank" rel="noopener">Coinbase Wallet</a> or open the Coinbase app, buy <strong>$3 of USDC</strong>, and make sure you're on the <strong>Base</strong> network (not Ethereum mainnet — fees are lower on Base).
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-label">Send $3 to this address</div>
+          <div class="step-desc">Scan the QR code or copy the address below. Double-check you're sending on <strong>Base network</strong>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-label">Submit your transaction below</div>
+          <div class="step-desc">Paste your transaction ID and Discord username. We'll verify and grant your role within 24 hours.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider" style="margin-top:1.25rem;"></div>
+
+    <!-- Address -->
+    <div id="address-section" style="display:none;">
+      <div class="address-wrap">
+        <img id="qr-img" class="qr-img" alt="Wallet QR code" />
+        <div class="address-right">
+          <div class="network-tag">
+            <div class="network-dot"></div>
+            Base network · ETH / USDC
+          </div>
+          <div>
+            <div id="address-box" class="address-box" title="Click to copy"></div>
+            <div style="margin-top:0.5rem;">
+              <button class="copy-btn" id="copy-btn" onclick="copyAddress()">Copy address</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="no-address" style="font-size:0.85rem;color:var(--muted);">Contact a staff member in Discord for payment info.</div>
+  </div>
+
+  <!-- Claim form -->
+  <div class="card">
+    <div class="card-title">Already paid? Claim your role</div>
+    <form id="claim-form">
+      <div class="form-group">
+        <label class="form-label" for="discord-user">Your Discord username</label>
+        <input class="form-input" id="discord-user" type="text" placeholder="e.g. everest or everest#1234" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="txn-id">Transaction ID</label>
+        <input class="form-input" id="txn-id" type="text" placeholder="e.g. 0xabc123... (from your wallet's activity)" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="txn-note">Anything else? <span style="font-weight:400;opacity:0.6;">(optional)</span></label>
+        <input class="form-input" id="txn-note" type="text" placeholder="e.g. paid with USDC on Base" />
+      </div>
+      <button class="submit-btn" type="submit" id="submit-btn">Submit payment →</button>
+      <div id="form-result"></div>
+    </form>
+  </div>
+
+  <p style="text-align:center;font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">
+    Cancel any time by messaging a staff member in Discord.<br>
+    Questions? <a href="https://discord.gg/NScKEHkd6U" target="_blank" rel="noopener" style="color:var(--accent-lighter);text-decoration:none;">Join the Discord</a>
+  </p>
+
+</div>
+
+<script>
+  // ── Load address from server config ──────────────────────────────────────
+  fetch("/api/premium-info")
+    .then(r => r.json())
+    .then(({ price, crypto }) => {
+      if (crypto) {
+        document.getElementById("address-section").style.display = "";
+        document.getElementById("no-address").style.display = "none";
+        document.getElementById("address-box").textContent = crypto;
+        document.getElementById("qr-img").src =
+          `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(crypto)}&bgcolor=0e0e1e&color=a5b4fc&margin=12`;
+        document.getElementById("address-box").onclick = copyAddress;
+      }
+      if (price) {
+        document.querySelectorAll(".price-tag").forEach(el => el.textContent = `$${price}/month`);
+      }
+    })
+    .catch(() => {});
+
+  // ── Copy address ──────────────────────────────────────────────────────────
+  function copyAddress() {
+    const addr = document.getElementById("address-box").textContent;
+    if (!addr) return;
+    navigator.clipboard.writeText(addr).then(() => {
+      const btn = document.getElementById("copy-btn");
+      btn.textContent = "Copied!";
+      btn.classList.add("copied");
+      setTimeout(() => { btn.textContent = "Copy address"; btn.classList.remove("copied"); }, 2000);
+    });
+  }
+
+  // ── Form submit ───────────────────────────────────────────────────────────
+  document.getElementById("claim-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn    = document.getElementById("submit-btn");
+    const result = document.getElementById("form-result");
+    btn.disabled = true;
+    btn.textContent = "Submitting…";
+    result.style.display = "none";
+
+    try {
+      const res = await fetch("/api/premium-claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          discord: document.getElementById("discord-user").value.trim(),
+          txn:     document.getElementById("txn-id").value.trim(),
+          note:    document.getElementById("txn-note").value.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        result.className = "success";
+        result.textContent = "✓ Received! A staff member will verify your payment and grant your role within 24 hours.";
+        result.style.display = "block";
+        e.target.reset();
+      } else {
+        throw new Error(data.error || "Something went wrong");
+      }
+    } catch (err) {
+      result.className = "error";
+      result.textContent = "✗ " + err.message;
+      result.style.display = "block";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Submit payment →";
+    }
+  });
+</script>
+</body>
+</html>

@@ -850,6 +850,65 @@ fastify.get("/s/:id", (req, reply) => {
   return reply.redirect("/");
 });
 
+// ── Premium page & API ────────────────────────────────────────────────────────
+const PREMIUM_PRICE      = process.env.PREMIUM_PRICE      || "3.00";
+const PREMIUM_CRYPTO     = process.env.PREMIUM_CRYPTO     || "";
+const TICKETS_CHANNEL_ID = process.env.TICKETS_CHANNEL_ID || "";
+
+fastify.get("/premium", (_req, reply) =>
+  reply.type("text/html").sendFile("premium.html")
+);
+
+fastify.get("/api/premium-info", (_req, reply) =>
+  reply.send({ price: PREMIUM_PRICE, crypto: PREMIUM_CRYPTO })
+);
+
+fastify.post("/api/premium-claim", async (req, reply) => {
+  if (rateLimit(req, reply, { max: 5, windowMs: 60_000 })) return;
+
+  const { discord, txn, note } = req.body ?? {};
+  if (!discord || typeof discord !== "string" || discord.trim().length === 0)
+    return reply.code(400).send({ error: "Discord username is required." });
+  if (!txn || typeof txn !== "string" || txn.trim().length === 0)
+    return reply.code(400).send({ error: "Transaction ID is required." });
+
+  if (!DISCORD_TOKEN || !TICKETS_CHANNEL_ID) {
+    // Still succeeds for the user — staff will be contacted another way
+    return reply.send({ ok: true });
+  }
+
+  const fields = [
+    { name: "Discord username", value: discord.trim().slice(0, 200), inline: true },
+    { name: "Transaction ID",   value: txn.trim().slice(0, 200),     inline: true },
+  ];
+  if (note && typeof note === "string" && note.trim().length > 0)
+    fields.push({ name: "Note", value: note.trim().slice(0, 500), inline: false });
+
+  const body = JSON.stringify({
+    content: `<@&${process.env.STAFF_ROLE_ID || ""}>`,
+    embeds: [{
+      title: "💳 Premium Claim — Website",
+      color: 0xfbbf24,
+      fields,
+      footer: { text: "Submitted via secure.brightpathlearning.website/premium" },
+      timestamp: new Date().toISOString(),
+    }],
+  });
+
+  try {
+    const res = await fetch(`https://discord.com/api/v10/channels/${TICKETS_CHANNEL_ID}/messages`, {
+      method: "POST",
+      headers: { "Authorization": `Bot ${DISCORD_TOKEN}`, "Content-Type": "application/json" },
+      body,
+    });
+    if (!res.ok) console.error(`[premium-claim] Discord API error: ${res.status}`);
+  } catch (e) {
+    console.error(`[premium-claim] Discord fetch failed: ${e.message}`);
+  }
+
+  return reply.send({ ok: true });
+});
+
 fastify.setNotFoundHandler((_req, reply) => {
   return reply.code(404).type("text/html").sendFile("404.html");
 });
