@@ -308,7 +308,7 @@ const commands = [
     .addStringOption((o) =>
       o.setName("filter").setDescription("Which filter to check against").setRequired(true)
         .addChoices(
-          { name: "GoGuardian",     value: "goguardian"    },
+          { name: "GoGuardian V2",  value: "goguardianv2"  },
           { name: "Securly",        value: "securly"       },
           { name: "Lightspeed",     value: "lightspeed"    },
           { name: "Cisco Umbrella", value: "cisco"         },
@@ -327,6 +327,13 @@ const commands = [
           { name: "Qustodio",       value: "qustodio"      },
           { name: "Sophos",         value: "sophos"        },
           { name: "ContentKeeper",  value: "contentkeeper" },
+        )
+    )
+    .addStringOption((o) =>
+      o.setName("domains").setDescription("Which domains to search (default: public only)").setRequired(false)
+        .addChoices(
+          { name: "Public only",         value: "public" },
+          { name: "Public + Private",    value: "all"    },
         )
     )
     .addBooleanOption((o) =>

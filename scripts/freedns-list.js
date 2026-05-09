@@ -1,9 +1,12 @@
-// Scrapes all public domains from the FreeDNS shared domain registry.
-// Run: node scripts/freedns-list.js
-// Output: one domain per line to stdout, progress to stderr
-// Save to file: node scripts/freedns-list.js > freedns-domains.txt
+// Scrapes domains from the FreeDNS shared domain registry.
+// Run: node scripts/freedns-list.js [--all]
+//   --all   Include private domains in addition to public ones (default: public only)
+// Output: one domain + type per line ("domain\tpublic" or "domain\tprivate"), progress to stderr
+// Save to file: node scripts/freedns-list.js --all > freedns-domains.txt
 
 import { execFileSync } from "child_process";
+
+const includePrivate = process.argv.includes("--all");
 
 function fetchPage(page) {
   const html = execFileSync("curl", [
@@ -22,20 +25,28 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function extractPublicDomains(html) {
+function extractDomains(html) {
   const domains = [];
   // Each row: <tr class="trl"><td><a href=/subdomain/edit.php?edit_domain_id=29>mooo.com</a>...<td>public</td>
+  // or <td>private</td>
   const rows = html.split(/<tr class="tr[ld]">/i);
   for (const row of rows) {
     const domainMatch = row.match(/edit_domain_id=\d+>([^<]+)<\/a>/i);
-    if (domainMatch && /<td>public<\/td>/i.test(row)) {
-      domains.push(domainMatch[1].trim().toLowerCase());
+    if (!domainMatch) continue;
+    const isPublic  = /<td>public<\/td>/i.test(row);
+    const isPrivate = /<td>private<\/td>/i.test(row);
+    if (isPublic) {
+      domains.push(domainMatch[1].trim().toLowerCase() + "\tpublic");
+    } else if (includePrivate && isPrivate) {
+      domains.push(domainMatch[1].trim().toLowerCase() + "\tprivate");
     }
   }
   return domains;
 }
 
 async function main() {
+  process.stderr.write(`Mode: ${includePrivate ? "public + private" : "public only"} (use --all to include private)\n`);
+
   let firstPage;
   try {
     firstPage = fetchPage(1);
@@ -49,7 +60,7 @@ async function main() {
   process.stderr.write(`FreeDNS registry: ${totalPages} pages to scrape\n`);
 
   const allDomains = [];
-  allDomains.push(...extractPublicDomains(firstPage));
+  allDomains.push(...extractDomains(firstPage));
 
   for (let page = 2; page <= totalPages; page++) {
     let html;
@@ -66,19 +77,21 @@ async function main() {
       }
     }
 
-    const domains = extractPublicDomains(html);
+    const domains = extractDomains(html);
     allDomains.push(...domains);
 
     if (page % 25 === 0 || page === totalPages) {
-      process.stderr.write(`Page ${page}/${totalPages} — ${allDomains.length} public domains so far\n`);
+      process.stderr.write(`Page ${page}/${totalPages} — ${allDomains.length} domains so far\n`);
     }
 
     // 350ms between requests
     await sleep(350);
   }
 
+  const publicCount  = allDomains.filter(l => l.endsWith("\tpublic")).length;
+  const privateCount = allDomains.filter(l => l.endsWith("\tprivate")).length;
   process.stdout.write(allDomains.join("\n") + "\n");
-  process.stderr.write(`\nDone. ${allDomains.length} public domains written.\n`);
+  process.stderr.write(`\nDone. ${publicCount} public + ${privateCount} private = ${allDomains.length} domains written.\n`);
 }
 
 main();

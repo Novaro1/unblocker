@@ -868,7 +868,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.editReply({ content: `🔍 Searching for a domain unblocked by **${filterKey}**…` });
         const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
         const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
-        const pool = readFileSync(FREEDNS_FILE, "utf-8").split("\n").map(d => d.trim()).filter(Boolean)
+        const pool = readFileSync(FREEDNS_FILE, "utf-8").split("\n")
+          .map(line => line.split("\t")[0].trim()).filter(Boolean)
           .sort(() => Math.random() - 0.5).slice(0, 30);
 
         for (const domain of pool) {
@@ -1657,8 +1658,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const count = interaction.options.getInteger("count") ?? 5;
     const allDomains = readFileSync(FREEDNS_FILE, "utf-8")
       .split("\n")
-      .map((d) => d.trim())
-      .filter(Boolean);
+      .map((line) => line.split("\t")[0].trim())
+      .filter((d) => d && !d.endsWith("\tprivate"));
 
     // Pick `count` random unique domains
     const picked = [];
@@ -1717,6 +1718,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const filterKey = interaction.options.getString("filter");
     const skipUncategorized = interaction.options.getBoolean("skip_uncategorized") ?? true;
+    const domainsOption = interaction.options.getString("domains") ?? "public";
     const MONTHLY_LIMIT = 5;
 
     const uses = getFindlinkUses(interaction.user.id);
@@ -1732,7 +1734,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     incrementFindlinkUses(interaction.user.id);
 
     const allDomains = readFileSync(FREEDNS_FILE, "utf-8")
-      .split("\n").map((d) => d.trim()).filter(Boolean);
+      .split("\n")
+      .map((line) => { const [d, type] = line.split("\t"); return { domain: d?.trim(), type: type?.trim() || "public" }; })
+      .filter(({ domain, type }) => domain && (domainsOption === "all" || type === "public"))
+      .map(({ domain }) => domain);
 
     // Shuffle
     const pool = [...allDomains].sort(() => Math.random() - 0.5);
