@@ -341,6 +341,10 @@ const commands = [
       o.setName("skip_uncategorized").setDescription("Skip domains with no known category (default: true)").setRequired(false)
     ),
   new SlashCommandBuilder()
+    .setName("mylinks")
+    .setDescription("Show links that work on your school's content filter"),
+
+  new SlashCommandBuilder()
     .setName("setupfilterroles")
     .setDescription("Post the filter role picker panel in this channel (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),

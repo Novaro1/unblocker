@@ -2183,6 +2183,56 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
+  // /mylinks
+  if (commandName === "mylinks") {
+    const filterRole = interaction.member.roles.cache.find(r => r.name.startsWith(FILTER_ROLE_PREFIX));
+    if (!filterRole) {
+      return interaction.reply({
+        content: "You haven't set a filter yet. Use the filter picker in the server to choose your school's content filter first.",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const filterName = filterRole.name.slice(FILTER_ROLE_PREFIX.length);
+    const links = loadLinks();
+    const matched = links.filter(l =>
+      Array.isArray(l.unblocked) && l.unblocked.some(f =>
+        f.replace(/\s*\(.*\)$/, "").trim().toLowerCase() === filterName.toLowerCase()
+      )
+    );
+
+    if (!matched.length) {
+      return interaction.reply({
+        content: `No links in the list currently pass **${filterName}**. Check back after the next link drop, or use \`/findlink\` to find a FreeDNS domain that works.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    // Build a single embed listing all matching links
+    const lines = matched.map((l, i) => {
+      const typeIcon = l.type === "static" ? "📄" : "🌐";
+      return `${typeIcon} **[${l.name || l.url}](${l.url})**`;
+    });
+
+    // Discord embed description limit — chunk if needed
+    const chunks = [];
+    let current = "";
+    for (const line of lines) {
+      if (current.length + line.length + 1 > 3800) { chunks.push(current); current = ""; }
+      current += (current ? "\n" : "") + line;
+    }
+    if (current) chunks.push(current);
+
+    const embeds = chunks.map((chunk, i) =>
+      new EmbedBuilder()
+        .setColor(0x6366f1)
+        .setTitle(i === 0 ? `Links that work on ${filterName} (${matched.length})` : null)
+        .setDescription(chunk)
+    );
+
+    return interaction.reply({ embeds, flags: MessageFlags.Ephemeral });
+  }
+
   // /setuppings
   if (commandName === "setuppings") {
     // Ensure all roles exist
