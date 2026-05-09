@@ -2365,7 +2365,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   // ── /premium ─────────────────────────────────────────────────────────────────
   if (commandName === "premium") {
     const paymentLines = [];
-    if (PREMIUM_CRYPTO) paymentLines.push(`**Crypto:** \`${PREMIUM_CRYPTO}\``);
+    if (PREMIUM_CRYPTO) paymentLines.push(`**Crypto (Base network — ETH/USDC):** \`${PREMIUM_CRYPTO}\``);
     if (PREMIUM_VENMO)  paymentLines.push(`**Venmo:** ${PREMIUM_VENMO}`);
     if (!paymentLines.length) paymentLines.push("Contact a staff member for payment info.");
 
