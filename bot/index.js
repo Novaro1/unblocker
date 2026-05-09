@@ -583,6 +583,33 @@ async function freednsTrySave(cookies, captchaCode, captchaPhpsessid, sub, domai
   return { error: saveHtml.match(/<b[^>]*>([^<]{5,200})<\/b>/i)?.[1]?.trim() || "Save failed" };
 }
 
+// ── Select menu interactions ───────────────────────────────────────────────
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isStringSelectMenu()) return;
+
+  if (interaction.customId === "filter_role_select") {
+    const chosen = interaction.values[0];
+    try {
+      const toRemove = interaction.member.roles.cache.filter(r => r.name.startsWith(FILTER_ROLE_PREFIX));
+      for (const [, r] of toRemove) await interaction.member.roles.remove(r);
+
+      if (chosen === "none") {
+        return interaction.reply({ content: "Your filter role has been removed.", flags: MessageFlags.Ephemeral });
+      }
+
+      const role = await ensureFilterRole(interaction.guild, chosen);
+      await interaction.member.roles.add(role);
+      return interaction.reply({
+        content: `Your filter is set to **${chosen}**. You'll be notified when links that work on your filter are added!`,
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch (err) {
+      console.error("[filter_role_select] error:", err);
+      return interaction.reply({ content: `Error setting filter role: ${err.message}`, flags: MessageFlags.Ephemeral });
+    }
+  }
+});
+
 // ── Button interactions ────────────────────────────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isButton()) return;
@@ -607,29 +634,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.followUp({ content: `Error closing ticket: ${err.message}`, ephemeral: true });
     }
     return;
-  }
-
-  // ── Filter role select menu ───────────────────────────────────────────────
-  if (interaction.isStringSelectMenu() && interaction.customId === "filter_role_select") {
-    const chosen = interaction.values[0];
-    try {
-      // Remove any existing filter roles first
-      const toRemove = interaction.member.roles.cache.filter(r => r.name.startsWith(FILTER_ROLE_PREFIX));
-      for (const [, r] of toRemove) await interaction.member.roles.remove(r);
-
-      if (chosen === "none") {
-        return interaction.reply({ content: "Your filter role has been removed.", flags: MessageFlags.Ephemeral });
-      }
-
-      const role = await ensureFilterRole(interaction.guild, chosen);
-      await interaction.member.roles.add(role);
-      return interaction.reply({
-        content: `Your filter is set to **${chosen}**. You'll be notified when links that work on your filter are added!`,
-        flags: MessageFlags.Ephemeral,
-      });
-    } catch (err) {
-      return interaction.reply({ content: `Error setting filter role: ${err.message}`, flags: MessageFlags.Ephemeral });
-    }
   }
 
   // ── Ping role toggle buttons ──────────────────────────────────────────────
