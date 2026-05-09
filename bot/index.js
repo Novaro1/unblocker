@@ -834,7 +834,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTitle("User Verified (captcha)")
         .addFields({ name: "User", value: `${interaction.user.tag} (${interaction.user.id})` })
         .setTimestamp());
-      return interaction.reply({ content: "✅ You're verified! Welcome to Veil.", ephemeral: true });
+
+      const filterSelect = new StringSelectMenuBuilder()
+        .setCustomId("filter_role_select")
+        .setPlaceholder("Select your school's content filter…")
+        .addOptions([
+          ...FILTER_ROLES.map(f =>
+            new StringSelectMenuOptionBuilder().setLabel(f.id).setValue(f.id)
+          ),
+          new StringSelectMenuOptionBuilder().setLabel("None / Not sure").setValue("none"),
+        ]);
+
+      const embed = new EmbedBuilder()
+        .setColor(0x22c55e)
+        .setTitle("✅ You're verified! Welcome to Veil.")
+        .setDescription(
+          "One last thing — what content filter does your school use?\n\n" +
+          "This lets us notify you when new links that work on your filter are dropped, " +
+          "and helps you find ones that will actually work. You can change this anytime."
+        );
+
+      return interaction.reply({
+        embeds: [embed],
+        components: [new ActionRowBuilder().addComponents(filterSelect)],
+        flags: MessageFlags.Ephemeral,
+      });
     } catch (err) {
       return interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
     }
