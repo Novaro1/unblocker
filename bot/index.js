@@ -179,7 +179,7 @@ const {
 // Public commands that must be used in #bot-commands
 const PUBLIC_COMMANDS = new Set([
   "links", "status", "serverinfo", "uptime",
-  "leaderboard", "beta-status", "freedns", "findlink", "premium",
+  "leaderboard", "beta-status", "freedns", "findlink", "premium", "compatible",
 ]);
 
 // Send a log embed to #mod-log
@@ -2065,6 +2065,57 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setFooter({ text: `Powered by live.glseries.net · ${MONTHLY_LIMIT - uses - 1} uses remaining this month` })
       .setTimestamp();
     return interaction.editReply({ embeds: [embed] });
+  }
+
+  // /compatible
+  if (commandName === "compatible") {
+    const rawFilters = interaction.options.getString("filters");
+    const links = loadLinks();
+
+    // Parse the requested filters (comma or space separated)
+    const requested = rawFilters
+      .split(/[,\s]+/)
+      .map(f => f.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (requested.length < 2) {
+      return interaction.reply({
+        content: "Please provide at least two filters separated by commas (e.g. `GoGuardian, Lightspeed`).",
+        ephemeral: true,
+      });
+    }
+
+    // A link is compatible if its unblocked array contains a match for every requested filter
+    const compatible = links.filter(l => {
+      if (!l.unblocked || !l.unblocked.length) return false;
+      return requested.every(req => l.unblocked.some(f => filterMatches(f, req)));
+    });
+
+    if (!compatible.length) {
+      return interaction.reply({
+        content: `No links found that work on all of: **${requested.join(", ")}**.\nThey might not have been tested against all those filters yet.`,
+        ephemeral: true,
+      });
+    }
+
+    const filterLabel = requested.map(f => {
+      // Try to find the canonical display name from FILTER_ROLES
+      const canonical = FILTER_ROLES.find(r => {
+        const aliases = FILTER_ALIASES[r.id.toLowerCase()] ?? [r.id.toLowerCase()];
+        return aliases.includes(f) || r.id.toLowerCase() === f;
+      });
+      return canonical ? canonical.id : f;
+    }).join(" + ");
+
+    const embeds = compatible.map((l, i) => buildLinkEmbed(l, i));
+    await interaction.reply({
+      content: `**${compatible.length} link${compatible.length !== 1 ? "s" : ""}** that work on **${filterLabel}**:`,
+      embeds: embeds.slice(0, 10),
+    });
+    for (let i = 10; i < embeds.length; i += 10) {
+      await interaction.followUp({ embeds: embeds.slice(i, i + 10) });
+    }
+    return;
   }
 
   // /setuptickets

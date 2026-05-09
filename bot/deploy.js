@@ -11,6 +11,15 @@ const commands = [
     .setDescription("Show all working Veil proxy links"),
 
   new SlashCommandBuilder()
+    .setName("compatible")
+    .setDescription("Show links that work on multiple specific filters at the same time")
+    .addStringOption((o) =>
+      o.setName("filters")
+        .setDescription("Filters to match, comma-separated (e.g. GoGuardian, Lightspeed)")
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
     .setName("addlink")
     .setDescription("Add a working link — auto-checks which school filters it bypasses")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
