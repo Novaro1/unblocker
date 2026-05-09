@@ -2109,20 +2109,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (existing) { skipped.push(chanName); continue; }
 
         const filterRole = await ensureFilterRole(guild, f.id);
-        const staffRole  = guild.roles.cache.find(r => r.id === process.env.STAFF_ROLE_ID);
-
-        const overwrites = [
-          { id: everyoneRole.id, deny: [PermissionFlagsBits.ViewChannel] },
-          { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] },
-        ];
-        if (staffRole) overwrites.push({ id: staffRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.SendMessages] });
 
         await guild.channels.create({
           name: chanName,
           type: ChannelType.GuildText,
           parent: category.id,
           topic: `Links that bypass **${f.id}** — only visible to members with the ${f.id} filter role.`,
-          permissionOverwrites: overwrites,
+          permissionOverwrites: [
+            { id: everyoneRole.id, deny:  [PermissionFlagsBits.ViewChannel] },
+            { id: filterRole.id,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] },
+          ],
         });
         created.push(chanName);
       }
