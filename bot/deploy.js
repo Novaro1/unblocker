@@ -110,7 +110,8 @@ const commands = [
           { name: "Site won't load",                 value: "blocked" },
           { name: "Make your own link",              value: "link"    },
           { name: "History & privacy",               value: "history" },
-          { name: "Ambassador program",              value: "ambassador" }
+          { name: "Ambassador program",              value: "ambassador" },
+          { name: "How to access Veil at school",   value: "access"     }
         )
     ),
 

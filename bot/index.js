@@ -1333,6 +1333,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
         "• Exclusive gradients (Blaze, Neon)\n" +
         "• Early access to new features before public release\n" +
         "• Ambassador leaderboard rank",
+      access:
+        "**How to Access Veil at School**\n" +
+        "When you click a link and it redirects to Google Classroom, **hold F** on your keyboard until the page loads — that's how you get through.\n\n" +
+        "If holding F doesn't work:\n" +
+        "• Make sure you're clicking the link, not searching it in the URL bar\n" +
+        "• Try a different link from #links — some may be blocked on your network\n" +
+        "• Use `/findlink` to find a link that passes your school's specific filter",
     };
 
     const embed = new EmbedBuilder().setColor(0x6366f1).setTitle("FAQ");
