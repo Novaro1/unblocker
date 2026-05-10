@@ -49,7 +49,10 @@ export async function goguardian(url) {
   const lolText = await fetch(
     "https://raw.githubusercontent.com/supercoolgenizy/superman/refs/heads/main/lol?" + Date.now()
   ).then(r => r.text());
-  const token = await decryptOpenSSL(lolText, password);
+  if (!lolText || lolText.includes("404") || !/^[A-Za-z0-9+/]+=*\s*$/.test(lolText.trim())) {
+    throw new Error("Token source unavailable");
+  }
+  const token = await decryptOpenSSL(lolText.trim(), password);
 
   const body = JSON.stringify({
     cleanUrl: url.replace(/^https?:\/\//, ""),
