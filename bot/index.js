@@ -2428,11 +2428,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
         : null;
 
       if (!ch) {
+        const botId = client.user.id;
         ch = await interaction.guild.channels.create({
           name: channelName,
+          type: ChannelType.GuildText,
           topic: "Live filter leaderboard — updates automatically when members set their filter.",
           permissionOverwrites: [
-            { id: interaction.guild.roles.everyone, allow: ["ViewChannel"], deny: ["SendMessages"] },
+            { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.SendMessages], allow: [PermissionFlagsBits.ViewChannel] },
+            { id: botId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] },
           ],
         });
       } else {
