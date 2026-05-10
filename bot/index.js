@@ -36,7 +36,11 @@ const BOT_INTERNAL_KEY_FILE = join(__dirname, "../bot-internal-key.txt");
 
 // Internal API key for calling Veil's own filter checker — written by src/index.js on first start
 let VEIL_API_KEY = null;
-try { VEIL_API_KEY = readFileSync(BOT_INTERNAL_KEY_FILE, "utf-8").trim(); } catch {}
+function loadVeilApiKey() {
+  try { VEIL_API_KEY = readFileSync(BOT_INTERNAL_KEY_FILE, "utf-8").trim(); } catch {}
+  return VEIL_API_KEY;
+}
+loadVeilApiKey();
 const SERVER_URL_FOR_API = process.env.SERVER_URL || "https://secure.brightpathlearning.website";
 
 // ── Referral storage ───────────────────────────────────────────────────────
@@ -1355,7 +1359,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         for (const domain of pool) {
           try {
             let results = getCachedResults(domain);
-            if (!results && VEIL_API_KEY) {
+            if (!results && loadVeilApiKey()) {
               const data = await fetch(
                 `${SERVER_URL_FOR_API}/api/v1/check?domain=${encodeURIComponent(domain)}&key=${VEIL_API_KEY}`
               ).then(r => r.json());
@@ -1462,7 +1466,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     let totalChecked = 0;
     try {
       let results = getCachedResults(domain);
-      if (!results && VEIL_API_KEY) {
+      if (!results && loadVeilApiKey()) {
         const res = await fetch(
           `${SERVER_URL_FOR_API}/api/v1/check?domain=${encodeURIComponent(domain)}&key=${VEIL_API_KEY}`
         );
@@ -2456,7 +2460,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       checked++;
       try {
         let results = getCachedResults(domain);
-        if (!results && VEIL_API_KEY) {
+        if (!results && loadVeilApiKey()) {
           const res = await fetch(
             `${SERVER_URL_FOR_API}/api/v1/check?domain=${encodeURIComponent(domain)}&key=${VEIL_API_KEY}`
           );
@@ -2520,7 +2524,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.editReply({ content: "❌ Invalid URL. Example: `https://example.com` or `example.com`" });
     }
 
-    if (!VEIL_API_KEY) {
+    if (!loadVeilApiKey()) {
       return interaction.editReply({ content: "❌ Filter API not configured (missing internal key)." });
     }
 
