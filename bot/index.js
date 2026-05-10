@@ -184,10 +184,10 @@ async function refreshFilterStats(guild) {
     const ch = await guild.channels.fetch(cfg.filterStatsChannelId).catch(() => null);
     if (!ch) return;
 
-    const topName = counts.length
+    const topSlug = counts.length
       ? counts[0].id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
-      : "none";
-    const newName = `top-${topName}`;
+      : "unknown";
+    const newName = `📡・${topSlug}-leads`;
     if (ch.name !== newName) {
       await ch.setName(newName).catch(() => {});
     }
@@ -2416,10 +2416,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (otherRole?.members.size > 0) counts.push({ id: "Other", color: 0x6b7280, count: otherRole.members.size });
       counts.sort((a, b) => b.count - a.count);
 
-      const topName = counts.length
+      const topSlug = counts.length
         ? counts[0].id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
-        : "none";
-      const channelName = `top-${topName}`;
+        : "unknown";
+      const channelName = `📡・${topSlug}-leads`;
 
       // Create or reuse the channel
       const cfg = loadConfig();
