@@ -183,6 +183,17 @@ fastify.get("/go", (_req, reply) => {
   return reply.type("text/html").sendFile("index.html");
 });
 
+// ── SEO ───────────────────────────────────────────────────────────────────────
+fastify.get("/sitemap.xml", (_req, reply) =>
+  reply.type("application/xml").sendFile("sitemap.xml")
+);
+
+fastify.get("/robots.txt", (_req, reply) =>
+  reply.type("text/plain").send(
+    "User-agent: *\nAllow: /\nSitemap: https://secure.brightpathlearning.website/sitemap.xml\n"
+  )
+);
+
 // Panic escape redirect — bypasses Scramjet service worker interception
 fastify.get('/escape', (req, reply) => {
   const { to } = req.query;
