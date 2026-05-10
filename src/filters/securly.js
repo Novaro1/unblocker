@@ -20,21 +20,56 @@ async function fetchWithCookies(url, opts = {}) {
   return res;
 }
 
+// Securly status codes returned by the broker endpoint:
+//   ALLOW  → site is permitted
+//   DENY   → site is blocked
+//   SS     → Google/Bing Safe Search enforced (allowed)
+//   YT     → YouTube with restrictions (allowed)
+//   UNKNOWN_SCHOOL → email domain not registered with Securly
+const ALLOWED_STATUSES = new Set(["ALLOW", "SS", "YT"]);
+
+// Category names for the most common Securly category bitmasks (bits 0-37)
+const CAT_NAMES = {
+  3:  "Adult/Gambling",
+  6:  "Social Networking",
+  7:  "Social Networking",
+  9:  "Social Networking",
+  13: "Social Networking",
+  16: "Games",
+  25: "Video Streaming",
+  26: "Entertainment",
+  36: "Entertainment",
+  37: "Entertainment",
+};
+
+function decodeCategoryId(catIdStr) {
+  const n = parseInt(catIdStr, 10);
+  if (!n || n < 0) return "Unknown";
+  // Find the highest set bit and map to a name
+  for (let i = 37; i >= 0; i--) {
+    if (n & (1 << i)) {
+      return CAT_NAMES[i] ?? "Filtered";
+    }
+  }
+  return "Unknown";
+}
+
 export async function securly(url) {
   let raw = url.includes("://") ? url.split("://")[1] : url;
   raw = raw.split("?")[0].split("#")[0];
   const encodedUrl = Buffer.from(raw).toString("base64");
 
   const res1 = await fetchWithCookies(
-    `https://uswest-www.securly.com/crextn/broker?useremail=admin@edison.k12.ca.us&chrome=true&reason=crextn&version=-&cu=https://uswest-www.securly.com/crextn&uf=1&cf=1&host=${raw}&url=${encodedUrl}`
+    `https://uswest-www.securly.com/crextn/broker?useremail=student@lausd.net&chrome=true&reason=crextn&version=-&cu=https://uswest-www.securly.com/crextn&uf=1&cf=1&host=${raw}&url=${encodedUrl}`
   );
   const html1 = await res1.text();
-  const [status, policyid, categoryid] = html1.trim().split(":");
+  const parts = html1.trim().split(":");
+  const status = parts[0];
+  const categoryid = parts[2];
 
-  const res2 = await fetchWithCookies(
-    `https://www.securly.com/blocked?useremail=admin@edison.k12.ca.us&chrome=true&reason=globalblacklist&keyword=&extension_id=kfiocjonplkilcjfgabfngiddebalkod&extension_version=3.0.21&categoryid=${categoryid}&policyid=${policyid}&url=${encodedUrl}`
-  );
-  const html2 = await res2.text();
-  const category = html2.split(`params['categories'] = "`)[1]?.split(`"`)[0] ?? "Unknown";
-  return { category, blocked: status?.replace(/\n/g, "").trim() !== "ALLOW" };
+  if (status === "UNKNOWN_SCHOOL") throw new Error("School not registered with Securly");
+
+  const blocked = !ALLOWED_STATUSES.has(status);
+  const category = blocked ? decodeCategoryId(categoryid) : "Allowed";
+  return { category, blocked };
 }

@@ -43,6 +43,10 @@ function loadVeilApiKey() {
 loadVeilApiKey();
 const SERVER_URL_FOR_API = process.env.SERVER_URL || "https://secure.brightpathlearning.website";
 
+// Filters that are still being fixed — shown as a note in check-related commands
+const FILTERS_UNDER_CONSTRUCTION = ["Palo Alto", "ContentKeeper"];
+const FILTER_HELP_NOTE = `> ⚠️ **Veil's filter checker is new!** The following filters are still under construction: **${FILTERS_UNDER_CONSTRUCTION.join(", ")}** — results may be inaccurate.\n> Do you use one of these at school? Help us improve by reaching out in <#${process.env.BOT_COMMANDS_CHANNEL_ID ?? "the server"}>!`;
+
 // ── Referral storage ───────────────────────────────────────────────────────
 function loadReferrals() {
   if (!existsSync(REFERRALS_FILE)) return { users: {}, inviteCache: {} };
@@ -2491,7 +2495,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           `Checked **${checked}** random FreeDNS domains against **${filterName}** — none passed.\nTry running the command again for a new random batch.`
         )
         .setTimestamp();
-      return interaction.editReply({ embeds: [embed] });
+      return interaction.editReply({ content: FILTER_HELP_NOTE, embeds: [embed] });
     }
 
     const embed = new EmbedBuilder()
@@ -2509,7 +2513,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       )
       .setFooter({ text: `Powered by Veil Filter API · ${MONTHLY_LIMIT - uses - 1} uses remaining this month` })
       .setTimestamp();
-    return interaction.editReply({ embeds: [embed] });
+    return interaction.editReply({ content: FILTER_HELP_NOTE, embeds: [embed] });
   }
 
   // /checklink
@@ -2590,7 +2594,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       for (const c of chunks.slice(1)) embed.addFields({ name: "\u200b", value: c });
     }
 
-    return interaction.editReply({ embeds: [embed] });
+    return interaction.editReply({ content: FILTER_HELP_NOTE, embeds: [embed] });
   }
 
   // /compatible
