@@ -15,6 +15,13 @@ const commands = [
     .setDescription("Show which school filters are most common in the server"),
 
   new SlashCommandBuilder()
+    .setName("checklink")
+    .setDescription("Check a URL against all school content filters to see what passes and what blocks it")
+    .addStringOption((o) =>
+      o.setName("url").setDescription("The URL or domain to check (e.g. example.com)").setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
     .setName("compatible")
     .setDescription("Show links that work on multiple specific filters at the same time")
     .addStringOption((o) =>

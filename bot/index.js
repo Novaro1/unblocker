@@ -2508,6 +2508,87 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return interaction.editReply({ embeds: [embed] });
   }
 
+  // /checklink
+  if (commandName === "checklink") {
+    const input = interaction.options.getString("url");
+    await interaction.deferReply();
+
+    let domain;
+    try {
+      domain = new URL(input.startsWith("http") ? input : "https://" + input).hostname;
+    } catch {
+      return interaction.editReply({ content: "❌ Invalid URL. Example: `https://example.com` or `example.com`" });
+    }
+
+    if (!VEIL_API_KEY) {
+      return interaction.editReply({ content: "❌ Filter API not configured (missing internal key)." });
+    }
+
+    let data;
+    try {
+      const res = await fetch(`${SERVER_URL_FOR_API}/api/v1/check?domain=${encodeURIComponent(domain)}&key=${VEIL_API_KEY}`);
+      data = await res.json();
+    } catch (e) {
+      return interaction.editReply({ content: `❌ Filter check failed: ${e.message}` });
+    }
+
+    if (!data.success || !data.results) {
+      return interaction.editReply({ content: "❌ Filter check returned no results. Try again." });
+    }
+
+    const results = data.results;
+    const passed  = results.filter(r => !r.blocked && !r.error);
+    const blocked = results.filter(r => r.blocked  && !r.error);
+    const errors  = results.filter(r => r.error);
+
+    // Build compact rows: coloured circle + name + category
+    const passLines  = passed.map(r  => `🟢 **${r.name}** — ${r.category}`);
+    const blockLines = blocked.map(r => `🔴 **${r.name}** — ${r.category}`);
+    const errLines   = errors.map(r  => `⚪ **${r.name}** — ${r.category.replace("Error: ", "")}`);
+
+    const allLines = [...passLines, ...blockLines, ...errLines];
+
+    // Discord field value limit is 1024 chars — split if needed
+    const CHUNK = 1024;
+    const chunk = (lines) => {
+      const out = [];
+      let cur = "";
+      for (const l of lines) {
+        if ((cur + "\n" + l).length > CHUNK) { out.push(cur); cur = l; }
+        else cur = cur ? cur + "\n" + l : l;
+      }
+      if (cur) out.push(cur);
+      return out.length ? out : ["—"];
+    };
+
+    const embed = new EmbedBuilder()
+      .setColor(passed.length > 0 ? 0x22c55e : 0xef4444)
+      .setTitle(`Filter Check — ${domain}`)
+      .setDescription(
+        `**${passed.length}** pass  ·  **${blocked.length}** block  ·  **${errors.length}** error` +
+        (data.cached ? "  ·  *(cached)*" : "")
+      )
+      .setTimestamp();
+
+    if (passLines.length) {
+      const chunks = chunk(passLines);
+      embed.addFields({ name: `✅ Passes (${passed.length})`, value: chunks[0] });
+      for (const c of chunks.slice(1)) embed.addFields({ name: "\u200b", value: c });
+    }
+    if (blockLines.length) {
+      const chunks = chunk(blockLines);
+      embed.addFields({ name: `🚫 Blocked (${blocked.length})`, value: chunks[0] });
+      for (const c of chunks.slice(1)) embed.addFields({ name: "\u200b", value: c });
+    }
+    if (errLines.length) {
+      const chunks = chunk(errLines);
+      embed.addFields({ name: `⚠️ Errors (${errors.length})`, value: chunks[0] });
+      for (const c of chunks.slice(1)) embed.addFields({ name: "\u200b", value: c });
+    }
+
+    return interaction.editReply({ embeds: [embed] });
+  }
+
   // /compatible
   if (commandName === "compatible") {
     const rawFilters = interaction.options.getString("filters");
