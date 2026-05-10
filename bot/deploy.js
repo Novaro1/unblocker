@@ -11,6 +11,10 @@ const commands = [
     .setDescription("Show all working Veil proxy links"),
 
   new SlashCommandBuilder()
+    .setName("filterstats")
+    .setDescription("Show which school filters are most common in the server"),
+
+  new SlashCommandBuilder()
     .setName("compatible")
     .setDescription("Show links that work on multiple specific filters at the same time")
     .addStringOption((o) =>

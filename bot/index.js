@@ -187,7 +187,7 @@ const {
 // Public commands that must be used in #bot-commands
 const PUBLIC_COMMANDS = new Set([
   "links", "status", "serverinfo", "uptime",
-  "leaderboard", "beta-status", "freedns", "findlink", "premium", "compatible",
+  "leaderboard", "filterstats", "beta-status", "freedns", "findlink", "premium", "compatible",
 ]);
 
 // Send a log embed to #mod-log
@@ -1857,6 +1857,65 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setTimestamp();
 
     return interaction.reply({ embeds: [embed] });
+  }
+
+  // /filterstats
+  if (commandName === "filterstats") {
+    await interaction.deferReply();
+    await interaction.guild.members.fetch();
+
+    // Count members per filter role
+    const counts = [];
+    for (const filterDef of FILTER_ROLES) {
+      if (filterDef.id === "Other") continue;
+      const roleName = FILTER_ROLE_PREFIX + filterDef.id;
+      const role = interaction.guild.roles.cache.find(r => r.name === roleName);
+      if (!role) continue;
+      const count = role.members.size;
+      if (count > 0) counts.push({ id: filterDef.id, color: filterDef.color, count });
+    }
+
+    // Also count "Other"
+    const otherRole = interaction.guild.roles.cache.find(r => r.name === FILTER_ROLE_PREFIX + "Other");
+    if (otherRole?.members.size > 0)
+      counts.push({ id: "Other", color: 0x6b7280, count: otherRole.members.size });
+
+    counts.sort((a, b) => b.count - a.count);
+
+    const total = counts.reduce((sum, c) => sum + c.count, 0);
+    const totalMembers = interaction.guild.memberCount;
+
+    if (!counts.length) {
+      return interaction.editReply({ content: "No members have set a filter role yet." });
+    }
+
+    const BAR_WIDTH = 12;
+    const maxCount = counts[0].count;
+    const RANK_ICONS = ["🥇", "🥈", "🥉"];
+
+    const lines = counts.map((c, i) => {
+      const pct = total > 0 ? Math.round((c.count / total) * 100) : 0;
+      const filled = Math.round((c.count / maxCount) * BAR_WIDTH);
+      const bar = "█".repeat(filled) + "░".repeat(BAR_WIDTH - filled);
+      const rank = RANK_ICONS[i] ?? `**${i + 1}.**`;
+      return `${rank} **${c.id}** — ${c.count} member${c.count !== 1 ? "s" : ""} (${pct}%)\n\`${bar}\``;
+    });
+
+    const noFilter = totalMembers - total;
+
+    const embed = new EmbedBuilder()
+      .setColor(counts[0].color)
+      .setTitle("📊 Filter Distribution")
+      .setDescription(lines.join("\n\n"))
+      .addFields(
+        { name: "Members with a filter set", value: `${total}`, inline: true },
+        { name: "No filter set",             value: `${noFilter}`, inline: true },
+        { name: "Most common",               value: `**${counts[0].id}** with ${counts[0].count} member${counts[0].count !== 1 ? "s" : ""}`, inline: false },
+      )
+      .setFooter({ text: `Based on ${totalMembers} total server members · Set your filter with /setfilter` })
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [embed] });
   }
 
   // /beta-release
