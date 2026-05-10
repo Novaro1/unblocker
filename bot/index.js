@@ -24,13 +24,37 @@ import https from "https";
 import OpenAI from "openai";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const LINKS_FILE         = join(__dirname, "links.json");
-const CONFIG_FILE        = join(__dirname, "live-config.json");
-const TOKENS_FILE        = join(__dirname, "../tokens.json");
-const BETA_FEATURES_FILE = join(__dirname, "../beta-features.json");
-const FREEDNS_FILE       = join(__dirname, "../freedns-domains.txt");
+const LINKS_FILE          = join(__dirname, "links.json");
+const CONFIG_FILE         = join(__dirname, "live-config.json");
+const TOKENS_FILE         = join(__dirname, "../tokens.json");
+const BETA_FEATURES_FILE  = join(__dirname, "../beta-features.json");
+const FREEDNS_FILE        = join(__dirname, "../freedns-domains.txt");
 const FINDLINK_USAGE_FILE = join(__dirname, "../findlink-usage.json");
 const FINDLINK_CACHE_FILE = join(__dirname, "../findlink-cache.json");
+const REFERRALS_FILE      = join(__dirname, "referrals.json");
+
+// ── Referral storage ───────────────────────────────────────────────────────
+function loadReferrals() {
+  if (!existsSync(REFERRALS_FILE)) return { users: {}, inviteCache: {} };
+  try { return JSON.parse(readFileSync(REFERRALS_FILE, "utf-8")); } catch { return { users: {}, inviteCache: {} }; }
+}
+function saveReferrals(data) {
+  writeFileSync(REFERRALS_FILE, JSON.stringify(data, null, 2));
+}
+
+// Snapshot current use counts for all invites in a guild
+async function snapshotInvites(guild) {
+  try {
+    const invites = await guild.invites.fetch();
+    const data = loadReferrals();
+    for (const [code, inv] of invites) data.inviteCache[code] = inv.uses ?? 0;
+    saveReferrals(data);
+    return data.inviteCache;
+  } catch { return {}; }
+}
+
+const REFERRAL_THRESHOLD = parseInt(process.env.REFERRAL_THRESHOLD || "5");
+const AMBASSADOR_ROLE_NAME = "Referral Ambassador";
 
 // ── /findlink domain result cache ───────────────────────────────────────────
 function loadFindlinkCache() {
@@ -273,7 +297,7 @@ const {
 // Public commands that must be used in #bot-commands
 const PUBLIC_COMMANDS = new Set([
   "links", "status", "serverinfo", "uptime",
-  "leaderboard", "filterstats", "beta-status", "freedns", "findlink", "premium", "compatible",
+  "leaderboard", "filterstats", "referral", "referralboard", "beta-status", "freedns", "findlink", "premium", "compatible",
 ]);
 
 // Send a log embed to #mod-log
@@ -640,6 +664,8 @@ async function runAiScan(guild) {
 
 client.once(Events.ClientReady, () => {
   console.log(`Veil Bot ready as ${client.user.tag}`);
+  // Snapshot invite use counts so we can detect which invite a new member used
+  client.guilds.cache.forEach(g => snapshotInvites(g).catch(() => {}));
   // Refresh live embeds every 60 seconds
   setInterval(refreshLiveMessages, 60_000);
   // Start AI monitor if configured
@@ -653,6 +679,96 @@ client.once(Events.ClientReady, () => {
 
 // ── Auto-role + welcome on join ────────────────────────────────────────────
 client.on(Events.GuildMemberAdd, async (member) => {
+  // ── Referral detection ──────────────────────────────────────────────────
+  try {
+    const data = loadReferrals();
+    const before = { ...data.inviteCache };
+    const after  = await snapshotInvites(member.guild);
+
+    // Find the invite whose use count increased
+    let usedCode = null;
+    for (const [code, uses] of Object.entries(after)) {
+      if ((before[code] ?? 0) < uses) { usedCode = code; break; }
+    }
+
+    if (usedCode) {
+      // Find who owns this invite code
+      const referrerId = Object.keys(data.users).find(
+        uid => data.users[uid].inviteCode === usedCode
+      );
+      if (referrerId && referrerId !== member.id) {
+        const ref = data.users[referrerId];
+        if (!ref.referrals) ref.referrals = [];
+        if (!ref.referrals.includes(member.id)) {
+          ref.referrals.push(member.id);
+          saveReferrals(data);
+
+          // DM the referrer
+          try {
+            const referrer = await member.guild.members.fetch(referrerId);
+            const count = ref.referrals.length;
+            const dmEmbed = new EmbedBuilder()
+              .setColor(0x22c55e)
+              .setTitle("🎉 Someone joined with your link!")
+              .setDescription(
+                `**${member.user.username}** just joined Veil using your referral link.\n` +
+                `You've now referred **${count} member${count !== 1 ? "s" : ""}** total.`
+              )
+              .addFields({
+                name: "Progress to Ambassador",
+                value: count >= REFERRAL_THRESHOLD
+                  ? "✅ You've hit the threshold — ambassador role incoming!"
+                  : `${count}/${REFERRAL_THRESHOLD} referrals`,
+              })
+              .setTimestamp();
+            await referrer.send({ embeds: [dmEmbed] }).catch(() => {});
+
+            // Auto-grant ambassador role at threshold
+            if (count >= REFERRAL_THRESHOLD && !ref.ambassadorGranted) {
+              ref.ambassadorGranted = true;
+              saveReferrals(data);
+
+              let ambRole = member.guild.roles.cache.find(r => r.name === AMBASSADOR_ROLE_NAME);
+              if (!ambRole) {
+                ambRole = await member.guild.roles.create({
+                  name: AMBASSADOR_ROLE_NAME,
+                  color: 0xf59e0b,
+                  hoist: true,
+                  mentionable: false,
+                  reason: "Auto-created for referral ambassadors",
+                });
+              }
+              await referrer.roles.add(ambRole).catch(() => {});
+
+              const rewardEmbed = new EmbedBuilder()
+                .setColor(0xf59e0b)
+                .setTitle("⭐ You're a Referral Ambassador!")
+                .setDescription(
+                  `You've referred **${count} members** to Veil and unlocked the **${AMBASSADOR_ROLE_NAME}** role!\n\n` +
+                  `Thank you for growing the community. 🙏`
+                )
+                .setTimestamp();
+              await referrer.send({ embeds: [rewardEmbed] }).catch(() => {});
+              await modLog(member.guild, new EmbedBuilder()
+                .setColor(0xf59e0b)
+                .setTitle("⭐ Referral Ambassador Granted")
+                .addFields(
+                  { name: "User",     value: `${referrer} (${referrer.user.username})`, inline: true },
+                  { name: "Referrals", value: `${count}`, inline: true },
+                )
+                .setTimestamp()
+              );
+            }
+          } catch (e) {
+            console.error("[referral] reward error:", e.message);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[referral] join detection error:", e.message);
+  }
+
   if (MEMBER_ROLE_ID) {
     const role = member.guild.roles.cache.get(MEMBER_ROLE_ID);
     if (role) await member.roles.add(role).catch(console.error);
@@ -1950,6 +2066,102 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setTitle("⭐ Ambassador Leaderboard")
       .setDescription(lines.length ? lines.join("\n") : "No ambassadors yet.")
       .setFooter({ text: "Earn points by advertising Veil. Staff award points via /award-points." })
+      .setTimestamp();
+
+    return interaction.reply({ embeds: [embed] });
+  }
+
+  // /referral
+  if (commandName === "referral") {
+    const data = loadReferrals();
+    let entry = data.users[interaction.user.id];
+
+    // Create an invite if the user doesn't have one yet
+    if (!entry?.inviteCode) {
+      try {
+        const inviteChannel = interaction.guild.channels.cache.get(WELCOME_CHANNEL_ID)
+          ?? interaction.guild.channels.cache.find(c => c.type === 0 && c.permissionsFor(interaction.guild.members.me).has("CreateInstantInvite"))
+          ?? interaction.channel;
+
+        const invite = await inviteChannel.createInvite({
+          maxAge: 0,       // never expires
+          maxUses: 0,      // unlimited uses
+          unique: true,
+          reason: `Referral link for ${interaction.user.username}`,
+        });
+
+        if (!data.users[interaction.user.id]) data.users[interaction.user.id] = {};
+        entry = data.users[interaction.user.id];
+        entry.inviteCode = invite.code;
+        entry.referrals  = entry.referrals ?? [];
+        entry.createdAt  = new Date().toISOString();
+        // Seed invite cache
+        data.inviteCache[invite.code] = 0;
+        saveReferrals(data);
+      } catch (err) {
+        return interaction.reply({ content: `❌ Couldn't create invite: ${err.message}`, flags: MessageFlags.Ephemeral });
+      }
+    }
+
+    const referrals  = entry.referrals ?? [];
+    const count      = referrals.length;
+    const inviteUrl  = `https://discord.gg/${entry.inviteCode}`;
+    const remaining  = Math.max(0, REFERRAL_THRESHOLD - count);
+    const hasRole    = entry.ambassadorGranted ?? false;
+
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("🔗 Your Referral Link")
+      .setDescription(`Share this link to invite people to Veil:\n## ${inviteUrl}`)
+      .addFields(
+        { name: "👥 Total referrals",        value: `${count}`,    inline: true },
+        { name: "⭐ Ambassador threshold",    value: `${REFERRAL_THRESHOLD}`, inline: true },
+        { name: hasRole ? "✅ Status" : "🎯 Progress",
+          value: hasRole
+            ? "You're a **Referral Ambassador**!"
+            : `${count}/${REFERRAL_THRESHOLD} — **${remaining} more** to earn the role`,
+          inline: true,
+        },
+      )
+      .setFooter({ text: "You'll get a DM every time someone joins with your link" })
+      .setTimestamp();
+
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  }
+
+  // /referralboard
+  if (commandName === "referralboard") {
+    const data   = loadReferrals();
+    const board  = Object.entries(data.users)
+      .map(([uid, u]) => ({ uid, count: (u.referrals ?? []).length, ambassador: u.ambassadorGranted ?? false }))
+      .filter(e => e.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    if (!board.length) {
+      return interaction.reply({ content: "No referrals recorded yet. Use `/referral` to get your link!", ephemeral: true });
+    }
+
+    const MEDALS = ["🥇", "🥈", "🥉"];
+    const lines = await Promise.all(board.map(async (e, i) => {
+      let name = `<@${e.uid}>`;
+      try {
+        const m = await interaction.guild.members.fetch(e.uid).catch(() => null);
+        if (m) name = `**${m.user.username}**`;
+      } catch {}
+      const star = e.ambassador ? " ⭐" : "";
+      return `${MEDALS[i] ?? `\`${i + 1}.\``} ${name}${star} — ${e.count} referral${e.count !== 1 ? "s" : ""}`;
+    }));
+
+    const embed = new EmbedBuilder()
+      .setColor(0xf59e0b)
+      .setTitle("🏆 Referral Leaderboard")
+      .setDescription(lines.join("\n"))
+      .addFields({
+        name: "How to earn referrals",
+        value: `Use \`/referral\` to get your personal invite link. Reach **${REFERRAL_THRESHOLD} referrals** to unlock the ⭐ **${AMBASSADOR_ROLE_NAME}** role.`,
+      })
+      .setFooter({ text: "⭐ = Referral Ambassador" })
       .setTimestamp();
 
     return interaction.reply({ embeds: [embed] });

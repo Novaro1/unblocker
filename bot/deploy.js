@@ -24,6 +24,14 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
+    .setName("referral")
+    .setDescription("Get your personal referral invite link and see your stats"),
+
+  new SlashCommandBuilder()
+    .setName("referralboard")
+    .setDescription("Show the top referrers in the server"),
+
+  new SlashCommandBuilder()
     .setName("scandomains")
     .setDescription("Check N random FreeDNS domains and rank them by how many school filters they pass (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
