@@ -32,6 +32,12 @@ const FREEDNS_FILE        = join(__dirname, "../freedns-domains.txt");
 const FINDLINK_USAGE_FILE = join(__dirname, "../findlink-usage.json");
 const FINDLINK_CACHE_FILE = join(__dirname, "../findlink-cache.json");
 const REFERRALS_FILE      = join(__dirname, "referrals.json");
+const BOT_INTERNAL_KEY_FILE = join(__dirname, "../bot-internal-key.txt");
+
+// Internal API key for calling Veil's own filter checker — written by src/index.js on first start
+let VEIL_API_KEY = null;
+try { VEIL_API_KEY = readFileSync(BOT_INTERNAL_KEY_FILE, "utf-8").trim(); } catch {}
+const SERVER_URL_FOR_API = process.env.SERVER_URL || "https://secure.brightpathlearning.website";
 
 // ── Referral storage ───────────────────────────────────────────────────────
 function loadReferrals() {
@@ -1341,7 +1347,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return interaction.editReply({ content: "❌ FreeDNS domain list not generated yet on the server." });
 
         await interaction.editReply({ content: `🔍 Searching for a domain unblocked by **${filterKey}**…` });
-        const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
         const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
         const pool = readFileSync(FREEDNS_FILE, "utf-8").split("\n")
           .map(line => line.split("\t")[0].trim()).filter(Boolean)
@@ -1350,14 +1355,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
         for (const domain of pool) {
           try {
             let results = getCachedResults(domain);
-            if (!results) {
+            if (!results && VEIL_API_KEY) {
               const data = await fetch(
-                `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
+                `${SERVER_URL_FOR_API}/api/v1/check?domain=${encodeURIComponent(domain)}&key=${VEIL_API_KEY}`
               ).then(r => r.json());
               if (!data.success) continue;
               results = data.results;
               setCachedResults(domain, results);
             }
+            if (!results) continue;
             const result = results.find(r => r.filter === filterKey);
             if (result) filterName = result.name;
             const category = result?.category || "";
@@ -1451,15 +1457,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       entry.submittedById = submitter.id;
     }
     // Auto-check which filters this URL passes
-    const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
     const domain = new URL(url).hostname;
     let passedFilters = [];
     let totalChecked = 0;
     try {
       let results = getCachedResults(domain);
-      if (!results) {
+      if (!results && VEIL_API_KEY) {
         const res = await fetch(
-          `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
+          `${SERVER_URL_FOR_API}/api/v1/check?domain=${encodeURIComponent(domain)}&key=${VEIL_API_KEY}`
         );
         const data = await res.json();
         if (data.success) {
@@ -2167,6 +2172,67 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return interaction.reply({ embeds: [embed] });
   }
 
+  // /createapikey — staff only, creates a Veil Filter API key for external developers
+  if (commandName === "createapikey") {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      return interaction.reply({ content: "❌ Staff only.", ephemeral: true });
+    }
+    const devName   = interaction.options.getString("name");
+    const tier      = interaction.options.getString("tier")      ?? "free";
+    const dailyLimit = interaction.options.getInteger("daily_limit") ?? 500;
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const adminToken = process.env.ADMIN_TOKEN;
+    const port       = process.env.PORT || "8080";
+    // Try localhost first (same machine, no auth needed), fall back to public URL with ADMIN_TOKEN
+    let key = null;
+    try {
+      const res  = await fetch(`http://127.0.0.1:${port}/api/admin/createkey`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: devName, tier, dailyLimit }),
+      });
+      const data = await res.json();
+      if (res.ok) key = data.key;
+    } catch {
+      // localhost failed — try public URL with ADMIN_TOKEN
+      if (adminToken) {
+        try {
+          const res  = await fetch(`${SERVER_URL_FOR_API}/api/admin/createkey`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${adminToken}` },
+            body: JSON.stringify({ name: devName, tier, dailyLimit }),
+          });
+          const data = await res.json();
+          if (res.ok) key = data.key;
+        } catch { /* fall through */ }
+      }
+    }
+
+    if (!key) {
+      return interaction.editReply({ content: "❌ Failed to create key. Make sure the server is running and `ADMIN_TOKEN` is set if calling remotely." });
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("API Key Created")
+      .addFields(
+        { name: "Name",        value: devName,                   inline: true  },
+        { name: "Tier",        value: tier,                      inline: true  },
+        { name: "Daily Limit", value: dailyLimit.toString(),     inline: true  },
+        { name: "Key",         value: `\`\`\`${key}\`\`\``                    },
+        {
+          name: "Usage",
+          value: `GET \`${SERVER_URL_FOR_API}/api/v1/check?domain=example.com&key=${key}\``,
+        },
+      )
+      .setFooter({ text: "Share this key with the developer — it cannot be recovered if lost." })
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [embed] });
+  }
+
   // /filterstats
   if (commandName === "filterstats") {
     await interaction.deferReply();
@@ -2380,7 +2446,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // Shuffle
     const pool = [...allDomains].sort(() => Math.random() - 0.5);
 
-    const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
     const MAX_TRIES = 30;
     const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous)/i;
     let found = null;
@@ -2391,15 +2456,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
       checked++;
       try {
         let results = getCachedResults(domain);
-        if (!results) {
+        if (!results && VEIL_API_KEY) {
           const res = await fetch(
-            `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
+            `${SERVER_URL_FOR_API}/api/v1/check?domain=${encodeURIComponent(domain)}&key=${VEIL_API_KEY}`
           );
           const data = await res.json();
           if (!data.success) continue;
           results = data.results;
           setCachedResults(domain, results);
         }
+        if (!results) continue;
         const result = results.find((r) => r.filter === filterKey);
         if (result) filterName = result.name;
         const category = result?.category || "";
@@ -2437,7 +2503,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           value: `Go to [FreeDNS](https://freedns.afraid.org/subdomain/edit.php) and register a subdomain like \`yourname.${found.domain}\``,
         }
       )
-      .setFooter({ text: `Powered by live.glseries.net · ${MONTHLY_LIMIT - uses - 1} uses remaining this month` })
+      .setFooter({ text: `Powered by Veil Filter API · ${MONTHLY_LIMIT - uses - 1} uses remaining this month` })
       .setTimestamp();
     return interaction.editReply({ embeds: [embed] });
   }
@@ -2507,7 +2573,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     await interaction.deferReply();
 
-    const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
     const UNCATEGORIZED = /^(uncategor|unknown|unrated|none|n\/a|other|miscellaneous|parked|new url)/i;
 
     // School filters we care about (matches FILTER_ROLES)
@@ -2567,9 +2632,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     for (const domain of pool) {
       try {
         let filterResults = getCachedResults(domain);
-        if (!filterResults) {
+        if (!filterResults && VEIL_API_KEY) {
           const res = await fetch(
-            `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`
+            `${SERVER_URL_FOR_API}/api/v1/check?domain=${encodeURIComponent(domain)}&key=${VEIL_API_KEY}`
           );
           const data = await res.json();
           if (data.success) {

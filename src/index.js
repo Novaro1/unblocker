@@ -866,7 +866,8 @@ fastify.get("/s/:id", (req, reply) => {
 });
 
 // ── Filter Check API ──────────────────────────────────────────────────────────
-const filterKeysPath = fileURLToPath(new URL("../filter-api-keys.json", import.meta.url));
+const filterKeysPath    = fileURLToPath(new URL("../filter-api-keys.json", import.meta.url));
+const botInternalKeyPath = fileURLToPath(new URL("../bot-internal-key.txt", import.meta.url));
 
 function loadFilterKeys() {
   if (!existsSync(filterKeysPath)) return {};
@@ -875,6 +876,26 @@ function loadFilterKeys() {
 function saveFilterKeys(keys) {
   writeFileSync(filterKeysPath, JSON.stringify(keys, null, 2));
 }
+
+// Ensure a permanent internal key exists for the bot (created once, stored in bot-internal-key.txt)
+function ensureBotInternalKey() {
+  let key;
+  // Reuse existing internal key if already written
+  if (existsSync(botInternalKeyPath)) {
+    key = readFileSync(botInternalKeyPath, "utf-8").trim();
+  } else {
+    key = "veil_internal_" + cryptoRandomBytes(16).toString("hex");
+  }
+  const keys = loadFilterKeys();
+  if (!keys[key]) {
+    keys[key] = { name: "Veil Bot Internal", tier: "internal", dailyLimit: 999999, createdAt: new Date().toISOString(), usage: {} };
+    saveFilterKeys(keys);
+    console.log("[filter-api] Created internal bot key");
+  }
+  writeFileSync(botInternalKeyPath, key);
+  return key;
+}
+ensureBotInternalKey();
 
 // Generate a new API key — called from bot /createapikey command
 export function createFilterApiKey({ name, tier = "free", dailyLimit = 500 }) {
@@ -942,6 +963,32 @@ fastify.get("/api/v1/filters", (_req, reply) =>
 fastify.get("/api/v1/status", (_req, reply) =>
   reply.send({ ok: true, version: "1.0.0", filters: FILTERS.length })
 );
+
+// POST /api/admin/createkey — create a new API key (requires ADMIN_TOKEN or localhost)
+fastify.post("/api/admin/createkey", async (req, reply) => {
+  const adminToken = process.env.ADMIN_TOKEN;
+  const authHeader = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+  const ip = req.ip;
+  const isLocalhost = ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+  if (!isLocalhost && (!adminToken || authHeader !== adminToken)) {
+    return reply.code(403).send({ error: "Forbidden. Requires ADMIN_TOKEN or localhost." });
+  }
+  const { name, tier = "free", dailyLimit = 500 } = req.body ?? {};
+  if (!name || typeof name !== "string" || !name.trim()) {
+    return reply.code(400).send({ error: "name is required." });
+  }
+  const key = createFilterApiKey({ name: name.trim(), tier, dailyLimit: Number(dailyLimit) || 500 });
+  return reply.send({ key, name: name.trim(), tier, dailyLimit });
+});
+
+// GET /api/admin/botkey — return the internal bot key (localhost only, no auth needed)
+fastify.get("/api/admin/botkey", (req, reply) => {
+  const ip = req.ip;
+  const isLocalhost = ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+  if (!isLocalhost) return reply.code(403).send({ error: "Forbidden." });
+  if (!existsSync(botInternalKeyPath)) return reply.code(503).send({ error: "Bot key not initialized." });
+  return reply.send({ key: readFileSync(botInternalKeyPath, "utf-8").trim() });
+});
 
 // ── Premium page & API ────────────────────────────────────────────────────────
 const PREMIUM_PRICE      = process.env.PREMIUM_PRICE      || "3.00";

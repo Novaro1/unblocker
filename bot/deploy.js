@@ -432,6 +432,26 @@ const commands = [
     .setDescription("Show Veil Premium perks and how to subscribe"),
 
   new SlashCommandBuilder()
+    .setName("createapikey")
+    .setDescription("Create a Veil Filter API key for an external developer (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addStringOption((o) =>
+      o.setName("name").setDescription("Developer or project name (e.g. ProxyBot by xUser)").setRequired(true)
+    )
+    .addStringOption((o) =>
+      o.setName("tier").setDescription("Key tier (default: free)").setRequired(false)
+        .addChoices(
+          { name: "Free (500 req/day)",      value: "free"    },
+          { name: "Pro (5000 req/day)",       value: "pro"     },
+          { name: "Unlimited (internal use)", value: "internal" },
+        )
+    )
+    .addIntegerOption((o) =>
+      o.setName("daily_limit").setDescription("Custom daily request limit (overrides tier default)").setRequired(false)
+        .setMinValue(1).setMaxValue(999999)
+    ),
+
+  new SlashCommandBuilder()
     .setName("grantpremium")
     .setDescription("Grant Veil Premium to a user after payment (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
