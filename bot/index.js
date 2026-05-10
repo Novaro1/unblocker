@@ -340,7 +340,7 @@ async function ensurePingRole(guild, ping) {
   if (!role) {
     role = await guild.roles.create({
       name: roleName,
-      colors: [ping.color],
+      color: ping.color,
       mentionable: true,
       reason: "Auto-created ping role for notification system",
     });
@@ -400,7 +400,7 @@ async function ensureFilterRole(guild, filterId) {
   if (!role) {
     role = await guild.roles.create({
       name,
-      colors: [def?.color ?? 0x6b7280],
+      color: def?.color ?? 0x6b7280,
       mentionable: false,
       reason: "Auto-created filter role",
     });
@@ -416,7 +416,7 @@ async function ensureAdminRole(guild) {
     // Create with no permissions first, then set what the bot can grant
     role = await guild.roles.create({
       name: ADMIN_ROLE_NAME,
-      colors: [0xf59e0b],
+      color: 0xf59e0b,
       permissions: [],
       hoist: true,
       mentionable: true,
@@ -452,7 +452,7 @@ async function ensurePremiumRole(guild) {
   if (!role) {
     role = await guild.roles.create({
       name: PREMIUM_ROLE_NAME,
-      colors: [0xfbbf24],   // gold
+      color: 0xfbbf24,   // gold
       hoist: true,
       mentionable: false,
       reason: "Veil Premium role — created by bot",
