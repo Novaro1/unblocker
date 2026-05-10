@@ -25,6 +25,9 @@ const GIVEAWAYS_FILE    = join(DATA_DIR, "giveaways.json");
 const FINDLINK_CACHE    = join(DATA_DIR, "findlink-cache.json");
 const FINDLINK_USAGE    = join(DATA_DIR, "findlink-usage.json");
 
+const VEIL_API_URL = process.env.VEIL_API_URL || "https://secure.brightpathlearning.website";
+const VEIL_API_KEY = process.env.VEIL_API_KEY || "";
+
 if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
 
 // ── Storage helpers ──────────────────────────────────────────────────────────
@@ -659,10 +662,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // /findlink
   if (commandName === "findlink") {
-    const glToken = cfg.glApiKey;
-    if (!glToken) {
+    if (!VEIL_API_KEY) {
       return interaction.reply({
-        content: "This server hasn't set up a glseries API key yet. An admin needs to run `/set-findlink-key` first.\nGet a free key at **live.glseries.net**.",
+        content: "This bot hasn't been configured with a Veil API key yet. Please contact the bot owner.",
         ephemeral: true,
       });
     }
@@ -707,7 +709,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       try {
         let results = getFindlinkCache(domain);
         if (!results) {
-          const res  = await fetch(`https://live.glseries.net/api/v1/check?token=${glToken}&url=${encodeURIComponent(domain)}`);
+          const res  = await fetch(`${VEIL_API_URL}/api/v1/check?domain=${encodeURIComponent(domain)}&key=${VEIL_API_KEY}`);
           const data = await res.json();
           if (!data.success) continue;
           results = data.results;
@@ -1001,11 +1003,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return interaction.reply({ content: "✅ Welcome message updated.", ephemeral: true });
   }
 
-  // /set-findlink-key
+  // /set-findlink-key — kept for backwards compatibility, no longer needed
   if (commandName === "set-findlink-key") {
-    const key = interaction.options.getString("key");
-    setConfig(interaction.guild.id, { glApiKey: key });
-    return interaction.reply({ content: "✅ glseries API key saved. `/findlink` is now enabled for this server.", ephemeral: true });
+    return interaction.reply({ content: "✅ `/findlink` now uses the Veil Filter API — no key setup needed.", ephemeral: true });
   }
 
 

@@ -1,16 +1,26 @@
 #!/usr/bin/env node
-// Batch-checks FreeDNS domains against the GL filter API.
+// Batch-checks FreeDNS domains against the Veil Filter API.
 // Pre-filters to domains that sound educational/neutral to reduce API calls.
 // Usage: node scripts/check-freedns-filters.js [max-checks]
 
-import { readFileSync } from "fs";
+import "dotenv/config";
+import { readFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const GL_TOKEN = "gl_6b3e2fc034923e71ec0054e0fb667ec1c9efa8578aec687b";
-const DELAY_MS = 1200; // ~50 req/min to be safe
+const VEIL_API_URL = process.env.VEIL_API_URL || "https://secure.brightpathlearning.website";
+const BOT_KEY_FILE = join(__dirname, "../bot-internal-key.txt");
+const VEIL_API_KEY = process.env.VEIL_API_KEY ||
+  (existsSync(BOT_KEY_FILE) ? readFileSync(BOT_KEY_FILE, "utf-8").trim() : "");
+
+if (!VEIL_API_KEY) {
+  console.error("No API key found. Set VEIL_API_KEY env var or ensure bot-internal-key.txt exists.");
+  process.exit(1);
+}
+
+const DELAY_MS = 300; // our API has no strict rate limit but be polite
 const MAX_CHECKS = parseInt(process.argv[2] || "80", 10);
 
 const GOOD_KEYWORDS = [
@@ -63,8 +73,8 @@ for (let i = 0; i < candidates.length; i++) {
   process.stdout.write(`[${i + 1}/${candidates.length}] ${domain} ... `);
   try {
     const res = await fetch(
-      `https://live.glseries.net/api/v1/check?token=${GL_TOKEN}&url=${encodeURIComponent(domain)}`,
-      { signal: AbortSignal.timeout(10000) }
+      `${VEIL_API_URL}/api/v1/check?domain=${encodeURIComponent(domain)}&key=${VEIL_API_KEY}`,
+      { signal: AbortSignal.timeout(15000) }
     );
     const data = await res.json();
     if (data.success && data.results) {

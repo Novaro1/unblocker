@@ -1,7 +1,7 @@
 /**
  * Veil Filter Checker
  * Unified interface for all school content filters.
- * Returns the same schema as the glseries API for drop-in compatibility.
+ * Returns { filter, name, category, blocked, error, responseTime } per filter.
  */
 
 import { goguardian }               from "./goguardian.js";
