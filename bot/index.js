@@ -45,7 +45,7 @@ const SERVER_URL_FOR_API = process.env.SERVER_URL || "https://secure.brightpathl
 
 // Filters that are still being fixed — shown as a note in check-related commands
 const FILTERS_UNDER_CONSTRUCTION = ["Palo Alto", "ContentKeeper"];
-const FILTER_HELP_NOTE = `> ⚠️ **Veil's filter checker is new!** The following filters are still under construction: **${FILTERS_UNDER_CONSTRUCTION.join(", ")}** — results may be inaccurate.\n> Do you use one of these at school? Help us improve by reaching out in <#${process.env.BOT_COMMANDS_CHANNEL_ID ?? "the server"}>!`;
+const FILTER_HELP_NOTE = `> ⚠️ **Veil's filter checker is new!** The following filters are still under construction: **${FILTERS_UNDER_CONSTRUCTION.join(", ")}** — results may be inaccurate.\n> Do you use one of these at school? Help us improve — open a ticket in <#${process.env.TICKETS_CHANNEL_ID ?? "the server"}>!`;
 
 // ── Referral storage ───────────────────────────────────────────────────────
 function loadReferrals() {
