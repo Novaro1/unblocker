@@ -184,11 +184,9 @@ fastify.get("/go", (_req, reply) => {
 });
 
 // ── SEO ───────────────────────────────────────────────────────────────────────
-fastify.get("/sitemap.xml", (req, reply) => {
-  if (req.hostname !== "secure.brightpathlearning.website")
-    return reply.code(404).send("Not found");
-  return reply.type("application/xml").sendFile("sitemap.xml");
-});
+fastify.get("/sitemap.xml", (_req, reply) =>
+  reply.type("application/xml").sendFile("sitemap.xml")
+);
 
 fastify.get("/robots.txt", (req, reply) => {
   if (req.hostname === "secure.brightpathlearning.website")
