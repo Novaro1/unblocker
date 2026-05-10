@@ -8,15 +8,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const cats = JSON.parse(readFileSync(join(__dirname, "json/goguardian.json"), "utf8"));
 
 // The licenseTag is the GoGuardian License extension ID (deployed by the school admin).
-// This one corresponds to the "GoGuardian License" extension (jjmjlpijaakeocnopljpgmfgjmkcdgaa).
-// Sign-in returns an anonymous session token valid for ~24h.
-const LICENSE_TAG = "jjmjlpijaakeocnopljpgmfgjmkcdgaa";
+// Set GG_LICENSE_TAG in your .env file — do not commit the real value to git.
+const LICENSE_TAG = process.env.GG_LICENSE_TAG;
 const EXT_VERSION = "4.1.229";
 
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
 async function getToken() {
+  if (!LICENSE_TAG) throw new Error("GG_LICENSE_TAG env var not set");
   if (cachedToken && Date.now() < tokenExpiresAt - 60_000) return cachedToken;
 
   const res = await fetch("https://prod-ext-gateway.goguardian.com/v1/auth/sign-in", {
