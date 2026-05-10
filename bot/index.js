@@ -124,6 +124,92 @@ function buildProgressBar(current, total, width = 12) {
   return `\`[${"█".repeat(filled)}${"░".repeat(empty)}]\` ${Math.round(pct * 100)}%`;
 }
 
+// ── Filter stats channel ────────────────────────────────────────────────────
+function buildFilterStatsEmbed(counts, totalMembers) {
+  if (!counts.length) {
+    return new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("📊 Filter Leaderboard")
+      .setDescription("No members have set a filter role yet.")
+      .setTimestamp();
+  }
+
+  const total  = counts.reduce((s, c) => s + c.count, 0);
+  const maxCount = counts[0].count;
+  const BAR = 14;
+  const MEDALS = ["🥇", "🥈", "🥉"];
+
+  const lines = counts.map((c, i) => {
+    const pct    = total > 0 ? Math.round((c.count / total) * 100) : 0;
+    const filled = Math.round((c.count / maxCount) * BAR);
+    const bar    = "█".repeat(filled) + "░".repeat(BAR - filled);
+    const rank   = MEDALS[i] ?? `\`${i + 1}.\``;
+    return `${rank} **${c.id}**\n\`${bar}\` ${c.count} member${c.count !== 1 ? "s" : ""} · ${pct}%`;
+  });
+
+  const noFilter = totalMembers - total;
+  const topFilter = counts[0];
+
+  return new EmbedBuilder()
+    .setColor(topFilter.color)
+    .setTitle("📊 Filter Leaderboard")
+    .setDescription(lines.join("\n\n"))
+    .addFields(
+      { name: "👑 Most common",        value: `**${topFilter.id}** — ${topFilter.count} member${topFilter.count !== 1 ? "s" : ""}`, inline: true },
+      { name: "✅ Filter set",          value: `${total} member${total !== 1 ? "s" : ""}`,   inline: true },
+      { name: "❓ No filter set",       value: `${noFilter} member${noFilter !== 1 ? "s" : ""}`, inline: true },
+    )
+    .setFooter({ text: "Updates when someone sets their filter · /setfilter to set yours" })
+    .setTimestamp();
+}
+
+async function refreshFilterStats(guild) {
+  const cfg = loadConfig();
+  if (!cfg.filterStatsChannelId || !cfg.filterStatsMessageId) return;
+
+  try {
+    await guild.members.fetch();
+
+    const counts = [];
+    for (const filterDef of FILTER_ROLES) {
+      if (filterDef.id === "Other") continue;
+      const role = guild.roles.cache.find(r => r.name === FILTER_ROLE_PREFIX + filterDef.id);
+      if (role?.members.size > 0) counts.push({ id: filterDef.id, color: filterDef.color, count: role.members.size });
+    }
+    const otherRole = guild.roles.cache.find(r => r.name === FILTER_ROLE_PREFIX + "Other");
+    if (otherRole?.members.size > 0) counts.push({ id: "Other", color: 0x6b7280, count: otherRole.members.size });
+    counts.sort((a, b) => b.count - a.count);
+
+    // Update channel name to show top filter
+    const ch = await guild.channels.fetch(cfg.filterStatsChannelId).catch(() => null);
+    if (!ch) return;
+
+    const topName = counts.length
+      ? counts[0].id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+      : "none";
+    const newName = `top-${topName}`;
+    if (ch.name !== newName) {
+      await ch.setName(newName).catch(() => {});
+    }
+
+    // Edit the stats embed
+    const msg = await ch.messages.fetch(cfg.filterStatsMessageId).catch(() => null);
+    if (!msg) return;
+    await msg.edit({ embeds: [buildFilterStatsEmbed(counts, guild.memberCount)] });
+  } catch (e) {
+    console.error("[filterstats] refresh error:", e.message);
+  }
+}
+
+// Refresh filter stats every 10 minutes
+setInterval(async () => {
+  const cfg = loadConfig();
+  if (!cfg.filterStatsChannelId) return;
+  for (const [, guild] of client.guilds.cache) {
+    await refreshFilterStats(guild).catch(() => {});
+  }
+}, 600_000);
+
 // ── Link storage ───────────────────────────────────────────────────────────
 function loadLinks() {
   if (!existsSync(LINKS_FILE)) return [];
@@ -660,6 +746,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const role = await ensureFilterRole(interaction.guild, chosen);
       await interaction.member.roles.add(role);
+      // Update the filter stats channel in the background
+      refreshFilterStats(interaction.guild).catch(() => {});
       return interaction.reply({
         content: `Your filter is set to **${chosen}**. You'll be notified when links that work on your filter are added!`,
         flags: MessageFlags.Ephemeral,
@@ -2309,6 +2397,63 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setTimestamp();
 
     return interaction.editReply({ embeds: [embed] });
+  }
+
+  // /setupfilterstats
+  if (commandName === "setupfilterstats") {
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      await interaction.guild.members.fetch();
+
+      // Build initial counts
+      const counts = [];
+      for (const filterDef of FILTER_ROLES) {
+        if (filterDef.id === "Other") continue;
+        const role = interaction.guild.roles.cache.find(r => r.name === FILTER_ROLE_PREFIX + filterDef.id);
+        if (role?.members.size > 0) counts.push({ id: filterDef.id, color: filterDef.color, count: role.members.size });
+      }
+      const otherRole = interaction.guild.roles.cache.find(r => r.name === FILTER_ROLE_PREFIX + "Other");
+      if (otherRole?.members.size > 0) counts.push({ id: "Other", color: 0x6b7280, count: otherRole.members.size });
+      counts.sort((a, b) => b.count - a.count);
+
+      const topName = counts.length
+        ? counts[0].id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+        : "none";
+      const channelName = `top-${topName}`;
+
+      // Create or reuse the channel
+      const cfg = loadConfig();
+      let ch = cfg.filterStatsChannelId
+        ? interaction.guild.channels.cache.get(cfg.filterStatsChannelId) ?? null
+        : null;
+
+      if (!ch) {
+        ch = await interaction.guild.channels.create({
+          name: channelName,
+          topic: "Live filter leaderboard — updates automatically when members set their filter.",
+          permissionOverwrites: [
+            { id: interaction.guild.roles.everyone, allow: ["ViewChannel"], deny: ["SendMessages"] },
+          ],
+        });
+      } else {
+        await ch.setName(channelName).catch(() => {});
+        // Clear old messages
+        const old = cfg.filterStatsMessageId
+          ? await ch.messages.fetch(cfg.filterStatsMessageId).catch(() => null)
+          : null;
+        if (old) await old.delete().catch(() => {});
+      }
+
+      const msg = await ch.send({ embeds: [buildFilterStatsEmbed(counts, interaction.guild.memberCount)] });
+
+      cfg.filterStatsChannelId = ch.id;
+      cfg.filterStatsMessageId = msg.id;
+      saveConfig(cfg);
+
+      return interaction.editReply({ content: `✅ Filter stats channel set up: <#${ch.id}>` });
+    } catch (err) {
+      return interaction.editReply({ content: `❌ Error: ${err.message}` });
+    }
   }
 
   // /setuptickets

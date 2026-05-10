@@ -274,6 +274,11 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
+    .setName("setupfilterstats")
+    .setDescription("Create the live filter leaderboard channel (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+
+  new SlashCommandBuilder()
     .setName("setuptickets")
     .setDescription("Post the ticket panel with an Open a Ticket button in this channel (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
