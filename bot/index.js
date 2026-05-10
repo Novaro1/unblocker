@@ -748,8 +748,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.member.roles.add(role);
       // Update the filter stats channel in the background
       refreshFilterStats(interaction.guild).catch(() => {});
+      // Count links that work on this filter
+      const matchingLinks = loadLinks().filter(l =>
+        Array.isArray(l.unblocked) && l.unblocked.some(f => filterMatches(f, chosen))
+      );
+      const linkCount = matchingLinks.length;
+      const linkLine = linkCount > 0
+        ? `\n**${linkCount} link${linkCount !== 1 ? "s" : ""}** work on your filter right now. Use \`/links\` to see them.`
+        : "\nNo links have been tested against your filter yet — check back soon.";
       return interaction.reply({
-        content: `Your filter is set to **${chosen}**. You'll be notified when links that work on your filter are added!`,
+        content: `Your filter is set to **${chosen}**.${linkLine}`,
         flags: MessageFlags.Ephemeral,
       });
     } catch (err) {
