@@ -362,27 +362,28 @@ const FILTER_ROLES = [
   { id: "Securly",        color: 0xf472b6 },
   { id: "Cisco Umbrella", color: 0xfbbf24 },
   { id: "iBoss",          color: 0xa78bfa },
-  { id: "Barracuda",      color: 0xf87171 },
-  { id: "DNSFilter",      color: 0x34d399 },
   { id: "FortiGuard",     color: 0xfb923c },
   { id: "Linewize",       color: 0x38bdf8 },
   { id: "Blocksi",        color: 0xe879f9 },
+  { id: "Senso Cloud",    color: 0x2dd4bf },
   { id: "LanSchool",      color: 0x94a3b8 },
-  { id: "Qustodio",       color: 0xfd7e14 },
-  { id: "Sophos",         color: 0x22d3ee },
   { id: "Palo Alto",      color: 0xf43f5e },
   { id: "ContentKeeper",  color: 0x84cc16 },
-  { id: "Netsweeper",     color: 0x818cf8 },
   { id: "Deledao",        color: 0xfcd34d },
+  { id: "AristotleK12",   color: 0xc084fc },
   { id: "Other",          color: 0x6b7280 },
 ];
 
 const FILTER_ROLE_PREFIX = "Filter: ";
 
 // Filters that should be treated as equivalent
+// Keys are role IDs (lowercase), values are all checker names that should match that role
 const FILTER_ALIASES = {
-  "goguardian v2": ["goguardian", "goguardian v2"],
-  "goguardian":    ["goguardian", "goguardian v2"],
+  "goguardian v2":  ["goguardian", "goguardian v2"],
+  "goguardian":     ["goguardian", "goguardian v2"],
+  "blocksi":        ["blocksi", "blocksi ai", "blocksi web"],
+  "senso cloud":    ["senso cloud", "senso"],
+  "aristotlek12":   ["aristotlek12", "aristotle", "aristotle k12"],
 };
 
 function filterMatches(linkFilterName, userFilterName) {
@@ -524,7 +525,7 @@ async function postLinkMessage(link) {
       for (const filterName of link.unblocked) {
         // Match filter name to a FILTER_ROLES entry (strip category suffix like " (uncategorized)")
         const baseName = filterName.replace(/\s*\(.*\)$/, "").trim();
-        const filterDef = FILTER_ROLES.find(f => f.id.toLowerCase() === baseName.toLowerCase());
+        const filterDef = FILTER_ROLES.find(f => filterMatches(baseName, f.id));
         if (!filterDef) continue;
 
         const chanName = filterDef.id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") + "-links";
