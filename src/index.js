@@ -2,9 +2,10 @@ import "dotenv/config";
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
 import { readFileSync, statSync, writeFileSync, existsSync } from "node:fs";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual, randomBytes as cryptoRandomBytes } from "node:crypto";
 import { fileURLToPath } from "url";
 import { hostname } from "node:os";
+import { checkDomain, FILTERS } from "./filters/index.js";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
 import { createBareServer } from "@tomphttp/bare-server-node";
 import Fastify from "fastify";
@@ -863,6 +864,84 @@ fastify.get("/s/:id", (req, reply) => {
   if (type === "music") return reply.redirect("/music.html?share=" + req.params.id);
   return reply.redirect("/");
 });
+
+// ── Filter Check API ──────────────────────────────────────────────────────────
+const filterKeysPath = fileURLToPath(new URL("../filter-api-keys.json", import.meta.url));
+
+function loadFilterKeys() {
+  if (!existsSync(filterKeysPath)) return {};
+  try { return JSON.parse(readFileSync(filterKeysPath, "utf-8")); } catch { return {}; }
+}
+function saveFilterKeys(keys) {
+  writeFileSync(filterKeysPath, JSON.stringify(keys, null, 2));
+}
+
+// Generate a new API key — called from bot /createapikey command
+export function createFilterApiKey({ name, tier = "free", dailyLimit = 500 }) {
+  const key = "veil_" + cryptoRandomBytes(20).toString("hex");
+  const keys = loadFilterKeys();
+  keys[key] = { name, tier, dailyLimit, createdAt: new Date().toISOString(), usage: {} };
+  saveFilterKeys(keys);
+  return key;
+}
+
+function checkFilterApiKey(key, reply) {
+  if (!key) {
+    reply.code(401).send({ error: "API key required. Pass ?key=YOUR_KEY or Authorization: Bearer YOUR_KEY" });
+    return null;
+  }
+  const keys = loadFilterKeys();
+  const entry = keys[key];
+  if (!entry) {
+    reply.code(401).send({ error: "Invalid API key." });
+    return null;
+  }
+  // Daily rate limit
+  const today = new Date().toISOString().slice(0, 10);
+  if (!entry.usage[today]) {
+    // Evict old dates
+    entry.usage = { [today]: 0 };
+  }
+  entry.usage[today]++;
+  if (entry.usage[today] > entry.dailyLimit) {
+    saveFilterKeys(keys);
+    reply.code(429).send({ error: `Daily limit of ${entry.dailyLimit} requests reached. Upgrade your plan.` });
+    return null;
+  }
+  saveFilterKeys(keys);
+  return entry;
+}
+
+// GET /api/v1/check?domain=DOMAIN&key=KEY  (key also accepted as Authorization: Bearer KEY)
+fastify.get("/api/v1/check", async (req, reply) => {
+  const key = req.query.key || req.headers.authorization?.replace(/^Bearer\s+/i, "");
+  const keyEntry = checkFilterApiKey(key, reply);
+  if (!keyEntry) return;
+
+  const domain = req.query.domain;
+  if (!domain) return reply.code(400).send({ error: "Missing ?domain= parameter." });
+
+  const only = req.query.filters ? req.query.filters.split(",").map(s => s.trim()) : undefined;
+
+  try {
+    const result = await checkDomain(domain, only);
+    reply.header("X-RateLimit-Limit", keyEntry.dailyLimit);
+    reply.header("X-RateLimit-Remaining", Math.max(0, keyEntry.dailyLimit - (Object.values(keyEntry.usage)[0] ?? 0)));
+    return reply.send({ success: true, ...result });
+  } catch (err) {
+    return reply.code(500).send({ error: err.message });
+  }
+});
+
+// GET /api/v1/filters — list all available filter IDs and names (no key needed)
+fastify.get("/api/v1/filters", (_req, reply) =>
+  reply.send({ filters: FILTERS.map(({ id, name }) => ({ id, name })) })
+);
+
+// GET /api/v1/status — health check (no key needed)
+fastify.get("/api/v1/status", (_req, reply) =>
+  reply.send({ ok: true, version: "1.0.0", filters: FILTERS.length })
+);
 
 // ── Premium page & API ────────────────────────────────────────────────────────
 const PREMIUM_PRICE      = process.env.PREMIUM_PRICE      || "3.00";
