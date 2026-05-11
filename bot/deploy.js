@@ -479,6 +479,10 @@ const commands = [
     .addStringOption((o) =>
       o.setName("reason").setDescription("Reason for revocation").setRequired(false)
     ),
+  new SlashCommandBuilder()
+    .setName("requestfilter")
+    .setDescription("Request a new school content filter be added to Veil's checker"),
+
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(DISCORD_TOKEN);

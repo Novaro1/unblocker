@@ -311,7 +311,7 @@ const {
 // Public commands that must be used in #bot-commands
 const PUBLIC_COMMANDS = new Set([
   "links", "status", "serverinfo", "uptime",
-  "leaderboard", "filterstats", "referral", "referralboard", "beta-status", "freedns", "findlink", "premium", "compatible",
+  "leaderboard", "filterstats", "referral", "referralboard", "beta-status", "freedns", "findlink", "premium", "compatible", "requestfilter",
 ]);
 
 // Send a log embed to #mod-log
@@ -1321,6 +1321,37 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return interaction.reply({
       content: `✅ Added \`${username}\` to the FreeDNS account pool (${list.length} account${list.length !== 1 ? "s" : ""} total).`,
       ephemeral: true,
+    });
+  }
+
+  // ── Filter request modal ───────────────────────────────────────────────────
+  if (interaction.customId === "requestfilter_modal") {
+    const filterName = interaction.fields.getTextInputValue("rf_filter_name").trim();
+    const school     = interaction.fields.getTextInputValue("rf_school").trim() || "—";
+    const extra      = interaction.fields.getTextInputValue("rf_extra").trim()  || "—";
+
+    const staffRole = STAFF_ROLE_ID ? `<@&${STAFF_ROLE_ID}>` : "Staff";
+    const embed = new EmbedBuilder()
+      .setColor(0x6366f1)
+      .setTitle("🔧 Filter Request")
+      .setDescription(`${staffRole} — someone is requesting a new filter be added to Veil's checker.`)
+      .addFields(
+        { name: "Filter",        value: filterName,                                           inline: true  },
+        { name: "User",          value: `${interaction.user} (${interaction.user.username})`, inline: true  },
+        { name: "School / Info", value: school },
+        { name: "Extra context", value: extra  },
+      )
+      .setTimestamp();
+
+    await modLog(interaction.guild, embed);
+
+    return interaction.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(0x22c55e)
+        .setTitle("Request received!")
+        .setDescription(`Thanks! Your request for **${filterName}** has been sent to the team. We'll look into adding it.`)
+        .setFooter({ text: "Veil Filter Checker" })],
+      flags: MessageFlags.Ephemeral,
     });
   }
 });
@@ -2647,6 +2678,45 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.followUp({ embeds: embeds.slice(i, i + 10) });
     }
     return;
+  }
+
+  // /requestfilter
+  if (commandName === "requestfilter") {
+    const modal = new ModalBuilder()
+      .setCustomId("requestfilter_modal")
+      .setTitle("Request a New Filter");
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("rf_filter_name")
+          .setLabel("Filter name (e.g. Smoothwall, NetNanny)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(100)
+          .setPlaceholder("The exact name of the content filter"),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("rf_school")
+          .setLabel("Your school or district (optional)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setMaxLength(200)
+          .setPlaceholder("e.g. Austin ISD, Western Sydney University"),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("rf_extra")
+          .setLabel("Anything else we should know? (optional)")
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(false)
+          .setMaxLength(500)
+          .setPlaceholder("e.g. public lookup URL, how it blocks sites, etc."),
+      ),
+    );
+
+    return interaction.showModal(modal);
   }
 
   // /scandomains
