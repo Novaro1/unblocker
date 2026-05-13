@@ -3046,6 +3046,69 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // /uptime
+  // /cleanupfilters
+  if (commandName === "cleanupfilters") {
+    try {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const guild = interaction.guild;
+      await guild.roles.fetch();
+      await guild.channels.fetch();
+
+      const validIds = new Set(FILTER_ROLES.map(f => f.id));
+      const renamed = [], deleted = [], deletedChannels = [];
+
+      // Rename outdated roles (e.g. "Filter: GoGuardian V2" → "Filter: GoGuardian")
+      const RENAMES = { "Filter: GoGuardian V2": "Filter: GoGuardian" };
+      for (const [oldName, newName] of Object.entries(RENAMES)) {
+        const role = guild.roles.cache.find(r => r.name === oldName);
+        if (role) {
+          await role.setName(newName, "Cleanup: renamed to match current FILTER_ROLES");
+          renamed.push(`\`${oldName}\` → \`${newName}\``);
+        }
+      }
+
+      // Delete Filter: roles whose id is no longer in FILTER_ROLES
+      for (const role of guild.roles.cache.values()) {
+        if (!role.name.startsWith(FILTER_ROLE_PREFIX)) continue;
+        const filterId = role.name.slice(FILTER_ROLE_PREFIX.length);
+        if (!validIds.has(filterId)) {
+          await role.delete("Cleanup: filter no longer supported");
+          deleted.push(`\`${role.name}\``);
+        }
+      }
+
+      // Delete filter channels whose filter id is no longer in FILTER_ROLES
+      for (const channel of guild.channels.cache.values()) {
+        if (channel.type !== ChannelType.GuildText) continue;
+        // Channel names are like "goguardian-v2-links" or "barracuda-links"
+        // Match by checking if any valid filter's slug matches this channel name
+        const isValid = [...validIds].some(id => {
+          const slug = id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") + "-links";
+          return channel.name === slug;
+        });
+        if (!isValid && channel.name.endsWith("-links")) {
+          // Only delete if it's inside the Filter Links category
+          const parent = channel.parent;
+          if (parent && parent.name === "Filter Links") {
+            await channel.delete("Cleanup: filter no longer supported");
+            deletedChannels.push(`\`#${channel.name}\``);
+          }
+        }
+      }
+
+      const lines = [];
+      if (renamed.length)         lines.push(`**Renamed (${renamed.length}):** ${renamed.join(", ")}`);
+      if (deleted.length)         lines.push(`**Deleted roles (${deleted.length}):** ${deleted.join(", ")}`);
+      if (deletedChannels.length) lines.push(`**Deleted channels (${deletedChannels.length}):** ${deletedChannels.join(", ")}`);
+      return interaction.editReply({ content: lines.join("\n") || "Nothing to clean up — everything is already up to date." });
+    } catch (err) {
+      console.error("[cleanupfilters] error:", err);
+      return interaction.editReply({ content: `Error: ${err.message}` }).catch(() =>
+        interaction.reply({ content: `Error: ${err.message}`, flags: MessageFlags.Ephemeral })
+      );
+    }
+  }
+
   // /setupfilterroles
   if (commandName === "setupfilterroles") {
     try {

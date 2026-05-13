@@ -388,6 +388,11 @@ const commands = [
     .setDescription("Show links that work on your school's content filter"),
 
   new SlashCommandBuilder()
+    .setName("cleanupfilters")
+    .setDescription("Rename/delete stale filter roles and channels to match current supported filters (Staff only)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
+
+  new SlashCommandBuilder()
     .setName("setupfilterroles")
     .setDescription("Post the filter role picker panel in this channel (Staff only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
