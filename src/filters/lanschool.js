@@ -27,5 +27,5 @@ export async function lanschool(url) {
   }
   const catId = text.split("&cat=")[1]?.split("&")[0];
   const category = catId ? (catJson[catId] ?? "Blocked") : "Blocked";
-  return { category, blocked: BLOCKED_CATS.has(category) || true };
+  return { category, blocked: BLOCKED_CATS.has(category) };
 }

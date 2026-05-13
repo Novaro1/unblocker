@@ -357,7 +357,7 @@ function getPingRole(guild, pingId) {
 
 // ── Filter roles ─────────────────────────────────────────────────────────────
 const FILTER_ROLES = [
-  { id: "GoGuardian V2",  color: 0x4ade80 },
+  { id: "GoGuardian",     color: 0x4ade80 },
   { id: "Lightspeed",     color: 0x60a5fa },
   { id: "Securly",        color: 0xf472b6 },
   { id: "Cisco Umbrella", color: 0xfbbf24 },
@@ -379,9 +379,9 @@ const FILTER_ROLE_PREFIX = "Filter: ";
 // Filters that should be treated as equivalent
 // Keys are role IDs (lowercase), values are all checker names that should match that role
 const FILTER_ALIASES = {
-  "goguardian v2":  ["goguardian", "goguardian v2"],
-  "goguardian":     ["goguardian", "goguardian v2"],
   "blocksi":        ["blocksi", "blocksi ai", "blocksi web"],
+  "blocksi ai":     ["blocksi", "blocksi ai", "blocksi web"],
+  "blocksi web":    ["blocksi", "blocksi ai", "blocksi web"],
   "senso cloud":    ["senso cloud", "senso"],
   "aristotlek12":   ["aristotlek12", "aristotle", "aristotle k12"],
 };
@@ -2737,10 +2737,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     // School filters we care about (matches FILTER_ROLES)
     const SCHOOL_FILTER_KEYS = new Set([
-      "goguardian", "goguardianv2", "lightspeed", "securly", "cisco",
-      "iboss", "barracuda", "dnsfilter", "fortiguard", "linewize",
-      "blocksiweb", "blocksiai", "lanschool", "lanschoolair",
-      "contentkeeper", "netsweeper", "deledao",
+      "goguardian", "lightspeed", "securly", "cisco",
+      "iboss", "fortiguard", "linewize",
+      "blocksiweb", "blocksiai", "lanschool",
+      "contentkeeper", "deledao", "senso", "paloalto", "aristotle",
     ]);
 
     const allDomains = readFileSync(FREEDNS_FILE, "utf-8")

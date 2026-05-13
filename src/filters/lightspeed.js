@@ -17,7 +17,7 @@ export async function lightspeed(url) {
     const ws = new WebSocket(
       "wss://production-gc.lsfilter.com?a=0ef9b862-b74f-4e8d-8aad-be549c5f452a&customer_id=74-1082-F000&agentType=chrome_extension&agentVersion=3.777.0&userGuid=00000000-0000-0000-0000-000000000000"
     );
-    const timer = setTimeout(() => { ws.terminate(); reject(new Error("timeout")); }, 10000);
+    const timer = setTimeout(() => { ws.close(); reject(new Error("timeout")); }, 10000);
     ws.on("open", () => {
       ws.send(JSON.stringify({
         action: "dy_lookup",

@@ -329,8 +329,6 @@ const commands = [
           { name: "Lightspeed",     value: "Lightspeed"    },
           { name: "Cisco Umbrella", value: "Cisco Umbrella"},
           { name: "iBoss",          value: "iBoss"         },
-          { name: "Barracuda",      value: "Barracuda"     },
-          { name: "DNSFilter",      value: "DNSFilter"     },
           { name: "FortiGuard",     value: "FortiGuard"    },
           { name: "Linewize",       value: "Linewize"      },
           { name: "Blocksi Web",    value: "Blocksi Web"   },
@@ -339,13 +337,8 @@ const commands = [
           { name: "Senso Cloud",    value: "Senso Cloud"   },
           { name: "Palo Alto",      value: "Palo Alto"     },
           { name: "LanSchool",      value: "LanSchool"     },
-          { name: "Qustodio",       value: "Qustodio"      },
-          { name: "Sophos",         value: "Sophos"        },
           { name: "ContentKeeper",  value: "ContentKeeper" },
-          { name: "Smoothwall",     value: "Smoothwall"    },
-          { name: "GoGuardian AI",  value: "GoGuardian AI" },
-          { name: "LanSchool Air",  value: "LanSchool Air" },
-          { name: "Netsweeper",     value: "Netsweeper"    },
+          { name: "AristotleK12",   value: "AristotleK12"  },
         )
     )
     .addStringOption((o) =>
@@ -363,13 +356,11 @@ const commands = [
     .addStringOption((o) =>
       o.setName("filter").setDescription("Which filter to check against").setRequired(true)
         .addChoices(
-          { name: "GoGuardian V2",  value: "goguardianv2"  },
+          { name: "GoGuardian",     value: "goguardian"    },
           { name: "Securly",        value: "securly"       },
           { name: "Lightspeed",     value: "lightspeed"    },
           { name: "Cisco Umbrella", value: "cisco"         },
           { name: "iBoss",          value: "iboss"         },
-          { name: "Barracuda",      value: "barracuda"     },
-          { name: "DNSFilter",      value: "dnsfilter"     },
           { name: "FortiGuard",     value: "fortiguard"    },
           { name: "Linewize",       value: "linewize"      },
           { name: "Blocksi Web",    value: "blocksiweb"    },
@@ -379,8 +370,6 @@ const commands = [
           { name: "Senso Cloud",    value: "senso"         },
           { name: "Palo Alto",      value: "paloalto"      },
           { name: "LanSchool",      value: "lanschool"     },
-          { name: "Qustodio",       value: "qustodio"      },
-          { name: "Sophos",         value: "sophos"        },
           { name: "ContentKeeper",  value: "contentkeeper" },
         )
     )
