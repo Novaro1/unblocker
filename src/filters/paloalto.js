@@ -111,9 +111,21 @@ async function login() {
   });
   const samlHtml = await samlPageRes.text();
 
-  const samlResponse = samlHtml.match(/name="SAMLResponse"\s+value="([^"]+)"/)?.[1];
-  const relayState   = samlHtml.match(/name="RelayState"\s+value="([^"]+)"/)?.[1] ?? "";
-  const acsAction    = samlHtml.match(/<form[^>]+action="([^"]+)"/)?.[1];
+  // Attributes may appear in any order; action URL uses HTML entities
+  function inputVal(html, name) {
+    const m = html.match(new RegExp(`name="${name}"[^>]+value="([^"]*)"`, "s")) ||
+              html.match(new RegExp(`value="([^"]*)"[^>]+name="${name}"`, "s"));
+    return m?.[1] ?? null;
+  }
+  function decodeEntities(s) {
+    return s.replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+            .replace(/&amp;/g, "&");
+  }
+
+  const samlResponse = inputVal(samlHtml, "SAMLResponse");
+  const relayState   = inputVal(samlHtml, "RelayState") ?? "";
+  const rawAction    = samlHtml.match(/<form[^>]+action="([^"]+)"/s)?.[1];
+  const acsAction    = rawAction ? decodeEntities(rawAction) : null;
   if (!samlResponse || !acsAction) throw new Error("PAN login: could not extract SAMLResponse from Okta page");
 
   const acsRes = await fetch(acsAction, {
