@@ -59,9 +59,13 @@ async function login() {
   if (!username || !password) throw new Error("PAN_USERNAME / PAN_PASSWORD env vars not set");
   if (!totpSecret)            throw new Error("PAN_TOTP_SECRET env var not set — add Google Authenticator to your PAN account");
 
+  // ── Step 0: Get initial csrftoken from homepage ───────────────────────────
+  const rootRes = await fetch(BASE, { headers: { "User-Agent": UA } });
+  const initCsrf = parseCookies(rootRes.headers).csrftoken ?? "";
+
   // ── Step 1: Get the SAML redirect URL from the SP ──────────────────────────
   const spRedir = await fetch(`${BASE}/oktalogin`, {
-    headers: { "User-Agent": UA },
+    headers: { "User-Agent": UA, "Cookie": `csrftoken=${initCsrf}` },
     redirect: "manual",
   });
   const samlUrl = spRedir.headers.get("location");
@@ -111,7 +115,7 @@ async function login() {
   });
   const samlHtml = await samlPageRes.text();
 
-  // Attributes may appear in any order; action URL uses HTML entities
+  // Attributes may appear in any order; action URL and values may use HTML entities
   function inputVal(html, name) {
     const m = html.match(new RegExp(`name="${name}"[^>]+value="([^"]*)"`, "s")) ||
               html.match(new RegExp(`value="([^"]*)"[^>]+name="${name}"`, "s"));
@@ -119,10 +123,11 @@ async function login() {
   }
   function decodeEntities(s) {
     return s.replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
-            .replace(/&amp;/g, "&");
+            .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
+            .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
   }
 
-  const samlResponse = inputVal(samlHtml, "SAMLResponse");
+  const samlResponse = decodeEntities(inputVal(samlHtml, "SAMLResponse") ?? "");
   const relayState   = inputVal(samlHtml, "RelayState") ?? "";
   const rawAction    = samlHtml.match(/<form[^>]+action="([^"]+)"/s)?.[1];
   const acsAction    = rawAction ? decodeEntities(rawAction) : null;
@@ -130,7 +135,12 @@ async function login() {
 
   const acsRes = await fetch(acsAction, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": UA,
+      "Cookie": `csrftoken=${initCsrf}`,
+      "Referer": "https://sso.paloaltonetworks.com/",
+    },
     body: new URLSearchParams({ SAMLResponse: samlResponse, RelayState: relayState }),
     redirect: "manual",
   });
