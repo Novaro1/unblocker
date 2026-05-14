@@ -5,35 +5,92 @@ import { join, dirname } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const blockedCats = new Set(JSON.parse(readFileSync(join(__dirname, "json/paloblocked.json"), "utf8")));
 
-// Session cookies from urlfiltering.paloaltonetworks.com (PAN LIVEcommunity account).
-// Logged-in users skip the captcha requirement added in March 2026.
-// sessionid expires ~30 days after login — update PAN_SESSION_COOKIE in .env when it does.
-const SESSION  = process.env.PAN_SESSION_COOKIE;
-const CSRF     = process.env.PAN_CSRF_TOKEN;
+const BASE = "https://urlfiltering.paloaltonetworks.com";
+const UA   = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-export async function paloalto(url) {
-  if (!SESSION || !CSRF) throw new Error("PAN_SESSION_COOKIE / PAN_CSRF_TOKEN env vars not set");
+// In-memory session — survives for the lifetime of the process
+let session = { id: null, csrf: null };
 
-  const res = await fetch("https://urlfiltering.paloaltonetworks.com/query/", {
+function parseCookies(headers) {
+  const cookies = {};
+  const raw = headers.getSetCookie ? headers.getSetCookie() : [headers.get("set-cookie")].filter(Boolean);
+  for (const c of raw) {
+    const [pair] = c.split(";");
+    const [k, v] = pair.split("=");
+    if (k && v) cookies[k.trim()] = v.trim();
+  }
+  return cookies;
+}
+
+async function login() {
+  const username = process.env.PAN_USERNAME;
+  const password = process.env.PAN_PASSWORD;
+  if (!username || !password) throw new Error("PAN_USERNAME / PAN_PASSWORD env vars not set");
+
+  // Step 1 — GET login page to obtain initial csrftoken cookie
+  const getRes = await fetch(`${BASE}/accounts/login/`, {
+    headers: { "User-Agent": UA },
+  });
+  const initCookies = parseCookies(getRes.headers);
+  const csrftoken = initCookies.csrftoken;
+  if (!csrftoken) throw new Error("PAN login: could not get csrftoken from login page");
+
+  // Step 2 — POST credentials
+  const postRes = await fetch(`${BASE}/accounts/login/`, {
     method: "POST",
     headers: {
-      "Cookie":       `sessionid=${SESSION}; csrftoken=${CSRF}`,
       "Content-Type": "application/x-www-form-urlencoded",
-      "Referer":      "https://urlfiltering.paloaltonetworks.com/",
-      "User-Agent":   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Cookie":       `csrftoken=${csrftoken}`,
+      "Referer":      `${BASE}/accounts/login/`,
+      "User-Agent":   UA,
     },
-    body: new URLSearchParams({ url, csrfmiddlewaretoken: CSRF }),
+    body: new URLSearchParams({
+      csrfmiddlewaretoken: csrftoken,
+      username,
+      password,
+      next: "/",
+    }),
+    redirect: "manual",
+  });
+
+  const loginCookies = parseCookies(postRes.headers);
+  const sessionid = loginCookies.sessionid;
+  const newCsrf   = loginCookies.csrftoken ?? csrftoken;
+
+  if (!sessionid) throw new Error("PAN login failed — check PAN_USERNAME / PAN_PASSWORD");
+
+  session = { id: sessionid, csrf: newCsrf };
+}
+
+async function query(url) {
+  const res = await fetch(`${BASE}/query/`, {
+    method: "POST",
+    headers: {
+      "Cookie":       `sessionid=${session.id}; csrftoken=${session.csrf}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Referer":      `${BASE}/`,
+      "User-Agent":   UA,
+    },
+    body: new URLSearchParams({ url, csrfmiddlewaretoken: session.csrf }),
   });
 
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const text = await res.text();
+  return res.text();
+}
 
-  // Result is server-rendered: var categories = [{id, name, ...}, ...]
+export async function paloalto(url) {
+  // Log in on first use
+  if (!session.id) await login();
+
+  let text = await query(url);
+
+  // Session expired — re-login once and retry
   if (!text.includes("var categories")) {
-    if (text.includes("g-recaptcha") || text.includes("unauthUserModal")) {
-      throw new Error("session expired — update PAN_SESSION_COOKIE in .env");
+    if (text.includes("g-recaptcha") || text.includes("unauthUserModal") || text.includes("login")) {
+      await login();
+      text = await query(url);
     }
-    throw new Error("unexpected page structure");
+    if (!text.includes("var categories")) throw new Error("unexpected page structure");
   }
 
   // The JS uses single-quoted strings so we can't JSON.parse — extract 'name' values with regex
