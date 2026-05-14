@@ -1,65 +1,158 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
+import { createHmac } from "node:crypto";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const blockedCats = new Set(JSON.parse(readFileSync(join(__dirname, "json/paloblocked.json"), "utf8")));
 
-const BASE = "https://urlfiltering.paloaltonetworks.com";
-const UA   = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const BASE   = "https://urlfiltering.paloaltonetworks.com";
+const OKTA   = "https://panw-ciam.okta-gov.com";
+const UA     = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-// In-memory session — survives for the lifetime of the process
-let session = { id: null, csrf: null };
+// ── TOTP (RFC 6238) — no external deps ───────────────────────────────────────
+function base32Decode(encoded) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = 0, value = 0;
+  const output = [];
+  for (const c of encoded.replace(/=+$/, "").toUpperCase()) {
+    const idx = chars.indexOf(c);
+    if (idx < 0) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) { output.push((value >>> (bits - 8)) & 255); bits -= 8; }
+  }
+  return Buffer.from(output);
+}
 
+function totp(secret, windowOffset = 0) {
+  const key  = base32Decode(secret);
+  const ctr  = BigInt(Math.floor(Date.now() / 1000 / 30) + windowOffset);
+  const buf  = Buffer.alloc(8);
+  buf.writeBigInt64BE(ctr);
+  const hmac = createHmac("sha1", key).update(buf).digest();
+  const off  = hmac[19] & 0xf;
+  const code = ((hmac[off] & 0x7f) << 24) | (hmac[off+1] << 16) | (hmac[off+2] << 8) | hmac[off+3];
+  return String(code % 1_000_000).padStart(6, "0");
+}
+
+// ── Cookie helpers ────────────────────────────────────────────────────────────
 function parseCookies(headers) {
-  const cookies = {};
+  const out = {};
   const raw = headers.getSetCookie ? headers.getSetCookie() : [headers.get("set-cookie")].filter(Boolean);
   for (const c of raw) {
     const [pair] = c.split(";");
-    const [k, v] = pair.split("=");
-    if (k && v) cookies[k.trim()] = v.trim();
+    const eq = pair.indexOf("=");
+    if (eq > 0) out[pair.slice(0, eq).trim()] = pair.slice(eq + 1).trim();
   }
-  return cookies;
+  return out;
 }
 
+// ── In-memory session ─────────────────────────────────────────────────────────
+let session = { id: null, csrf: null };
+let loginInProgress = null; // prevent concurrent logins
+
 async function login() {
-  const username = process.env.PAN_USERNAME;
-  const password = process.env.PAN_PASSWORD;
+  const username   = process.env.PAN_USERNAME;
+  const password   = process.env.PAN_PASSWORD;
+  const totpSecret = process.env.PAN_TOTP_SECRET;
   if (!username || !password) throw new Error("PAN_USERNAME / PAN_PASSWORD env vars not set");
+  if (!totpSecret)            throw new Error("PAN_TOTP_SECRET env var not set — add Google Authenticator to your PAN account");
 
-  // Step 1 — GET login page to obtain initial csrftoken cookie
-  const getRes = await fetch(`${BASE}/accounts/login/`, {
+  // ── Step 1: Get the SAML redirect URL from the SP ──────────────────────────
+  const spRedir = await fetch(`${BASE}/oktalogin`, {
     headers: { "User-Agent": UA },
+    redirect: "manual",
   });
-  const initCookies = parseCookies(getRes.headers);
-  const csrftoken = initCookies.csrftoken;
-  if (!csrftoken) throw new Error("PAN login: could not get csrftoken from login page");
+  const samlUrl = spRedir.headers.get("location");
+  if (!samlUrl) throw new Error("PAN login: no redirect from /oktalogin");
 
-  // Step 2 — POST credentials
-  const postRes = await fetch(`${BASE}/accounts/login/`, {
+  // ── Step 2: Authenticate with Okta ────────────────────────────────────────
+  const authnRes = await fetch(`${OKTA}/api/v1/authn`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Cookie":       `csrftoken=${csrftoken}`,
-      "Referer":      `${BASE}/accounts/login/`,
-      "User-Agent":   UA,
-    },
-    body: new URLSearchParams({
-      csrfmiddlewaretoken: csrftoken,
-      username,
-      password,
-      next: "/",
-    }),
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  const authn = await authnRes.json();
+
+  let sessionToken;
+
+  if (authn.status === "SUCCESS") {
+    sessionToken = authn.sessionToken;
+
+  } else if (authn.status === "MFA_REQUIRED") {
+    const stateToken = authn.stateToken;
+    // Prefer TOTP factor; fall back to whatever is available
+    const factors  = authn._embedded?.factors ?? [];
+    const factor   = factors.find(f => f.factorType === "token:software:totp") ?? factors[0];
+    if (!factor) throw new Error("PAN login: no MFA factor found");
+    const factorId = factor.id;
+
+    // Try current window ±1 to handle slight clock skew
+    for (const w of [0, 1, -1]) {
+      const verifyRes = await fetch(`${OKTA}/api/v1/authn/factors/${factorId}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ stateToken, passCode: totp(totpSecret, w) }),
+      });
+      const verify = await verifyRes.json();
+      if (verify.status === "SUCCESS") { sessionToken = verify.sessionToken; break; }
+    }
+    if (!sessionToken) throw new Error("PAN login: TOTP verification failed — check PAN_TOTP_SECRET");
+
+  } else {
+    throw new Error(`PAN login: Okta status "${authn.status}" — check credentials`);
+  }
+
+  // ── Step 3: Exchange sessionToken for SP session via SAML ─────────────────
+  const samlPageRes = await fetch(`${samlUrl}&sessionToken=${encodeURIComponent(sessionToken)}`, {
+    headers: { "User-Agent": UA },
+    redirect: "follow",
+  });
+  const samlHtml = await samlPageRes.text();
+
+  const samlResponse = samlHtml.match(/name="SAMLResponse"\s+value="([^"]+)"/)?.[1];
+  const relayState   = samlHtml.match(/name="RelayState"\s+value="([^"]+)"/)?.[1] ?? "";
+  const acsAction    = samlHtml.match(/<form[^>]+action="([^"]+)"/)?.[1];
+  if (!samlResponse || !acsAction) throw new Error("PAN login: could not extract SAMLResponse from Okta page");
+
+  const acsRes = await fetch(acsAction, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA },
+    body: new URLSearchParams({ SAMLResponse: samlResponse, RelayState: relayState }),
     redirect: "manual",
   });
 
-  const loginCookies = parseCookies(postRes.headers);
-  const sessionid = loginCookies.sessionid;
-  const newCsrf   = loginCookies.csrftoken ?? csrftoken;
+  // The ACS response is a redirect — follow it to collect the final session cookie
+  const acsCookies = parseCookies(acsRes.headers);
+  let sessionId = acsCookies.sessionid;
+  let csrf      = acsCookies.csrftoken;
 
-  if (!sessionid) throw new Error("PAN login failed — check PAN_USERNAME / PAN_PASSWORD");
+  if (!sessionId) {
+    // Some SAML setups redirect once more before setting the session cookie
+    const nextUrl = acsRes.headers.get("location");
+    if (nextUrl) {
+      const finalRes = await fetch(nextUrl, {
+        headers: { "User-Agent": UA, "Cookie": `csrftoken=${csrf}` },
+        redirect: "manual",
+      });
+      const finalCookies = parseCookies(finalRes.headers);
+      sessionId = finalCookies.sessionid ?? sessionId;
+      csrf      = finalCookies.csrftoken ?? csrf;
+    }
+  }
 
-  session = { id: sessionid, csrf: newCsrf };
+  if (!sessionId) throw new Error("PAN login: no sessionid after SAML assertion");
+
+  // Get a fresh csrftoken from the homepage if we only got the sessionid
+  if (!csrf) {
+    const homeRes = await fetch(BASE, {
+      headers: { "User-Agent": UA, "Cookie": `sessionid=${sessionId}` },
+    });
+    csrf = parseCookies(homeRes.headers).csrftoken;
+  }
+
+  session = { id: sessionId, csrf };
 }
 
 async function query(url) {
@@ -73,29 +166,29 @@ async function query(url) {
     },
     body: new URLSearchParams({ url, csrfmiddlewaretoken: session.csrf }),
   });
-
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.text();
 }
 
 export async function paloalto(url) {
-  // Log in on first use
-  if (!session.id) await login();
+  // Log in on first use (serialize concurrent logins)
+  if (!session.id) {
+    if (!loginInProgress) loginInProgress = login().finally(() => { loginInProgress = null; });
+    await loginInProgress;
+  }
 
   let text = await query(url);
 
   // Session expired — re-login once and retry
   if (!text.includes("var categories")) {
-    if (text.includes("g-recaptcha") || text.includes("unauthUserModal") || text.includes("login")) {
-      await login();
-      text = await query(url);
-    }
+    if (!loginInProgress) loginInProgress = login().finally(() => { loginInProgress = null; });
+    await loginInProgress;
+    text = await query(url);
     if (!text.includes("var categories")) throw new Error("unexpected page structure");
   }
 
-  // The JS uses single-quoted strings so we can't JSON.parse — extract 'name' values with regex
   const names = [...text.matchAll(/'name':\s*'([^']+)'/g)].map(m => m[1].replace(/-/g, " "));
-  const category = names.join(", ") || "Unknown";
+  const category  = names.join(", ") || "Unknown";
   const isBlocked = names.some(n => blockedCats.has(n.replace(/ /g, "-")));
   return { category, blocked: isBlocked };
 }
