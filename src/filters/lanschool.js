@@ -27,5 +27,6 @@ export async function lanschool(url) {
   }
   const catId = text.split("&cat=")[1]?.split("&")[0];
   const category = catId ? (catJson[catId] ?? "Blocked") : "Blocked";
-  return { category, blocked: BLOCKED_CATS.has(category) };
+  // If the server didn't ALLOW it, it's blocked — BLOCKED_CATS is used only to name the category
+  return { category, blocked: true };
 }
