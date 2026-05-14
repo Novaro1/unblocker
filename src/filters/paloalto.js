@@ -182,10 +182,14 @@ async function query(url) {
   return res.text();
 }
 
+// Warm up session at startup so the first real query doesn't pay login latency
+loginInProgress = login().finally(() => { loginInProgress = null; });
+
 export async function paloalto(url) {
-  // Log in on first use (serialize concurrent logins)
+  // Wait for in-progress login (startup or refresh) before querying
+  if (loginInProgress) await loginInProgress;
   if (!session.id) {
-    if (!loginInProgress) loginInProgress = login().finally(() => { loginInProgress = null; });
+    loginInProgress = login().finally(() => { loginInProgress = null; });
     await loginInProgress;
   }
 

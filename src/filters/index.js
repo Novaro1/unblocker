@@ -31,7 +31,7 @@ const FILTERS = [
   { id: "blocksiai",     name: "Blocksi AI",    fn: blocksiAI,     timeout: 10000 },
   { id: "blocksiweb",    name: "Blocksi Web",   fn: blocksiWeb,    timeout: 8000  },
   { id: "senso",         name: "Senso Cloud",   fn: senso,         timeout: 8000  },
-  { id: "paloalto",      name: "Palo Alto",     fn: paloalto,      timeout: 10000 },
+  { id: "paloalto",      name: "Palo Alto",     fn: paloalto,      timeout: 30000 },
   { id: "contentkeeper", name: "ContentKeeper", fn: contentkeeper, timeout: 10000 },
   { id: "lanschool",     name: "LanSchool",     fn: lanschool,     timeout: 10000 },
   { id: "deledao",       name: "Deledao",       fn: deledao,       timeout: 10000 },
