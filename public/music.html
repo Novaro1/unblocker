@@ -615,7 +615,7 @@
 <iframe id="sc-widget"
   allow="autoplay"
   src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/284331797&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false&visual=false&buying=false&sharing=false&download=false"
-  style="position:fixed;bottom:-200px;left:-200px;width:1px;height:1px;border:0"></iframe>
+  style="position:fixed;bottom:0;right:0;width:1px;height:1px;border:0;opacity:0.01"></iframe>
 
 <audio id="mp-audio"></audio>
 <script src="https://w.soundcloud.com/player/api.js"></script>
@@ -727,6 +727,11 @@ audio.volume = 0.8;
 
   widget.bind(SC.Widget.Events.PLAY_PROGRESS, function (e) {
     if (!widgetMode) return;
+    // Use PLAY_PROGRESS as a reliable signal that audio is actually running
+    if (elPlayPause.disabled) {
+      setQuality("full", "● Full Song");
+      elPlayPause.disabled = false;
+    }
     const pos = e.currentPosition;
     const dur = e.duration;
     if (!dur) return;
@@ -746,7 +751,16 @@ audio.volume = 0.8;
     playNext();
   });
 
-  widget.bind(SC.Widget.Events.PLAY,  function () { if (widgetMode) setPlayState(true); });
+  widget.bind(SC.Widget.Events.PLAY, function () {
+    if (!widgetMode) return;
+    setPlayState(true);
+    // Also unlock UI here in case READY didn't fire
+    if (elPlayPause.disabled) {
+      setQuality("full", "● Full Song");
+      elPlayPause.disabled = false;
+      widget.getDuration(function (d) { if (d > 0) elTotal.textContent = fmt(d); });
+    }
+  });
   widget.bind(SC.Widget.Events.PAUSE, function () { if (widgetMode) setPlayState(false); });
 
   widget.bind(SC.Widget.Events.ERROR, function () {
@@ -841,6 +855,8 @@ function loadTrack(track) {
     elPlayPause.disabled = false;
     widget.getDuration(function (d) { if (d > 0) elTotal.textContent = fmt(d); });
   });
+
+  setQuality("loading", `⏳ src=${track.sourceUrl ? "ok" : "MISSING"} w=${widget ? "ok" : "NULL"}`);
 
   // Load the track into the SC Widget — it handles auth, DRM, and CDN internally
   widget.load(track.sourceUrl, {
