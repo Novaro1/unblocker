@@ -574,8 +574,8 @@ fastify.get("/api/music/sc-transcoding", async (req, reply) => {
       const title  = track.title ?? "";
       const artist = track.user?.username ?? "";
       const query  = `${title} ${artist}`.trim();
-      console.log(`[sc-transcoding] progressive 404 for "${query}", searching Invidious`);
-      const ytResult = await invidiousSearch(query);
+      console.log(`[sc-transcoding] progressive 404 for "${query}", searching YouTube`);
+      const ytResult = await ytFallbackSearch(query);
       if (ytResult) {
         console.log(`[sc-transcoding] Invidious match: ${ytResult.title} (${ytResult.videoId})`);
         return reply.send({ ytVideoId: ytResult.videoId, ytTitle: ytResult.title });
@@ -592,64 +592,31 @@ fastify.get("/api/music/sc-transcoding", async (req, reply) => {
   }
 });
 
-// ── Invidious YouTube fallback ────────────────────────────────────────────────
-const INVIDIOUS_INSTANCES = [
-  "https://iv.ggtyler.dev",
-  "https://invidious.privacydev.net",
-  "https://invidious.nerdvpn.de",
-  "https://inv.tux.pizza",
-];
+// ── YouTube audio fallback (yt-dlp, no cookies needed for EC2) ───────────────
+// Search uses InnerTube API; stream URL comes from yt-dlp and is proxied
+// through this server because googlevideo URLs are IP-locked to requester.
 
-async function invidiousSearch(query) {
-  for (const base of INVIDIOUS_INSTANCES) {
-    try {
-      const r = await fetch(
-        `${base}/api/v1/search?q=${encodeURIComponent(query)}&type=video&fields=videoId,title`,
-        { signal: AbortSignal.timeout(6000) }
-      );
-      if (!r.ok) continue;
-      const results = await r.json();
-      if (Array.isArray(results) && results.length > 0)
-        return { videoId: results[0].videoId, title: results[0].title, base };
-    } catch {}
-  }
-  return null;
+async function ytFallbackSearch(query) {
+  const videoId = await ytSearch(query);
+  return videoId ? { videoId } : null;
 }
 
-async function invidiousAudioUrl(videoId, base) {
-  const instances = base ? [base, ...INVIDIOUS_INSTANCES.filter(b => b !== base)] : INVIDIOUS_INSTANCES;
-  for (const b of instances) {
-    try {
-      const r = await fetch(
-        `${b}/api/v1/videos/${videoId}?fields=adaptiveFormats`,
-        { signal: AbortSignal.timeout(8000) }
-      );
-      if (!r.ok) continue;
-      const info = await r.json();
-      // Prefer m4a/aac (itag 140) then webm/opus, highest bitrate
-      const audioFormats = (info.adaptiveFormats ?? []).filter(f => f.type?.startsWith("audio/"));
-      const best = audioFormats.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-      if (best?.url) return { url: best.url, type: best.type?.split(";")[0] || "audio/mp4" };
-    } catch {}
-  }
-  return null;
-}
-
-// YouTube audio proxy via Invidious — streams audio for a YouTube video ID.
+// YouTube audio proxy — resolves via yt-dlp then proxies bytes through server.
+// googlevideo.com URLs are IP-locked so the browser can't fetch them directly.
 fastify.get("/api/music/yt-proxy", async (req, reply) => {
   const videoId = String(req.query.v || "").trim();
   if (!/^[A-Za-z0-9_-]{11}$/.test(videoId))
     return reply.status(400).send({ error: "Invalid video ID" });
 
-  const audio = await invidiousAudioUrl(videoId, null);
-  if (!audio) return reply.status(503).send({ error: "No Invidious instance available" });
+  const audioUrl = await ytDirectUrl(videoId, 20000);
+  if (!audioUrl) return reply.status(503).send({ error: "yt-dlp could not get audio URL" });
 
   try {
-    const upstreamHeaders = {};
+    const upstreamHeaders = { "User-Agent": "Mozilla/5.0" };
     if (req.headers.range) upstreamHeaders["Range"] = req.headers.range;
-    const upstream = await fetch(audio.url, { headers: upstreamHeaders });
+    const upstream = await fetch(audioUrl, { headers: upstreamHeaders });
     reply.code(upstream.status);
-    reply.header("Content-Type",  audio.type);
+    reply.header("Content-Type",  upstream.headers.get("content-type") || "audio/mp4");
     reply.header("Accept-Ranges", "bytes");
     reply.header("Cache-Control", "no-cache");
     const cl = upstream.headers.get("content-length");
