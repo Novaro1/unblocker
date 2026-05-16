@@ -950,7 +950,7 @@ fastify.get("/s/:id", (req, reply) => {
   const share = shares[req.params.id];
   if (!share) return reply.code(404).type("text/html").sendFile("404.html");
   const { type, data } = share;
-  if (type === "site")  return reply.redirect("/games/play?src=" + encodeURIComponent(data.url));
+  if (type === "site")  return reply.redirect("/?url=" + encodeURIComponent(data.url));
   if (type === "ai")    return reply.redirect("/ai.html?share="   + req.params.id);
   if (type === "music") return reply.redirect("/music.html?share=" + req.params.id);
   return reply.redirect("/");

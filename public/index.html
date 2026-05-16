@@ -763,6 +763,20 @@
         const url = document.getElementById("sj-url-bar").value;
         if (url) window.veilShare("site", { url });
       });
+
+      // Auto-load shared site links: /?url=https://...
+      (function () {
+        const p = new URLSearchParams(location.search);
+        const u = p.get("url");
+        if (!u) return;
+        history.replaceState(null, "", "/"); // clean up the URL bar
+        const addr = document.getElementById("sj-address");
+        if (addr) {
+          addr.value = u;
+          // Trigger form submit after scripts are ready
+          document.getElementById("sj-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        }
+      })();
     </script>
   </body>
 </html>
