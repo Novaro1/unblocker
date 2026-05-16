@@ -725,15 +725,6 @@ audio.volume = 0.8;
   if (!iframe) return;
   widget = SC.Widget(iframe);
 
-  widget.bind(SC.Widget.Events.READY, function () {
-    if (!widgetMode) return;
-    setQuality("full", "● Full Song");
-    elPlayPause.disabled = false;
-    widget.getDuration(function (d) {
-      if (d > 0) elTotal.textContent = fmt(d);
-    });
-  });
-
   widget.bind(SC.Widget.Events.PLAY_PROGRESS, function (e) {
     if (!widgetMode) return;
     const pos = e.currentPosition;
@@ -844,6 +835,13 @@ function loadTrack(track) {
     return;
   }
 
+  // READY is one-shot (callback array cleared after each fire) — rebind before every load
+  widget.bind(SC.Widget.Events.READY, function () {
+    setQuality("full", "● Full Song");
+    elPlayPause.disabled = false;
+    widget.getDuration(function (d) { if (d > 0) elTotal.textContent = fmt(d); });
+  });
+
   // Load the track into the SC Widget — it handles auth, DRM, and CDN internally
   widget.load(track.sourceUrl, {
     auto_play: true,
@@ -856,7 +854,6 @@ function loadTrack(track) {
     sharing: false,
     download: false,
   });
-  // setQuality + enable play button fire in the READY event handler below
 }
 
 // ── Playback controls ─────────────────────────────────────────────────────────
