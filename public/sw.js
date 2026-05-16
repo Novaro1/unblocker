@@ -51,8 +51,10 @@ function isCaptchaRequest(url) {
 }
 
 async function handleRequest(event) {
-  await _scramjet.loadConfig();
+  // Check bypass list BEFORE loadConfig — loadConfig can hang if bare-mux
+  // SharedWorker fails to connect, which would block these requests forever.
   if (isCaptchaRequest(event.request.url)) return fetch(event.request);
+  await _scramjet.loadConfig();
   if (_scramjet.route(event)) return _scramjet.fetch(event);
   return fetch(event.request);
 }
