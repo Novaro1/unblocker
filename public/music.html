@@ -611,11 +611,11 @@
 
 </div>
 
-<!-- SC widget container — fresh iframe created here per track -->
-<div id="sc-widget-wrap" style="position:fixed;bottom:0;right:0;width:1px;height:1px;overflow:hidden"></div>
+<!-- YouTube IFrame API player (hidden) -->
+<div id="yt-player-wrap" style="position:fixed;bottom:0;right:0;width:1px;height:1px;overflow:hidden"></div>
 
 <audio id="mp-audio"></audio>
-<script src="https://w.soundcloud.com/player/api.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
 "use strict";
@@ -631,8 +631,11 @@ let autoplay = false;
 let autoplayFetching = false;
 let activeTab = "results";
 let currentTrack = null;
-let widgetMode = false;  // true when SC Widget is handling playback
-let widget = null;
+let widgetMode = false;  // true when YouTube player is handling playback
+let ytPlayer = null;
+let ytAPIReady = false;
+let ytPendingVideoId = null;
+let ytProgressInterval = null;
 
 const audio = document.getElementById("mp-audio");
 
@@ -715,75 +718,92 @@ audio.addEventListener("ended", () => {
 
 audio.volume = 0.8;
 
-// ── SC Widget helpers ─────────────────────────────────────────────────────────
-function bindWidget(w) {
-  w.bind(SC.Widget.Events.READY, function () {
-    if (!widgetMode) return;
-    setQuality("full", "● Full Song");
-    elPlayPause.disabled = false;
-    w.getDuration(function (d) { if (d > 0) elTotal.textContent = fmt(d); });
-  });
+// ── YouTube IFrame API ────────────────────────────────────────────────────────
+window.onYouTubeIframeAPIReady = function () {
+  ytAPIReady = true;
+  if (ytPendingVideoId) { makeYTPlayer(ytPendingVideoId); ytPendingVideoId = null; }
+};
 
-  w.bind(SC.Widget.Events.PLAY_PROGRESS, function (e) {
-    if (!widgetMode) return;
-    if (elPlayPause.disabled) { setQuality("full", "● Full Song"); elPlayPause.disabled = false; }
-    const pos = e.currentPosition, dur = e.duration;
-    if (!dur) return;
-    const pct = Math.min(100, (pos / dur) * 100);
-    elBarFill.style.width = pct + "%";
-    elBarThumb.style.left = pct + "%";
-    elTime.textContent = fmt(pos);
-  });
-
-  w.bind(SC.Widget.Events.PLAY, function () {
-    if (!widgetMode) return;
-    setPlayState(true);
-    if (elPlayPause.disabled) {
-      setQuality("full", "● Full Song");
-      elPlayPause.disabled = false;
-      w.getDuration(function (d) { if (d > 0) elTotal.textContent = fmt(d); });
-    }
-  });
-
-  w.bind(SC.Widget.Events.PAUSE, function () { if (widgetMode) setPlayState(false); });
-
-  w.bind(SC.Widget.Events.FINISH, function () {
-    if (!widgetMode) return;
-    if (repeat === "one") { w.seekTo(0); w.play(); return; }
-    playNext();
-  });
-
-  w.bind(SC.Widget.Events.ERROR, function () {
-    if (!widgetMode) return;
-    setQuality("preview", "✕ Failed to load");
-    elPlayPause.disabled = false;
-  });
+function stopYTProgress() {
+  clearInterval(ytProgressInterval);
+  ytProgressInterval = null;
 }
 
-function makeFreshWidget(sourceUrl) {
-  // Replace the widget iframe entirely so we get a clean READY event every time
-  const container = document.getElementById("sc-widget-wrap");
-  container.innerHTML = "";
-  const iframe = document.createElement("iframe");
-  iframe.allow = "autoplay";
-  iframe.style.cssText = "position:absolute;inset:0;width:1px;height:1px;border:0;opacity:0.01";
-  const src = "https://w.soundcloud.com/player/?url=" + encodeURIComponent(sourceUrl)
-    + "&auto_play=true&hide_related=true&show_comments=false&show_user=false"
-    + "&show_reposts=false&show_teaser=false&visual=false&buying=false&sharing=false&download=false";
-  iframe.src = src;
-  container.appendChild(iframe);
-  if (typeof SC === "undefined") return null;
-  const w = SC.Widget(iframe);
-  bindWidget(w);
-  return w;
+function startYTProgress() {
+  stopYTProgress();
+  ytProgressInterval = setInterval(() => {
+    if (!widgetMode || !ytPlayer) { stopYTProgress(); return; }
+    try {
+      const pos = (ytPlayer.getCurrentTime() || 0) * 1000;
+      const dur = (ytPlayer.getDuration()    || 0) * 1000;
+      if (!dur) return;
+      const pct = Math.min(100, (pos / dur) * 100);
+      elBarFill.style.width = pct + "%";
+      elBarThumb.style.left = pct + "%";
+      elTime.textContent    = fmt(pos);
+    } catch (_) {}
+  }, 250);
+}
+
+function makeYTPlayer(videoId) {
+  if (!ytAPIReady || typeof YT === "undefined" || !YT.Player) {
+    ytPendingVideoId = videoId; // will retry when onYouTubeIframeAPIReady fires
+    return;
+  }
+  stopYTProgress();
+  if (ytPlayer) { try { ytPlayer.destroy(); } catch (_) {} ytPlayer = null; }
+
+  const wrap = document.getElementById("yt-player-wrap");
+  wrap.innerHTML = '<div id="yt-player"></div>';
+
+  ytPlayer = new YT.Player("yt-player", {
+    height: "1", width: "1",
+    videoId,
+    playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0,
+                  iv_load_policy: 3, origin: location.origin },
+    events: {
+      onReady(e) {
+        e.target.setVolume(Math.round(parseFloat(elVol.value) * 100));
+        const dur = e.target.getDuration();
+        if (dur > 0) elTotal.textContent = fmt(dur * 1000);
+      },
+      onStateChange(e) {
+        if (!widgetMode) return;
+        if (e.data === YT.PlayerState.PLAYING) {
+          setPlayState(true);
+          setQuality("full", "● Full Song");
+          elPlayPause.disabled = false;
+          startYTProgress();
+          const dur = ytPlayer.getDuration();
+          if (dur > 0) elTotal.textContent = fmt(dur * 1000);
+        } else if (e.data === YT.PlayerState.PAUSED) {
+          setPlayState(false);
+          stopYTProgress();
+        } else if (e.data === YT.PlayerState.ENDED) {
+          setPlayState(false);
+          stopYTProgress();
+          if (repeat === "one") { ytPlayer.seekTo(0, true); ytPlayer.playVideo(); }
+          else playNext();
+        }
+      },
+      onError() {
+        if (!widgetMode) return;
+        setQuality("preview", "✕ Not available");
+        elPlayPause.disabled = false;
+      }
+    }
+  });
 }
 
 // ── Progress bar seek ─────────────────────────────────────────────────────────
 elBarOuter.addEventListener("click", (e) => {
   const rect = elBarOuter.getBoundingClientRect();
   const pct = (e.clientX - rect.left) / rect.width;
-  if (widgetMode && widget) {
-    widget.getDuration(d => { if (d > 0) widget.seekTo(pct * d); });
+  if (widgetMode && ytPlayer) {
+    try {
+      const dur = ytPlayer.getDuration();
+      if (dur > 0) ytPlayer.seekTo(pct * dur, true);
+    } catch (_) {}
     return;
   }
   const dur = (audio.duration && isFinite(audio.duration))
@@ -797,7 +817,7 @@ elBarOuter.addEventListener("click", (e) => {
 elVol.addEventListener("input", () => {
   const vol = parseFloat(elVol.value);
   audio.volume = vol;
-  if (widget) widget.setVolume(vol * 100);
+  if (ytPlayer) { try { ytPlayer.setVolume(Math.round(vol * 100)); } catch (_) {} }
 });
 
 // ── Load + play a track ───────────────────────────────────────────────────────
@@ -808,7 +828,7 @@ function setQuality(state, label) {
   elQuality.textContent = label;
 }
 
-function loadTrack(track) {
+async function loadTrack(track) {
   currentTrack = track;
 
   // Update UI immediately
@@ -846,31 +866,37 @@ function loadTrack(track) {
     if (w) w.location.href = location.origin + "?q=" + encodeURIComponent(track.sourceUrl || "https://soundcloud.com");
   };
 
-  // Stop any audio-element playback
+  // Stop any current playback
   audio.pause();
   audio.src = "";
+  stopYTProgress();
   widgetMode = true;
 
-  if (!track.sourceUrl) {
-    setQuality("preview", "✕ No source URL");
+  // Search YouTube for this track, then play via IFrame API
+  const query = `${track.title} ${track.artist}`;
+  let videoId = null;
+  try {
+    const res = await fetch(`/api/music/yt-id?q=${encodeURIComponent(query)}`);
+    if (res.ok) { const d = await res.json(); videoId = d.videoId; }
+  } catch (_) {}
+
+  if (!videoId) {
+    setQuality("preview", "✕ Not found");
     elPlayPause.disabled = false;
     return;
   }
 
-  // Create a fresh iframe + widget for every track — avoids widget.load() postMessage issues
-  widget = makeFreshWidget(track.sourceUrl);
-  if (!widget) {
-    setQuality("preview", "✕ Player unavailable");
-    elPlayPause.disabled = false;
-  }
+  makeYTPlayer(videoId);
 }
 
 // ── Playback controls ─────────────────────────────────────────────────────────
 elPlayPause.addEventListener("click", () => {
   if (!currentTrack) return;
-  if (widgetMode && widget) {
-    if (isPlaying) widget.pause();
-    else widget.play();
+  if (widgetMode && ytPlayer) {
+    try {
+      if (isPlaying) ytPlayer.pauseVideo();
+      else ytPlayer.playVideo();
+    } catch (_) {}
   } else {
     if (audio.paused) audio.play();
     else audio.pause();

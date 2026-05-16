@@ -294,6 +294,14 @@ fastify.get("/api/music/search", async (req, reply) => {
   }
 });
 
+// YouTube video ID lookup — used by music player to find a track on YouTube
+fastify.get("/api/music/yt-id", async (req, reply) => {
+  const q = String(req.query.q || "").trim();
+  if (!q) return reply.send({ videoId: null });
+  const videoId = await ytSearch(q);
+  reply.send({ videoId: videoId || null });
+});
+
 // Artwork proxy — serves SoundCloud thumbnails via our domain to bypass school filters
 fastify.get("/api/music/thumb", async (req, reply) => {
   let artworkUrl;

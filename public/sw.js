@@ -29,8 +29,7 @@ const DIRECT_HOSTS = new Set([
   "imgs.hcaptcha.com",
   "challenges.cloudflare.com",
   "static.cloudflareinsights.com",
-  // SoundCloud — widget iframe + API must run under their own origin
-  // so the SC Widget postMessage communication works correctly
+  // SoundCloud — must load directly for stream access
   "w.soundcloud.com",
   "api-v2.soundcloud.com",
   "api.soundcloud.com",
@@ -38,6 +37,12 @@ const DIRECT_HOSTS = new Set([
   "cf-hls-media.sndcdn.com",
   "cf-preview-media.sndcdn.com",
   "a-v2.sndcdn.com",
+  // YouTube — IFrame API and video player must load directly
+  "www.youtube.com",
+  "www.youtube-nocookie.com",
+  "s.ytimg.com",
+  "i.ytimg.com",
+  "yt3.ggpht.com",
 ]);
 
 function isCaptchaRequest(url) {
