@@ -59,9 +59,11 @@ async function handleRequest(event) {
   // Check bypass list BEFORE loadConfig — loadConfig can hang if bare-mux
   // SharedWorker fails to connect, which would block these requests forever.
   if (isCaptchaRequest(event.request.url)) return fetch(event.request);
+  // If Scramjet wouldn't proxy this URL (same-origin API calls, static assets, etc.)
+  // skip loadConfig entirely — it hangs when bare-mux SharedWorker is unavailable.
+  if (!_scramjet.route(event)) return fetch(event.request);
   await _scramjet.loadConfig();
-  if (_scramjet.route(event)) return _scramjet.fetch(event);
-  return fetch(event.request);
+  return _scramjet.fetch(event);
 }
 
 self.addEventListener("fetch", (event) => {
