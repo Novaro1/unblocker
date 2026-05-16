@@ -360,7 +360,51 @@ fastify.get("/api/music/related", async (req, reply) => {
   }
 });
 
-// SoundCloud audio stream — resolves direct URL for seek support, proxied through our server
+// Search YouTube InnerTube API for a track by query, returns first video ID or null
+async function ytSearch(query) {
+  try {
+    const res = await fetch("https://www.youtube.com/youtubei/v1/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        context: { client: { clientName: "WEB", clientVersion: "2.20240101" } },
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const items = data?.contents?.twoColumnSearchResultsRenderer
+      ?.primaryContents?.sectionListRenderer?.contents?.[0]
+      ?.itemSectionRenderer?.contents ?? [];
+    for (const item of items) {
+      const vid = item?.videoRenderer?.videoId;
+      if (vid) return vid;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+// Resolve a direct audio URL from a YouTube video ID via yt-dlp
+const YT_COOKIES = process.env.YTCOOKIES_PATH || "";
+function ytDirectUrl(videoId, timeoutMs = 12000) {
+  const args = ["--no-playlist", "--js-runtimes", "node:/usr/bin/node",
+    "-f", "bestaudio[ext=m4a]/bestaudio", "--get-url",
+    `https://www.youtube.com/watch?v=${videoId}`];
+  if (YT_COOKIES) args.splice(1, 0, "--cookies", YT_COOKIES);
+  return new Promise((resolve) => {
+    execFile("yt-dlp", args, { timeout: timeoutMs },
+      (err, stdout) => resolve(err ? null : stdout.trim().split("\n")[0] || null));
+  });
+}
+function ytPipeStream(videoId) {
+  const args = ["--no-playlist", "--js-runtimes", "node:/usr/bin/node",
+    "-f", "bestaudio[ext=m4a]/bestaudio", "-o", "-",
+    `https://www.youtube.com/watch?v=${videoId}`];
+  if (YT_COOKIES) args.splice(1, 0, "--cookies", YT_COOKIES);
+  return spawn("yt-dlp", args);
+}
+
+// SoundCloud audio stream — tries SoundCloud first, falls back to YouTube
 fastify.get("/api/music/stream", async (req, reply) => {
   const id = String(req.query.id || "").trim();
   let scUrl;
@@ -368,22 +412,21 @@ fastify.get("/api/music/stream", async (req, reply) => {
   catch { return reply.status(400).send("Invalid ID"); }
   if (!scUrl.startsWith("https://soundcloud.com/")) return reply.status(400).send("Invalid URL");
 
-  // Resolve the direct progressive MP3 URL so the browser can seek via range requests
-  const directUrl = await new Promise((resolve) => {
+  // ── Attempt 1: SoundCloud via yt-dlp (progressive MP3, seekable) ──────────
+  const scDirect = await new Promise((resolve) => {
     execFile(
       "yt-dlp",
       ["--no-playlist", "-f", "http_mp3_1_0/bestaudio[ext=mp3]/bestaudio", "--get-url", scUrl],
-      { timeout: 15000 },
+      { timeout: 8000 },
       (err, stdout) => resolve(err ? null : stdout.trim().split("\n")[0] || null)
     );
   });
 
-  if (directUrl) {
-    // Proxy with range header forwarding so the browser can seek
+  if (scDirect) {
     const upstreamHeaders = {};
     if (req.headers.range) upstreamHeaders["range"] = req.headers.range;
     try {
-      const upstream = await fetch(directUrl, { headers: upstreamHeaders });
+      const upstream = await fetch(scDirect, { headers: upstreamHeaders });
       reply.code(upstream.status);
       reply.header("Content-Type",  upstream.headers.get("content-type")  || "audio/mpeg");
       reply.header("Accept-Ranges", "bytes");
@@ -394,11 +437,59 @@ fastify.get("/api/music/stream", async (req, reply) => {
       if (cr) reply.header("Content-Range",  cr);
       return reply.send(Readable.fromWeb(upstream.body));
     } catch (err) {
-      console.error("[music/stream] proxy error:", err.message);
+      console.error("[music/stream] SC proxy error:", err.message);
     }
   }
 
-  // Fallback: pipe yt-dlp stdout (no seeking, but always works)
+  // ── Attempt 2: YouTube fallback ───────────────────────────────────────────
+  // Resolve track metadata from SoundCloud scraper to build a search query
+  let ytVideoId = null;
+  try {
+    const client = await getSCClient();
+    const info = await client.getSongInfo(scUrl);
+    if (info?.title) {
+      const artistPart = info.author?.name ? ` ${info.author.name}` : "";
+      const query = `${info.title}${artistPart}`;
+      console.error(`[music/stream] SC blocked, searching YouTube: "${query}"`);
+      ytVideoId = await ytSearch(query);
+    }
+  } catch (err) {
+    // If scraper also fails, fall back to slug-based search
+    const slug = scUrl.split("/").slice(-2).join(" ").replace(/-/g, " ");
+    console.error(`[music/stream] SC scraper error, using slug: "${slug}"`);
+    ytVideoId = await ytSearch(slug);
+  }
+
+  if (ytVideoId) {
+    const ytDirect = await ytDirectUrl(ytVideoId);
+    if (ytDirect) {
+      const upstreamHeaders = {};
+      if (req.headers.range) upstreamHeaders["range"] = req.headers.range;
+      try {
+        const upstream = await fetch(ytDirect, { headers: upstreamHeaders });
+        reply.code(upstream.status);
+        reply.header("Content-Type",  upstream.headers.get("content-type")  || "audio/mp4");
+        reply.header("Accept-Ranges", "bytes");
+        reply.header("Cache-Control", "no-cache");
+        const cl = upstream.headers.get("content-length");
+        const cr = upstream.headers.get("content-range");
+        if (cl) reply.header("Content-Length", cl);
+        if (cr) reply.header("Content-Range",  cr);
+        return reply.send(Readable.fromWeb(upstream.body));
+      } catch (err) {
+        console.error("[music/stream] YT proxy error:", err.message);
+      }
+      // If proxying fails, pipe yt-dlp directly
+      reply.header("Content-Type", "audio/mp4");
+      const ytChild = ytPipeStream(ytVideoId);
+      ytChild.stderr.on("data", d => console.error("[music/stream]", d.toString().trim()));
+      ytChild.on("error", err => console.error("[music/stream] spawn error:", err.message));
+      return reply.send(ytChild.stdout);
+    }
+  }
+
+  // ── Attempt 3: SoundCloud HLS pipe (last resort) ──────────────────────────
+  console.error("[music/stream] all attempts failed, trying SC HLS pipe");
   reply.header("Content-Type", "audio/mpeg");
   const child = spawn("yt-dlp", ["--no-playlist", "-f", "hls_mp3_1_0/bestaudio", "-o", "-", scUrl]);
   child.stderr.on("data", d => console.error("[music/stream]", d.toString().trim()));
