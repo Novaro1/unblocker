@@ -249,13 +249,34 @@ fastify.get('/api/beta-features', (_req, reply) => {
   return reply.send(result);
 });
 
-// SoundCloud client — lazily initialized with a fresh client_id
+// SoundCloud API — uses OAuth token directly; no client_id scraping needed.
+// SC_OAUTH_TOKEN env var must be set.  All api-v2 calls pass Authorization header.
 let scClient = null;
 let scClientId = null;
+
+function scAuthHeaders() {
+  const token = process.env.SC_OAUTH_TOKEN;
+  return token ? { "Authorization": `OAuth ${token}` } : {};
+}
+
+async function getSCClientId() {
+  return scClientId; // kept for compat; most callers now use scAuthHeaders()
+}
+
 async function getSCClient() {
   if (scClient) return scClient;
-  scClientId = await SoundCloud.keygen();
-  scClient = new SoundCloud.Client(scClientId);
+  // Fallback: try keygen with a hard timeout (used only when no OAuth token)
+  if (!process.env.SC_OAUTH_TOKEN) {
+    try {
+      scClientId = await Promise.race([
+        SoundCloud.keygen(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("keygen timeout")), 15000)),
+      ]);
+      scClient = new SoundCloud.Client(scClientId);
+    } catch (e) {
+      console.error("[SC] keygen failed:", e.message);
+    }
+  }
   return scClient;
 }
 
@@ -279,19 +300,11 @@ fastify.get("/api/music/search", async (req, reply) => {
   const limit = Math.min(parseInt(req.query.limit) || 24, 50);
   if (!q) return reply.send([]);
   try {
-    let clientId = scClientId;
-    if (!clientId) {
-      clientId = await SoundCloud.keygen();
-      scClientId = clientId;
-      scClient = new SoundCloud.Client(clientId);
-    }
     const res = await fetch(
-      `https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(q)}&limit=${limit}&client_id=${clientId}`
+      `https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(q)}&limit=${limit}`,
+      { headers: scAuthHeaders() }
     );
-    if (!res.ok) {
-      if (res.status === 401) { scClient = null; scClientId = null; }
-      return reply.send([]);
-    }
+    if (!res.ok) return reply.send([]);
     const data = await res.json();
     const results = (data.collection ?? []).map(t => ({
       id:        Buffer.from(t.permalink_url).toString("base64url"),
@@ -349,15 +362,11 @@ fastify.get("/api/music/related", async (req, reply) => {
   if (!sourceUrl.startsWith("https://soundcloud.com/")) return reply.send([]);
 
   try {
-    let clientId = scClientId;
-    if (!clientId) {
-      clientId = await SoundCloud.keygen();
-      scClientId = clientId;
-      scClient = new SoundCloud.Client(clientId);
-    }
+    const auth = scAuthHeaders();
     // Resolve the track to get its numeric ID via direct API (avoids scraper)
     const resolveRes = await fetch(
-      `https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(sourceUrl)}&client_id=${clientId}`
+      `https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(sourceUrl)}`,
+      { headers: auth }
     );
     if (!resolveRes.ok) return reply.send([]);
     const info = await resolveRes.json();
@@ -366,7 +375,8 @@ fastify.get("/api/music/related", async (req, reply) => {
 
     // Hit SoundCloud's related tracks endpoint directly
     const res = await fetch(
-      `https://api-v2.soundcloud.com/tracks/${trackId}/related?limit=20&client_id=${clientId}`
+      `https://api-v2.soundcloud.com/tracks/${trackId}/related?limit=20`,
+      { headers: auth }
     );
     if (!res.ok) return reply.send([]);
 
@@ -540,19 +550,12 @@ fastify.get("/api/music/sc-transcoding", async (req, reply) => {
   if (!scUrl.startsWith("https://soundcloud.com/")) return reply.status(400).send({ error: "Invalid URL" });
 
   try {
-    let clientId = scClientId;
-    if (!clientId) {
-      clientId = await SoundCloud.keygen();
-      scClientId = clientId;
-      scClient = new SoundCloud.Client(clientId);
-    }
+    const auth = scAuthHeaders();
     const res = await fetch(
-      `https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(scUrl)}&client_id=${clientId}`
+      `https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(scUrl)}`,
+      { headers: auth }
     );
-    if (!res.ok) {
-      if (res.status === 401) { scClient = null; scClientId = null; }
-      return reply.status(res.status).send({ error: `SoundCloud API: ${res.status}` });
-    }
+    if (!res.ok) return reply.status(res.status).send({ error: `SoundCloud API: ${res.status}` });
     const track = await res.json();
     // Accept any progressive transcoding; prefer mp3_1_0 then mp3_0_1 then any
     const transcodings = track.media?.transcodings ?? [];
@@ -563,10 +566,8 @@ fastify.get("/api/music/sc-transcoding", async (req, reply) => {
     if (!progressive) return reply.status(404).send({ error: "No progressive stream" });
 
     // Resolve the transcoding URL → signed CDN URL (server-side avoids CORS restriction)
-    // OAuth token unlocks some MONETIZE tracks; DRM-only tracks fall back to YouTube/Invidious
-    const streamHeaders = {};
-    if (process.env.SC_OAUTH_TOKEN) streamHeaders["Authorization"] = `OAuth ${process.env.SC_OAUTH_TOKEN}`;
-    const streamRes = await fetch(`${progressive.url}?client_id=${clientId}`, { headers: streamHeaders });
+    // OAuth token unlocks MONETIZE tracks; DRM-only tracks fall back to YouTube/Invidious
+    const streamRes = await fetch(progressive.url, { headers: auth });
 
     if (!streamRes.ok) {
       // Progressive stream unavailable (DRM-protected MONETIZE) — search YouTube via Invidious
