@@ -497,6 +497,63 @@ fastify.get("/api/music/stream", async (req, reply) => {
   return reply.send(child.stdout);
 });
 
+// SoundCloud transcoding URL resolver — called from the browser so the stream
+// endpoint request comes from the user's IP, not the server's blocked EC2 IP.
+fastify.get("/api/music/sc-transcoding", async (req, reply) => {
+  const id = String(req.query.id || "").trim();
+  let scUrl;
+  try { scUrl = Buffer.from(id, "base64url").toString(); }
+  catch { return reply.status(400).send({ error: "Invalid ID" }); }
+  if (!scUrl.startsWith("https://soundcloud.com/")) return reply.status(400).send({ error: "Invalid URL" });
+
+  try {
+    const clientId = scClientId || await SoundCloud.keygen();
+    if (!scClientId) { scClientId = clientId; scClient = new SoundCloud.Client(clientId); }
+    const res = await fetch(
+      `https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(scUrl)}&client_id=${clientId}`
+    );
+    const track = await res.json();
+    const progressive = track.media?.transcodings?.find(
+      t => t.format?.protocol === "progressive" && t.preset === "mp3_1_0"
+    );
+    if (!progressive) return reply.status(404).send({ error: "No progressive stream" });
+    return reply.send({ transcodingUrl: progressive.url, clientId });
+  } catch (err) {
+    return reply.status(500).send({ error: err.message });
+  }
+});
+
+// SoundCloud CDN audio proxy — proxies audio from a signed sndcdn.com CDN URL.
+// The URL is resolved client-side (browser IP) then passed here for proxying.
+const SC_CDN_PREFIXES = ["https://cf-media.sndcdn.com/", "https://cf-hls-media.sndcdn.com/",
+  "https://a-v2.sndcdn.com/", "https://wave.sndcdn.com/"];
+fastify.get("/api/music/sc-cdn-proxy", async (req, reply) => {
+  const urlParam = String(req.query.url || "").trim();
+  let cdnUrl;
+  try { cdnUrl = Buffer.from(urlParam, "base64url").toString(); }
+  catch { return reply.status(400).send("Invalid URL"); }
+  if (!SC_CDN_PREFIXES.some(p => cdnUrl.startsWith(p)))
+    return reply.status(400).send("Invalid CDN URL");
+
+  try {
+    const upstreamHeaders = {};
+    if (req.headers.range) upstreamHeaders["range"] = req.headers.range;
+    const upstream = await fetch(cdnUrl, { headers: upstreamHeaders });
+    reply.code(upstream.status);
+    reply.header("Content-Type",  upstream.headers.get("content-type")  || "audio/mpeg");
+    reply.header("Accept-Ranges", "bytes");
+    reply.header("Cache-Control", "no-cache");
+    const cl = upstream.headers.get("content-length");
+    const cr = upstream.headers.get("content-range");
+    if (cl) reply.header("Content-Length", cl);
+    if (cr) reply.header("Content-Range",  cr);
+    return reply.send(Readable.fromWeb(upstream.body));
+  } catch (err) {
+    console.error("[sc-cdn-proxy]", err.message);
+    return reply.status(502).send("CDN fetch failed");
+  }
+});
+
 // GitHub push webhook → Discord announcements
 const GH_WEBHOOK_SECRET   = process.env.GH_WEBHOOK_SECRET   || "";
 const DISCORD_TOKEN        = process.env.DISCORD_TOKEN        || "";

@@ -758,10 +758,6 @@ async function loadTrack(track) {
 
   setQuality("loading", "⏳ Loading...");
   elPlayPause.disabled = true;
-  // Clear stale event handlers before loading new track
-  audio.oncanplay = null;
-  audio.onerror = null;
-  audio.src = `/api/music/stream?id=${track.id}`;
 
   elYtLink.textContent = "Open in SoundCloud";
   elYtLink.onclick = () => {
@@ -769,19 +765,45 @@ async function loadTrack(track) {
     if (w) w.location.href = location.origin + "?q=" + encodeURIComponent(track.sourceUrl || "https://soundcloud.com");
   };
 
-  audio.oncanplay = () => {
-    setQuality("full", "● Full Song");
-    elPlayPause.disabled = false;
+  // Helper: point audio at a URL and start playback
+  function startAudio(src) {
     audio.oncanplay = null;
-  };
-  audio.onerror = () => {
-    setQuality("preview", "✕ Failed to load");
-    elPlayPause.disabled = false;
     audio.onerror = null;
-  };
+    audio.src = src;
+    audio.oncanplay = () => {
+      setQuality("full", "● Full Song");
+      elPlayPause.disabled = false;
+      audio.oncanplay = null;
+    };
+    audio.onerror = () => {
+      setQuality("preview", "✕ Failed to load");
+      elPlayPause.disabled = false;
+      audio.onerror = null;
+    };
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }
 
-  audio.currentTime = 0;
-  audio.play().catch(() => {});
+  // Try resolving via browser (user's IP bypasses EC2 block on SoundCloud's stream endpoint)
+  try {
+    const tcRes = await fetch(`/api/music/sc-transcoding?id=${track.id}`);
+    if (tcRes.ok) {
+      const { transcodingUrl, clientId } = await tcRes.json();
+      const streamRes = await fetch(`${transcodingUrl}?client_id=${clientId}`);
+      if (streamRes.ok) {
+        const { url: cdnUrl } = await streamRes.json();
+        if (cdnUrl) {
+          // Proxy the CDN audio through our server (CDN URL is accessible from EC2)
+          const cdnB64 = btoa(cdnUrl).replace(/\+/g,"-").replace(/\//g,"_").replace(/=/g,"");
+          startAudio(`/api/music/sc-cdn-proxy?url=${cdnB64}`);
+          return;
+        }
+      }
+    }
+  } catch (_) { /* fall through */ }
+
+  // Fall back to server-side stream (YouTube fallback)
+  startAudio(`/api/music/stream?id=${track.id}`);
 }
 
 // ── Playback controls ─────────────────────────────────────────────────────────
