@@ -544,7 +544,10 @@ fastify.get("/api/music/sc-transcoding", async (req, reply) => {
     if (!progressive) return reply.status(404).send({ error: "No progressive stream" });
 
     // Resolve the transcoding URL → signed CDN URL (server-side avoids CORS restriction)
-    const streamRes = await fetch(`${progressive.url}?client_id=${clientId}`);
+    // OAuth token unlocks MONETIZE tracks (policy: MONETIZE requires auth)
+    const streamHeaders = {};
+    if (process.env.SC_OAUTH_TOKEN) streamHeaders["Authorization"] = `OAuth ${process.env.SC_OAUTH_TOKEN}`;
+    const streamRes = await fetch(`${progressive.url}?client_id=${clientId}`, { headers: streamHeaders });
     if (!streamRes.ok) return reply.status(streamRes.status).send({ error: "Stream unavailable" });
     const { url: cdnUrl } = await streamRes.json();
     if (!cdnUrl) return reply.status(404).send({ error: "No CDN URL in response" });
