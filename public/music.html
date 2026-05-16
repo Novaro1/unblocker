@@ -845,7 +845,7 @@ function loadTrack(track) {
   }
 
   // Load the track into the SC Widget — it handles auth, DRM, and CDN internally
-  widget.load(`https://api.soundcloud.com/tracks/${track.id}`, {
+  widget.load(track.sourceUrl, {
     auto_play: true,
     hide_related: true,
     show_comments: false,
