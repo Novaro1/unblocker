@@ -603,26 +603,36 @@ async function ytFallbackSearch(query) {
   return videoId ? { videoId } : null;
 }
 
-// YouTube audio proxy — pipes yt-dlp stdout directly to response.
-// Uses webm/opus which is streamable from byte 0 (no moov atom at end like m4a).
-// googlevideo URLs are IP-locked so piping through the server is required anyway.
+// YouTube audio proxy — resolves URL via yt-dlp (ANDROID_VR client, no cookies
+// needed) then pipes through FFmpeg to convert m4a→mp3. mp3 is streamable from
+// byte 0; m4a has moov atom at EOF which causes browser range-request failures.
+const ytUrlCache = new Map(); // videoId → { url, expiresAt }
+async function getCachedYtUrl(videoId) {
+  const hit = ytUrlCache.get(videoId);
+  if (hit && hit.expiresAt > Date.now()) return hit.url;
+  const url = await ytDirectUrl(videoId, 25000);
+  if (url) ytUrlCache.set(videoId, { url, expiresAt: Date.now() + 4 * 60 * 1000 });
+  return url || null;
+}
+
 fastify.get("/api/music/yt-proxy", async (req, reply) => {
   const videoId = String(req.query.v || "").trim();
   if (!/^[A-Za-z0-9_-]{11}$/.test(videoId))
     return reply.status(400).send({ error: "Invalid video ID" });
 
-  reply.header("Content-Type",  "audio/webm");
+  const audioUrl = await getCachedYtUrl(videoId);
+  if (!audioUrl) return reply.status(503).send({ error: "yt-dlp failed" });
+
+  reply.header("Content-Type",  "audio/mpeg");
   reply.header("Cache-Control", "no-cache");
-  const child = spawn("yt-dlp", [
-    "--no-playlist",
-    "--js-runtimes", `node:${process.execPath}`,
-    "-f", "bestaudio[ext=webm]/bestaudio",
-    "-o", "-",
-    `https://www.youtube.com/watch?v=${videoId}`,
+  const ffmpeg = spawn("ffmpeg", [
+    "-loglevel", "error",
+    "-i", audioUrl,
+    "-f", "mp3", "-ab", "192k", "-vn",
+    "pipe:1",
   ]);
-  child.stderr.on("data", d => console.error("[yt-proxy]", d.toString().trim()));
-  child.on("error", err => console.error("[yt-proxy] spawn:", err.message));
-  return reply.send(child.stdout);
+  ffmpeg.on("error", err => console.error("[yt-proxy] ffmpeg:", err.message));
+  return reply.send(ffmpeg.stdout);
 });
 
 // SoundCloud CDN audio proxy — proxies audio from a signed sndcdn.com CDN URL.
