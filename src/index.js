@@ -511,8 +511,8 @@ fastify.get("/api/music/stream", async (req, reply) => {
   return reply.send(child.stdout);
 });
 
-// SoundCloud transcoding URL resolver — called from the browser so the stream
-// endpoint request comes from the user's IP, not the server's blocked EC2 IP.
+// SoundCloud stream resolver — resolves all the way to the signed CDN URL server-side.
+// Browser can then play from cf-media.sndcdn.com directly (CORS: * on CDN).
 fastify.get("/api/music/sc-transcoding", async (req, reply) => {
   const id = String(req.query.id || "").trim();
   let scUrl;
@@ -521,18 +521,36 @@ fastify.get("/api/music/sc-transcoding", async (req, reply) => {
   if (!scUrl.startsWith("https://soundcloud.com/")) return reply.status(400).send({ error: "Invalid URL" });
 
   try {
-    const clientId = scClientId || await SoundCloud.keygen();
-    if (!scClientId) { scClientId = clientId; scClient = new SoundCloud.Client(clientId); }
+    let clientId = scClientId;
+    if (!clientId) {
+      clientId = await SoundCloud.keygen();
+      scClientId = clientId;
+      scClient = new SoundCloud.Client(clientId);
+    }
     const res = await fetch(
       `https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(scUrl)}&client_id=${clientId}`
     );
+    if (!res.ok) {
+      if (res.status === 401) { scClient = null; scClientId = null; }
+      return reply.status(res.status).send({ error: `SoundCloud API: ${res.status}` });
+    }
     const track = await res.json();
-    const progressive = track.media?.transcodings?.find(
-      t => t.format?.protocol === "progressive" && t.preset === "mp3_1_0"
-    );
+    // Accept any progressive transcoding; prefer mp3_1_0 then mp3_0_1 then any
+    const transcodings = track.media?.transcodings ?? [];
+    const progressive =
+      transcodings.find(t => t.format?.protocol === "progressive" && t.preset === "mp3_1_0") ||
+      transcodings.find(t => t.format?.protocol === "progressive" && t.preset === "mp3_0_1") ||
+      transcodings.find(t => t.format?.protocol === "progressive");
     if (!progressive) return reply.status(404).send({ error: "No progressive stream" });
-    return reply.send({ transcodingUrl: progressive.url, clientId });
+
+    // Resolve the transcoding URL → signed CDN URL (server-side avoids CORS restriction)
+    const streamRes = await fetch(`${progressive.url}?client_id=${clientId}`);
+    if (!streamRes.ok) return reply.status(streamRes.status).send({ error: "Stream unavailable" });
+    const { url: cdnUrl } = await streamRes.json();
+    if (!cdnUrl) return reply.status(404).send({ error: "No CDN URL in response" });
+    return reply.send({ cdnUrl });
   } catch (err) {
+    scClient = null; scClientId = null;
     return reply.status(500).send({ error: err.message });
   }
 });

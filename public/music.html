@@ -774,8 +774,9 @@ async function loadTrack(track) {
   audio.pause();
   audio.src = "";
 
-  // Step 1: server resolves the SoundCloud transcoding URL (uses SoundCloud API)
-  let transcodingUrl, clientId;
+  // Server resolves SoundCloud URL → signed CDN URL (avoids CORS on the transcoding endpoint)
+  // Browser plays from cf-media.sndcdn.com directly (CORS: * on CDN, in DIRECT_HOSTS)
+  let cdnUrl;
   try {
     const res = await fetch(`/api/music/sc-transcoding?id=${encodeURIComponent(track.id)}`);
     if (!res.ok) {
@@ -783,36 +784,13 @@ async function loadTrack(track) {
       elPlayPause.disabled = false;
       return;
     }
-    ({ transcodingUrl, clientId } = await res.json());
+    ({ cdnUrl } = await res.json());
   } catch (_) {
     setQuality("preview", "✕ Failed to load");
     elPlayPause.disabled = false;
     return;
   }
 
-  // Step 2: browser resolves the transcoding URL to the actual CDN URL (from user's IP, not EC2)
-  let cdnUrl;
-  try {
-    const cdnRes = await fetch(`${transcodingUrl}?client_id=${clientId}`);
-    if (!cdnRes.ok) {
-      setQuality("preview", "✕ Cannot stream");
-      elPlayPause.disabled = false;
-      return;
-    }
-    ({ url: cdnUrl } = await cdnRes.json());
-  } catch (_) {
-    setQuality("preview", "✕ Failed to load");
-    elPlayPause.disabled = false;
-    return;
-  }
-
-  if (!cdnUrl) {
-    setQuality("preview", "✕ Failed to load");
-    elPlayPause.disabled = false;
-    return;
-  }
-
-  // Step 3: play the CDN audio directly (SoundCloud CDN is in DIRECT_HOSTS → bypasses Scramjet)
   audio.src = cdnUrl;
   audio.play().catch(() => {});
 }
