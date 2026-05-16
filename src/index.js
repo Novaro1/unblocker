@@ -603,41 +603,26 @@ async function ytFallbackSearch(query) {
   return videoId ? { videoId } : null;
 }
 
-const ytUrlCache = new Map(); // videoId → { url, expiresAt }
-async function getCachedYtUrl(videoId) {
-  const hit = ytUrlCache.get(videoId);
-  if (hit && hit.expiresAt > Date.now()) return hit.url;
-  const url = await ytDirectUrl(videoId, 25000);
-  if (url) ytUrlCache.set(videoId, { url, expiresAt: Date.now() + 5 * 60 * 1000 });
-  return url || null;
-}
-
-// YouTube audio proxy — resolves via yt-dlp then proxies bytes through server.
+// YouTube audio proxy — pipes yt-dlp stdout directly to response.
+// Uses webm/opus which is streamable from byte 0 (no moov atom at end like m4a).
+// googlevideo URLs are IP-locked so piping through the server is required anyway.
 fastify.get("/api/music/yt-proxy", async (req, reply) => {
   const videoId = String(req.query.v || "").trim();
   if (!/^[A-Za-z0-9_-]{11}$/.test(videoId))
     return reply.status(400).send({ error: "Invalid video ID" });
 
-  const audioUrl = await getCachedYtUrl(videoId);
-  if (!audioUrl) return reply.status(503).send({ error: "yt-dlp could not get audio URL" });
-
-  try {
-    const upstreamHeaders = { "User-Agent": "Mozilla/5.0" };
-    if (req.headers.range) upstreamHeaders["Range"] = req.headers.range;
-    const upstream = await fetch(audioUrl, { headers: upstreamHeaders });
-    reply.code(upstream.status);
-    reply.header("Content-Type",  upstream.headers.get("content-type") || "audio/mp4");
-    reply.header("Accept-Ranges", "bytes");
-    reply.header("Cache-Control", "no-cache");
-    const cl = upstream.headers.get("content-length");
-    const cr = upstream.headers.get("content-range");
-    if (cl) reply.header("Content-Length", cl);
-    if (cr) reply.header("Content-Range",  cr);
-    return reply.send(Readable.fromWeb(upstream.body));
-  } catch (err) {
-    console.error("[yt-proxy]", err.message);
-    return reply.status(502).send({ error: "Audio fetch failed" });
-  }
+  reply.header("Content-Type",  "audio/webm");
+  reply.header("Cache-Control", "no-cache");
+  const child = spawn("yt-dlp", [
+    "--no-playlist",
+    "--js-runtimes", `node:${process.execPath}`,
+    "-f", "bestaudio[ext=webm]/bestaudio",
+    "-o", "-",
+    `https://www.youtube.com/watch?v=${videoId}`,
+  ]);
+  child.stderr.on("data", d => console.error("[yt-proxy]", d.toString().trim()));
+  child.on("error", err => console.error("[yt-proxy] spawn:", err.message));
+  return reply.send(child.stdout);
 });
 
 // SoundCloud CDN audio proxy — proxies audio from a signed sndcdn.com CDN URL.
