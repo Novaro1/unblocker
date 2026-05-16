@@ -273,29 +273,39 @@ fastify.options("/api/music/*", (_req, reply) => {
        .code(204).send();
 });
 
-// Music: search SoundCloud (no API key, no bot detection)
+// Music: search SoundCloud via direct API (avoids soundcloud-scraper HTML parsing)
 fastify.get("/api/music/search", async (req, reply) => {
   const q     = String(req.query.q || "").trim();
   const limit = Math.min(parseInt(req.query.limit) || 24, 50);
   if (!q) return reply.send([]);
   try {
-    const client  = await getSCClient();
-    const found   = await client.search(q, "track");
-    const tracks  = found.filter(r => r.type === "track").slice(0, limit);
-    const infos   = await Promise.all(tracks.map(t => client.getSongInfo(t.url).catch(() => null)));
-    const results = infos.filter(s => s?.url).map(s => ({
-      id:        Buffer.from(s.url).toString("base64url"),
-      title:     s.title     || "Unknown",
-      artist:    s.author?.name || "Unknown",
+    let clientId = scClientId;
+    if (!clientId) {
+      clientId = await SoundCloud.keygen();
+      scClientId = clientId;
+      scClient = new SoundCloud.Client(clientId);
+    }
+    const res = await fetch(
+      `https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(q)}&limit=${limit}&client_id=${clientId}`
+    );
+    if (!res.ok) {
+      if (res.status === 401) { scClient = null; scClientId = null; }
+      return reply.send([]);
+    }
+    const data = await res.json();
+    const results = (data.collection ?? []).map(t => ({
+      id:        Buffer.from(t.permalink_url).toString("base64url"),
+      title:     t.title     || "Unknown",
+      artist:    t.user?.username || "Unknown",
       album:     "",
-      artwork:   `/api/music/thumb?url=${Buffer.from(s.thumbnail || "").toString("base64url")}`,
-      duration:  s.duration  || 0,
-      sourceUrl: s.url,
+      artwork:   `/api/music/thumb?url=${Buffer.from(t.artwork_url || t.user?.avatar_url || "").toString("base64url")}`,
+      duration:  t.duration  || 0,
+      sourceUrl: t.permalink_url,
     }));
     reply.send(results);
   } catch (err) {
     console.error("[music/search]", err.message);
-    scClient = null; scClientId = null; // reset on error so keygen retries
+    scClient = null; scClientId = null;
     reply.send([]);
   }
 });
@@ -339,15 +349,24 @@ fastify.get("/api/music/related", async (req, reply) => {
   if (!sourceUrl.startsWith("https://soundcloud.com/")) return reply.send([]);
 
   try {
-    const client = await getSCClient();
-    // Resolve the track to get its numeric ID
-    const info = await client.getSongInfo(sourceUrl);
+    let clientId = scClientId;
+    if (!clientId) {
+      clientId = await SoundCloud.keygen();
+      scClientId = clientId;
+      scClient = new SoundCloud.Client(clientId);
+    }
+    // Resolve the track to get its numeric ID via direct API (avoids scraper)
+    const resolveRes = await fetch(
+      `https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(sourceUrl)}&client_id=${clientId}`
+    );
+    if (!resolveRes.ok) return reply.send([]);
+    const info = await resolveRes.json();
     const trackId = info?.id;
     if (!trackId) return reply.send([]);
 
     // Hit SoundCloud's related tracks endpoint directly
     const res = await fetch(
-      `https://api-v2.soundcloud.com/tracks/${trackId}/related?limit=20&client_id=${scClientId}`
+      `https://api-v2.soundcloud.com/tracks/${trackId}/related?limit=20&client_id=${clientId}`
     );
     if (!res.ok) return reply.send([]);
 
