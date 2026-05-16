@@ -611,11 +611,7 @@
 
 </div>
 
-<!-- YouTube IFrame API player (hidden) -->
-<div id="yt-player-wrap" style="position:fixed;bottom:0;right:0;width:1px;height:1px;overflow:hidden"></div>
-
 <audio id="mp-audio"></audio>
-<script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
 "use strict";
@@ -631,11 +627,6 @@ let autoplay = false;
 let autoplayFetching = false;
 let activeTab = "results";
 let currentTrack = null;
-let widgetMode = false;  // true when YouTube player is handling playback
-let ytPlayer = null;
-let ytAPIReady = false;
-let ytPendingVideoId = null;
-let ytProgressInterval = null;
 
 const audio = document.getElementById("mp-audio");
 
@@ -687,7 +678,6 @@ function setPlayState(playing) {
 
 // ── Audio events ──────────────────────────────────────────────────────────────
 audio.addEventListener("timeupdate", () => {
-  if (widgetMode) return;
   const dur = (audio.duration && isFinite(audio.duration))
     ? audio.duration
     : (currentTrack?.duration / 1000 || 0);
@@ -699,15 +689,14 @@ audio.addEventListener("timeupdate", () => {
 });
 
 audio.addEventListener("loadedmetadata", () => {
-  if (widgetMode) return;
   elTotal.textContent = fmt(audio.duration * 1000);
 });
 
-audio.addEventListener("play",  () => { if (!widgetMode) setPlayState(true); });
-audio.addEventListener("pause", () => { if (!widgetMode) setPlayState(false); });
+audio.addEventListener("play",  () => { setPlayState(true);  setQuality("full", "● Full Song"); elPlayPause.disabled = false; });
+audio.addEventListener("pause", () => { setPlayState(false); });
+audio.addEventListener("error", () => { setQuality("preview", "✕ Failed to load"); setPlayState(false); elPlayPause.disabled = false; });
 
 audio.addEventListener("ended", () => {
-  if (widgetMode) return;
   if (repeat === "one") {
     audio.currentTime = 0;
     audio.play();
@@ -718,94 +707,11 @@ audio.addEventListener("ended", () => {
 
 audio.volume = 0.8;
 
-// ── YouTube IFrame API ────────────────────────────────────────────────────────
-window.onYouTubeIframeAPIReady = function () {
-  ytAPIReady = true;
-  if (ytPendingVideoId) { makeYTPlayer(ytPendingVideoId); ytPendingVideoId = null; }
-};
-
-function stopYTProgress() {
-  clearInterval(ytProgressInterval);
-  ytProgressInterval = null;
-}
-
-function startYTProgress() {
-  stopYTProgress();
-  ytProgressInterval = setInterval(() => {
-    if (!widgetMode || !ytPlayer) { stopYTProgress(); return; }
-    try {
-      const pos = (ytPlayer.getCurrentTime() || 0) * 1000;
-      const dur = (ytPlayer.getDuration()    || 0) * 1000;
-      if (!dur) return;
-      const pct = Math.min(100, (pos / dur) * 100);
-      elBarFill.style.width = pct + "%";
-      elBarThumb.style.left = pct + "%";
-      elTime.textContent    = fmt(pos);
-    } catch (_) {}
-  }, 250);
-}
-
-function makeYTPlayer(videoId) {
-  if (!ytAPIReady || typeof YT === "undefined" || !YT.Player) {
-    ytPendingVideoId = videoId; // will retry when onYouTubeIframeAPIReady fires
-    return;
-  }
-  stopYTProgress();
-  if (ytPlayer) { try { ytPlayer.destroy(); } catch (_) {} ytPlayer = null; }
-
-  const wrap = document.getElementById("yt-player-wrap");
-  wrap.innerHTML = '<div id="yt-player"></div>';
-
-  ytPlayer = new YT.Player("yt-player", {
-    height: "1", width: "1",
-    videoId,
-    playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0,
-                  iv_load_policy: 3, origin: location.origin },
-    events: {
-      onReady(e) {
-        e.target.setVolume(Math.round(parseFloat(elVol.value) * 100));
-        const dur = e.target.getDuration();
-        if (dur > 0) elTotal.textContent = fmt(dur * 1000);
-      },
-      onStateChange(e) {
-        if (!widgetMode) return;
-        if (e.data === YT.PlayerState.PLAYING) {
-          setPlayState(true);
-          setQuality("full", "● Full Song");
-          elPlayPause.disabled = false;
-          startYTProgress();
-          const dur = ytPlayer.getDuration();
-          if (dur > 0) elTotal.textContent = fmt(dur * 1000);
-        } else if (e.data === YT.PlayerState.PAUSED) {
-          setPlayState(false);
-          stopYTProgress();
-        } else if (e.data === YT.PlayerState.ENDED) {
-          setPlayState(false);
-          stopYTProgress();
-          if (repeat === "one") { ytPlayer.seekTo(0, true); ytPlayer.playVideo(); }
-          else playNext();
-        }
-      },
-      onError() {
-        if (!widgetMode) return;
-        setQuality("preview", "✕ Not available");
-        elPlayPause.disabled = false;
-      }
-    }
-  });
-}
 
 // ── Progress bar seek ─────────────────────────────────────────────────────────
 elBarOuter.addEventListener("click", (e) => {
   const rect = elBarOuter.getBoundingClientRect();
   const pct = (e.clientX - rect.left) / rect.width;
-  if (widgetMode && ytPlayer) {
-    try {
-      const dur = ytPlayer.getDuration();
-      if (dur > 0) ytPlayer.seekTo(pct * dur, true);
-    } catch (_) {}
-    return;
-  }
   const dur = (audio.duration && isFinite(audio.duration))
     ? audio.duration
     : (currentTrack?.duration / 1000 || 0);
@@ -815,9 +721,7 @@ elBarOuter.addEventListener("click", (e) => {
 
 // ── Volume ─────────────────────────────────────────────────────────────────────
 elVol.addEventListener("input", () => {
-  const vol = parseFloat(elVol.value);
-  audio.volume = vol;
-  if (ytPlayer) { try { ytPlayer.setVolume(Math.round(vol * 100)); } catch (_) {} }
+  audio.volume = parseFloat(elVol.value);
 });
 
 // ── Load + play a track ───────────────────────────────────────────────────────
@@ -828,7 +732,7 @@ function setQuality(state, label) {
   elQuality.textContent = label;
 }
 
-async function loadTrack(track) {
+function loadTrack(track) {
   currentTrack = track;
 
   // Update UI immediately
@@ -866,41 +770,17 @@ async function loadTrack(track) {
     if (w) w.location.href = location.origin + "?q=" + encodeURIComponent(track.sourceUrl || "https://soundcloud.com");
   };
 
-  // Stop any current playback
+  // Stop any current playback, then stream via server
   audio.pause();
-  audio.src = "";
-  stopYTProgress();
-  widgetMode = true;
-
-  // Search YouTube for this track, then play via IFrame API
-  const query = `${track.title} ${track.artist}`;
-  let videoId = null;
-  try {
-    const res = await fetch(`/api/music/yt-id?q=${encodeURIComponent(query)}`);
-    if (res.ok) { const d = await res.json(); videoId = d.videoId; }
-  } catch (_) {}
-
-  if (!videoId) {
-    setQuality("preview", "✕ Not found");
-    elPlayPause.disabled = false;
-    return;
-  }
-
-  makeYTPlayer(videoId);
+  audio.src = `/api/music/stream?id=${encodeURIComponent(track.id)}`;
+  audio.play().catch(() => {});
 }
 
 // ── Playback controls ─────────────────────────────────────────────────────────
 elPlayPause.addEventListener("click", () => {
   if (!currentTrack) return;
-  if (widgetMode && ytPlayer) {
-    try {
-      if (isPlaying) ytPlayer.pauseVideo();
-      else ytPlayer.playVideo();
-    } catch (_) {}
-  } else {
-    if (audio.paused) audio.play();
-    else audio.pause();
-  }
+  if (audio.paused) audio.play();
+  else audio.pause();
 });
 
 function playNext() {
