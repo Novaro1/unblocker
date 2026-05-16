@@ -17,9 +17,9 @@ try {
   _swBC.postMessage({ ok: false, message: e.message, stack: String(e.stack || "") });
 }
 
-// Captcha CDN hostnames that must load directly (not rewritten) so that
-// reCAPTCHA, hCaptcha, and Cloudflare Turnstile work correctly.
-const CAPTCHA_HOSTS = new Set([
+// Hostnames that must load directly (not rewritten through Scramjet).
+const DIRECT_HOSTS = new Set([
+  // Captcha providers
   "www.google.com",
   "www.gstatic.com",
   "recaptcha.net",
@@ -29,12 +29,21 @@ const CAPTCHA_HOSTS = new Set([
   "imgs.hcaptcha.com",
   "challenges.cloudflare.com",
   "static.cloudflareinsights.com",
+  // SoundCloud — widget iframe + API must run under their own origin
+  // so the SC Widget postMessage communication works correctly
+  "w.soundcloud.com",
+  "api-v2.soundcloud.com",
+  "api.soundcloud.com",
+  "cf-media.sndcdn.com",
+  "cf-hls-media.sndcdn.com",
+  "cf-preview-media.sndcdn.com",
+  "a-v2.sndcdn.com",
 ]);
 
 function isCaptchaRequest(url) {
   try {
     const { hostname, pathname } = new URL(url);
-    if (CAPTCHA_HOSTS.has(hostname)) return true;
+    if (DIRECT_HOSTS.has(hostname)) return true;
     // reCAPTCHA can also be loaded from the site's own domain via a path
     if (pathname.includes("/recaptcha/") || pathname.includes("/captcha/")) return true;
   } catch {}
