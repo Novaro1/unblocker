@@ -593,22 +593,32 @@ fastify.get("/api/music/sc-transcoding", async (req, reply) => {
 });
 
 // ── YouTube audio fallback (yt-dlp, no cookies needed for EC2) ───────────────
-// Search uses InnerTube API; stream URL comes from yt-dlp and is proxied
-// through this server because googlevideo URLs are IP-locked to requester.
+// Search uses InnerTube API; stream URL from yt-dlp is proxied through this
+// server because googlevideo URLs are IP-locked to the requester.
+// The resolved URL is cached per videoId (5 min) so range requests don't each
+// trigger a fresh 15s yt-dlp call.
 
 async function ytFallbackSearch(query) {
   const videoId = await ytSearch(query);
   return videoId ? { videoId } : null;
 }
 
+const ytUrlCache = new Map(); // videoId → { url, expiresAt }
+async function getCachedYtUrl(videoId) {
+  const hit = ytUrlCache.get(videoId);
+  if (hit && hit.expiresAt > Date.now()) return hit.url;
+  const url = await ytDirectUrl(videoId, 25000);
+  if (url) ytUrlCache.set(videoId, { url, expiresAt: Date.now() + 5 * 60 * 1000 });
+  return url || null;
+}
+
 // YouTube audio proxy — resolves via yt-dlp then proxies bytes through server.
-// googlevideo.com URLs are IP-locked so the browser can't fetch them directly.
 fastify.get("/api/music/yt-proxy", async (req, reply) => {
   const videoId = String(req.query.v || "").trim();
   if (!/^[A-Za-z0-9_-]{11}$/.test(videoId))
     return reply.status(400).send({ error: "Invalid video ID" });
 
-  const audioUrl = await ytDirectUrl(videoId, 20000);
+  const audioUrl = await getCachedYtUrl(videoId);
   if (!audioUrl) return reply.status(503).send({ error: "yt-dlp could not get audio URL" });
 
   try {
