@@ -116,6 +116,12 @@ const fastify = Fastify({
   },
 });
 
+// Service worker must never be cached — browser needs the latest version immediately
+fastify.get("/sw.js", (req, reply) => {
+  reply.header("Cache-Control", "no-cache, no-store, must-revalidate");
+  return reply.sendFile("sw.js");
+});
+
 fastify.register(fastifyStatic, {
   root: publicPath,
   decorateReply: true,
