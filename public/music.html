@@ -776,18 +776,27 @@ async function loadTrack(track) {
   audio.pause();
   audio.src = "";
 
-  // Server resolves SoundCloud URL → signed CDN URL (avoids CORS on the transcoding endpoint)
-  // Browser plays from cf-media.sndcdn.com directly (CORS: * on CDN, in DIRECT_HOSTS)
-  let cdnUrl;
+  // Server resolves SoundCloud URL → CDN URL (ALLOW) or YouTube proxy URL (MONETIZE/DRM)
+  let audioSrc;
   try {
     const res = await fetch(`/api/music/sc-transcoding?id=${encodeURIComponent(track.id)}`);
     if (!res.ok) {
       trackLoading = false;
-      setQuality("preview", res.status === 404 ? "✕ Premium track" : "✕ Failed to load");
+      setQuality("preview", "✕ Failed to load");
       elPlayPause.disabled = false;
       return;
     }
-    ({ cdnUrl } = await res.json());
+    const data = await res.json();
+    if (data.cdnUrl) {
+      audioSrc = data.cdnUrl;
+    } else if (data.ytVideoId) {
+      audioSrc = `/api/music/yt-proxy?v=${encodeURIComponent(data.ytVideoId)}`;
+    } else {
+      trackLoading = false;
+      setQuality("preview", "✕ Failed to load");
+      elPlayPause.disabled = false;
+      return;
+    }
   } catch (_) {
     trackLoading = false;
     setQuality("preview", "✕ Failed to load");
@@ -796,7 +805,7 @@ async function loadTrack(track) {
   }
 
   trackLoading = false;
-  audio.src = cdnUrl;
+  audio.src = audioSrc;
   audio.play().catch(() => {});
 }
 

@@ -544,17 +544,102 @@ fastify.get("/api/music/sc-transcoding", async (req, reply) => {
     if (!progressive) return reply.status(404).send({ error: "No progressive stream" });
 
     // Resolve the transcoding URL → signed CDN URL (server-side avoids CORS restriction)
-    // OAuth token unlocks MONETIZE tracks (policy: MONETIZE requires auth)
+    // OAuth token unlocks some MONETIZE tracks; DRM-only tracks fall back to YouTube/Invidious
     const streamHeaders = {};
     if (process.env.SC_OAUTH_TOKEN) streamHeaders["Authorization"] = `OAuth ${process.env.SC_OAUTH_TOKEN}`;
     const streamRes = await fetch(`${progressive.url}?client_id=${clientId}`, { headers: streamHeaders });
-    if (!streamRes.ok) return reply.status(streamRes.status).send({ error: "Stream unavailable" });
+
+    if (!streamRes.ok) {
+      // Progressive stream unavailable (DRM-protected MONETIZE) — search YouTube via Invidious
+      const title  = track.title ?? "";
+      const artist = track.user?.username ?? "";
+      const query  = `${title} ${artist}`.trim();
+      console.log(`[sc-transcoding] progressive 404 for "${query}", searching Invidious`);
+      const ytResult = await invidiousSearch(query);
+      if (ytResult) {
+        console.log(`[sc-transcoding] Invidious match: ${ytResult.title} (${ytResult.videoId})`);
+        return reply.send({ ytVideoId: ytResult.videoId, ytTitle: ytResult.title });
+      }
+      return reply.status(streamRes.status).send({ error: "Stream unavailable" });
+    }
+
     const { url: cdnUrl } = await streamRes.json();
     if (!cdnUrl) return reply.status(404).send({ error: "No CDN URL in response" });
     return reply.send({ cdnUrl });
   } catch (err) {
     scClient = null; scClientId = null;
     return reply.status(500).send({ error: err.message });
+  }
+});
+
+// ── Invidious YouTube fallback ────────────────────────────────────────────────
+const INVIDIOUS_INSTANCES = [
+  "https://iv.ggtyler.dev",
+  "https://invidious.privacydev.net",
+  "https://invidious.nerdvpn.de",
+  "https://inv.tux.pizza",
+];
+
+async function invidiousSearch(query) {
+  for (const base of INVIDIOUS_INSTANCES) {
+    try {
+      const r = await fetch(
+        `${base}/api/v1/search?q=${encodeURIComponent(query)}&type=video&fields=videoId,title`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      if (!r.ok) continue;
+      const results = await r.json();
+      if (Array.isArray(results) && results.length > 0)
+        return { videoId: results[0].videoId, title: results[0].title, base };
+    } catch {}
+  }
+  return null;
+}
+
+async function invidiousAudioUrl(videoId, base) {
+  const instances = base ? [base, ...INVIDIOUS_INSTANCES.filter(b => b !== base)] : INVIDIOUS_INSTANCES;
+  for (const b of instances) {
+    try {
+      const r = await fetch(
+        `${b}/api/v1/videos/${videoId}?fields=adaptiveFormats`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (!r.ok) continue;
+      const info = await r.json();
+      // Prefer m4a/aac (itag 140) then webm/opus, highest bitrate
+      const audioFormats = (info.adaptiveFormats ?? []).filter(f => f.type?.startsWith("audio/"));
+      const best = audioFormats.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+      if (best?.url) return { url: best.url, type: best.type?.split(";")[0] || "audio/mp4" };
+    } catch {}
+  }
+  return null;
+}
+
+// YouTube audio proxy via Invidious — streams audio for a YouTube video ID.
+fastify.get("/api/music/yt-proxy", async (req, reply) => {
+  const videoId = String(req.query.v || "").trim();
+  if (!/^[A-Za-z0-9_-]{11}$/.test(videoId))
+    return reply.status(400).send({ error: "Invalid video ID" });
+
+  const audio = await invidiousAudioUrl(videoId, null);
+  if (!audio) return reply.status(503).send({ error: "No Invidious instance available" });
+
+  try {
+    const upstreamHeaders = {};
+    if (req.headers.range) upstreamHeaders["Range"] = req.headers.range;
+    const upstream = await fetch(audio.url, { headers: upstreamHeaders });
+    reply.code(upstream.status);
+    reply.header("Content-Type",  audio.type);
+    reply.header("Accept-Ranges", "bytes");
+    reply.header("Cache-Control", "no-cache");
+    const cl = upstream.headers.get("content-length");
+    const cr = upstream.headers.get("content-range");
+    if (cl) reply.header("Content-Length", cl);
+    if (cr) reply.header("Content-Range",  cr);
+    return reply.send(Readable.fromWeb(upstream.body));
+  } catch (err) {
+    console.error("[yt-proxy]", err.message);
+    return reply.status(502).send({ error: "Audio fetch failed" });
   }
 });
 
