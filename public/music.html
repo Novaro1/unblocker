@@ -611,11 +611,8 @@
 
 </div>
 
-<!-- Hidden SC widget iframe — handles all audio playback -->
-<iframe id="sc-widget"
-  allow="autoplay"
-  src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/284331797&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false&visual=false&buying=false&sharing=false&download=false"
-  style="position:fixed;bottom:0;right:0;width:1px;height:1px;border:0;opacity:0.01"></iframe>
+<!-- SC widget container — fresh iframe created here per track -->
+<div id="sc-widget-wrap" style="position:fixed;bottom:0;right:0;width:1px;height:1px;overflow:hidden"></div>
 
 <audio id="mp-audio"></audio>
 <script src="https://w.soundcloud.com/player/api.js"></script>
@@ -718,22 +715,19 @@ audio.addEventListener("ended", () => {
 
 audio.volume = 0.8;
 
-// ── SC Widget initialization ──────────────────────────────────────────────────
-(function initWidget() {
-  if (typeof SC === "undefined") return;
-  const iframe = document.getElementById("sc-widget");
-  if (!iframe) return;
-  widget = SC.Widget(iframe);
-
-  widget.bind(SC.Widget.Events.PLAY_PROGRESS, function (e) {
+// ── SC Widget helpers ─────────────────────────────────────────────────────────
+function bindWidget(w) {
+  w.bind(SC.Widget.Events.READY, function () {
     if (!widgetMode) return;
-    // Use PLAY_PROGRESS as a reliable signal that audio is actually running
-    if (elPlayPause.disabled) {
-      setQuality("full", "● Full Song");
-      elPlayPause.disabled = false;
-    }
-    const pos = e.currentPosition;
-    const dur = e.duration;
+    setQuality("full", "● Full Song");
+    elPlayPause.disabled = false;
+    w.getDuration(function (d) { if (d > 0) elTotal.textContent = fmt(d); });
+  });
+
+  w.bind(SC.Widget.Events.PLAY_PROGRESS, function (e) {
+    if (!widgetMode) return;
+    if (elPlayPause.disabled) { setQuality("full", "● Full Song"); elPlayPause.disabled = false; }
+    const pos = e.currentPosition, dur = e.duration;
     if (!dur) return;
     const pct = Math.min(100, (pos / dur) * 100);
     elBarFill.style.width = pct + "%";
@@ -741,34 +735,48 @@ audio.volume = 0.8;
     elTime.textContent = fmt(pos);
   });
 
-  widget.bind(SC.Widget.Events.FINISH, function () {
-    if (!widgetMode) return;
-    if (repeat === "one") {
-      widget.seekTo(0);
-      widget.play();
-      return;
-    }
-    playNext();
-  });
-
-  widget.bind(SC.Widget.Events.PLAY, function () {
+  w.bind(SC.Widget.Events.PLAY, function () {
     if (!widgetMode) return;
     setPlayState(true);
-    // Also unlock UI here in case READY didn't fire
     if (elPlayPause.disabled) {
       setQuality("full", "● Full Song");
       elPlayPause.disabled = false;
-      widget.getDuration(function (d) { if (d > 0) elTotal.textContent = fmt(d); });
+      w.getDuration(function (d) { if (d > 0) elTotal.textContent = fmt(d); });
     }
   });
-  widget.bind(SC.Widget.Events.PAUSE, function () { if (widgetMode) setPlayState(false); });
 
-  widget.bind(SC.Widget.Events.ERROR, function () {
+  w.bind(SC.Widget.Events.PAUSE, function () { if (widgetMode) setPlayState(false); });
+
+  w.bind(SC.Widget.Events.FINISH, function () {
+    if (!widgetMode) return;
+    if (repeat === "one") { w.seekTo(0); w.play(); return; }
+    playNext();
+  });
+
+  w.bind(SC.Widget.Events.ERROR, function () {
     if (!widgetMode) return;
     setQuality("preview", "✕ Failed to load");
     elPlayPause.disabled = false;
   });
-})();
+}
+
+function makeFreshWidget(sourceUrl) {
+  // Replace the widget iframe entirely so we get a clean READY event every time
+  const container = document.getElementById("sc-widget-wrap");
+  container.innerHTML = "";
+  const iframe = document.createElement("iframe");
+  iframe.allow = "autoplay";
+  iframe.style.cssText = "position:absolute;inset:0;width:1px;height:1px;border:0;opacity:0.01";
+  const src = "https://w.soundcloud.com/player/?url=" + encodeURIComponent(sourceUrl)
+    + "&auto_play=true&hide_related=true&show_comments=false&show_user=false"
+    + "&show_reposts=false&show_teaser=false&visual=false&buying=false&sharing=false&download=false";
+  iframe.src = src;
+  container.appendChild(iframe);
+  if (typeof SC === "undefined") return null;
+  const w = SC.Widget(iframe);
+  bindWidget(w);
+  return w;
+}
 
 // ── Progress bar seek ─────────────────────────────────────────────────────────
 elBarOuter.addEventListener("click", (e) => {
@@ -843,33 +851,18 @@ function loadTrack(track) {
   audio.src = "";
   widgetMode = true;
 
-  if (!widget) {
-    setQuality("preview", "✕ Player unavailable");
+  if (!track.sourceUrl) {
+    setQuality("preview", "✕ No source URL");
     elPlayPause.disabled = false;
     return;
   }
 
-  // READY is one-shot (callback array cleared after each fire) — rebind before every load
-  widget.bind(SC.Widget.Events.READY, function () {
-    setQuality("full", "● Full Song");
+  // Create a fresh iframe + widget for every track — avoids widget.load() postMessage issues
+  widget = makeFreshWidget(track.sourceUrl);
+  if (!widget) {
+    setQuality("preview", "✕ Player unavailable");
     elPlayPause.disabled = false;
-    widget.getDuration(function (d) { if (d > 0) elTotal.textContent = fmt(d); });
-  });
-
-  setQuality("loading", `⏳ src=${track.sourceUrl ? "ok" : "MISSING"} w=${widget ? "ok" : "NULL"}`);
-
-  // Load the track into the SC Widget — it handles auth, DRM, and CDN internally
-  widget.load(track.sourceUrl, {
-    auto_play: true,
-    hide_related: true,
-    show_comments: false,
-    show_user: false,
-    show_reposts: false,
-    show_teaser: false,
-    buying: false,
-    sharing: false,
-    download: false,
-  });
+  }
 }
 
 // ── Playback controls ─────────────────────────────────────────────────────────
