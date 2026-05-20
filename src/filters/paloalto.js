@@ -192,10 +192,19 @@ async function query(url) {
   return res.text();
 }
 
-// Warm up session at startup so the first real query doesn't pay login latency
-loginInProgress = login().finally(() => { loginInProgress = null; });
+// Warm up session at startup so the first real query doesn't pay login latency.
+// Skip if credentials aren't configured (e.g. local dev environment).
+if (process.env.PAN_USERNAME && process.env.PAN_PASSWORD && process.env.PAN_TOTP_SECRET) {
+  loginInProgress = login().finally(() => { loginInProgress = null; });
+} else {
+  console.warn("[paloalto] credentials not set — filter disabled (local dev mode)");
+}
 
 export async function paloalto(url) {
+  // If credentials aren't configured, skip filter (local dev)
+  if (!process.env.PAN_USERNAME || !process.env.PAN_PASSWORD || !process.env.PAN_TOTP_SECRET) {
+    return null;
+  }
   // Wait for in-progress login (startup or refresh) before querying
   if (loginInProgress) await loginInProgress;
   if (!session.id) {
