@@ -20,6 +20,8 @@ import SoundCloud from "soundcloud-scraper";
 const publicPath        = fileURLToPath(new URL("../public/", import.meta.url));
 const tokensPath        = fileURLToPath(new URL("../tokens.json", import.meta.url));
 const betaFeaturesPath  = fileURLToPath(new URL("../beta-features.json", import.meta.url));
+const ytCookiesPath     = fileURLToPath(new URL("../yt-cookies.txt", import.meta.url));
+const linksPath         = fileURLToPath(new URL("../bot/links.json", import.meta.url));
 const bareAsModule3Path = fileURLToPath(
   new URL("../node_modules/@mercuryworkshop/bare-as-module3/dist/", import.meta.url)
 );
@@ -91,11 +93,18 @@ const bareServer = createBareServer("/bare/", {
 
 const fastify = Fastify({
   bodyLimit: 1048576,
+  connectionTimeout: 90000, // allow yt-dlp up to ~30s + streaming time
   serverFactory: (handler) => {
     return createServer()
       .on("request", (req, res) => {
-        res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-        res.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
+        // music pages need the SoundCloud widget iframe to work:
+        //  - no COEP: widget loads with user's SC cookies (not stripped as credentialless)
+        //  - no COOP: keeps parent + widget in the same browsing-context group so
+        //    postMessage (SC.Widget API) can cross the iframe boundary
+        if (!req.url.startsWith("/music")) {
+          res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+          res.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
+        }
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "SAMEORIGIN");
         res.setHeader("Referrer-Policy", "no-referrer");
@@ -161,7 +170,12 @@ fastify.get("/", (req, reply) => {
   const cookies = req.headers.cookie || "";
   const hasCookie = cookies.includes("v_ok=1");
   const isPoisoned = cookies.includes("v_poison=1");
-  const isDesktop = /Windows NT|Macintosh/.test(ua);
+  // iPhone/iPad/iPod must never hit the decoy.
+  // The iOS Screen Time bypass WKWebView spoofs a Macintosh UA, but iOS always
+  // uses "Intel Mac OS X 10_15_7" (Catalina) as the fake macOS version —
+  // real modern Macs run 12–15, not 10.15. Use that as the iOS tell.
+  const isAppleMobile = /iPhone|iPad|iPod|Intel Mac OS X 10_15_7/.test(ua);
+  const isDesktop = !isAppleMobile && /Windows NT|Macintosh/.test(ua);
   const isChromebook = /CrOS/.test(ua);
 
   // Poisoned: student activated panic mode — clear everything and redirect to Google Classroom
@@ -183,6 +197,11 @@ fastify.get("/", (req, reply) => {
   // Set the access cookie and serve Veil directly
   reply.header("Set-Cookie", "v_ok=1; Max-Age=31536000; Path=/; SameSite=Lax");
   return reply.type("text/html").sendFile("index.html");
+});
+
+// ── GET /ua — debug: returns the raw user-agent string (remove after debugging)
+fastify.get("/ua", (req, reply) => {
+  return reply.type("text/plain").send(req.headers["user-agent"] || "(none)");
 });
 
 // ── GET /go — proxy / unblocker ───────────────────────────────────────────────
@@ -292,6 +311,24 @@ fastify.options("/api/music/*", (_req, reply) => {
        .header("Access-Control-Allow-Methods", "GET, OPTIONS")
        .header("Access-Control-Allow-Headers", "Content-Type, Range")
        .code(204).send();
+});
+
+// Cookie upload — admin only (requires X-Admin-Key header matching ADMIN_KEY env var)
+fastify.addContentTypeParser("text/plain", { parseAs: "string" }, (_req, body, done) => done(null, body));
+fastify.post("/api/music/yt-cookies", async (req, reply) => {
+  const key = req.headers["x-admin-key"];
+  if (!key || key !== process.env.ADMIN_KEY) return reply.status(401).send({ error: "Unauthorized" });
+  const body = typeof req.body === "string" ? req.body : "";
+  if (!body.includes("youtube.com") && !body.includes("# Netscape")) {
+    return reply.status(400).send({ error: "Doesn't look like a YouTube Netscape cookies file" });
+  }
+  // Normalize: parse then re-serialize so dot-prefix fix is applied before saving.
+  const parsed = parseNetscapeCookies(body);
+  writeFileSync(ytCookiesPath, netscapeFromParsed(parsed));
+  await refreshYtCookies(); // extend session immediately
+  const count = parsed.length;
+  console.log(`[yt-cookies] uploaded ${count} cookies via admin`);
+  reply.send({ ok: true, cookies: count });
 });
 
 // Music: search SoundCloud via direct API (avoids soundcloud-scraper HTML parsing)
@@ -427,23 +464,115 @@ async function ytSearch(query) {
   return null;
 }
 
-// Resolve a direct audio URL from a YouTube video ID via yt-dlp
-const YT_COOKIES = process.env.YTCOOKIES_PATH || "";
-function ytDirectUrl(videoId, timeoutMs = 12000) {
-  const args = ["--no-playlist", "--js-runtimes", "node:/usr/bin/node",
-    "-f", "bestaudio[ext=m4a]/bestaudio", "--get-url",
-    `https://www.youtube.com/watch?v=${videoId}`];
-  if (YT_COOKIES) args.splice(1, 0, "--cookies", YT_COOKIES);
-  return new Promise((resolve) => {
-    execFile("yt-dlp", args, { timeout: timeoutMs },
-      (err, stdout) => resolve(err ? null : stdout.trim().split("\n")[0] || null));
-  });
+// ── YouTube cookie management ─────────────────────────────────────────────────
+// Cookies are stored in yt-cookies.txt (Netscape format).
+// They're uploaded once via /api/music/yt-cookies and kept alive by a daily
+// refresh that visits youtube.com with the existing session.
+
+function parseNetscapeCookies(text) {
+  return text.split("\n").filter(l => l && !l.startsWith("#")).map(l => {
+    const p = l.replace(/^#HttpOnly_/, "").split("\t");
+    if (p.length < 7) return null;
+    // Netscape format requires domain to start with a dot; yt-dlp rejects the
+    // entire file if any domain is missing it — auto-correct on parse.
+    const domain = p[0].startsWith(".") ? p[0] : "." + p[0];
+    return { domain, path: p[2], secure: p[3] === "TRUE", expires: parseInt(p[4]) || 0, name: p[5], value: p[6].trim() };
+  }).filter(Boolean);
 }
+
+function netscapeFromParsed(cookies) {
+  return "# Netscape HTTP Cookie File\n" + cookies.map(c =>
+    `${c.domain}\tTRUE\t${c.path}\t${c.secure ? "TRUE" : "FALSE"}\t${c.expires}\t${c.name}\t${c.value}`
+  ).join("\n") + "\n";
+}
+
+async function refreshYtCookies() {
+  if (!existsSync(ytCookiesPath)) return;
+  try {
+    const cookies = parseNetscapeCookies(readFileSync(ytCookiesPath, "utf8"));
+    if (!cookies.length) return;
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join("; ");
+    const res = await fetch("https://www.youtube.com/", {
+      headers: {
+        "Cookie": cookieHeader,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xhtml+xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    const setCookies = res.headers.getSetCookie?.() ?? [];
+    if (setCookies.length) {
+      const updated = new Map(cookies.map(c => [c.name, c]));
+      for (const raw of setCookies) {
+        const [nameVal, ...attrs] = raw.split(";");
+        const [name, ...vParts] = nameVal.trim().split("=");
+        const value = vParts.join("=");
+        const expiresAttr = attrs.find(a => a.trim().toLowerCase().startsWith("expires="));
+        const expires = expiresAttr
+          ? Math.floor(new Date(expiresAttr.split("=")[1]).getTime() / 1000)
+          : Math.floor(Date.now() / 1000) + 86400 * 365;
+        if (updated.has(name)) updated.set(name, { ...updated.get(name), value, expires });
+        else updated.set(name, { domain: ".youtube.com", path: "/", secure: true, expires, name, value });
+      }
+      writeFileSync(ytCookiesPath, netscapeFromParsed([...updated.values()]));
+      console.log(`[yt-cookies] refreshed ${setCookies.length} cookies`);
+    } else {
+      console.log("[yt-cookies] session still valid, no updates");
+    }
+  } catch (e) {
+    console.error("[yt-cookies] refresh error:", e.message);
+  }
+}
+
+// Refresh on startup then every 24 hours
+refreshYtCookies();
+setInterval(refreshYtCookies, 24 * 60 * 60 * 1000);
+
+// AUTH_ERR patterns from yt-dlp stderr that mean cookies are invalid/expired
+const YT_AUTH_ERRS = ["sign in", "bot", "login required", "private video", "confirm you're not"];
+
+function ytDlpAuthFailed(stderr) {
+  const s = stderr.toLowerCase();
+  return YT_AUTH_ERRS.some(p => s.includes(p));
+}
+
+// Resolve a direct audio URL from a YouTube video ID via yt-dlp.
+// Tries with cookies first; if yt-dlp signals an auth error it retries without
+// cookies (the ANDROID_VR client works cookie-free from EC2).
+async function ytDirectUrl(videoId, timeoutMs = 12000) {
+  const hasCookies = existsSync(ytCookiesPath);
+
+  const run = (useCookies) => new Promise((resolve) => {
+    const args = ["--no-playlist", "--js-runtimes", `node:${process.execPath}`,
+      "-f", "bestaudio[ext=m4a]/bestaudio", "--get-url",
+      `https://www.youtube.com/watch?v=${videoId}`];
+    if (useCookies) args.splice(1, 0, "--cookies", ytCookiesPath);
+    let stderr = "";
+    const proc = execFile("yt-dlp", args, { timeout: timeoutMs }, (err, stdout) => {
+      resolve({ url: err ? null : stdout.trim().split("\n")[0] || null, stderr });
+    });
+    proc.stderr?.on("data", d => { stderr += d; });
+  });
+
+  const first = await run(hasCookies);
+  if (first.url) return first.url;
+
+  // If cookies caused an auth error, retry without them and trigger a refresh
+  if (hasCookies && ytDlpAuthFailed(first.stderr)) {
+    console.warn("[yt-dlp] cookies rejected — retrying without cookies and refreshing");
+    refreshYtCookies().catch(() => {});
+    const retry = await run(false);
+    return retry.url;
+  }
+  return null;
+}
+
 function ytPipeStream(videoId) {
-  const args = ["--no-playlist", "--js-runtimes", "node:/usr/bin/node",
+  const hasCookies = existsSync(ytCookiesPath);
+  const args = ["--no-playlist", "--js-runtimes", `node:${process.execPath}`,
     "-f", "bestaudio[ext=m4a]/bestaudio", "-o", "-",
     `https://www.youtube.com/watch?v=${videoId}`];
-  if (YT_COOKIES) args.splice(1, 0, "--cookies", YT_COOKIES);
+  if (hasCookies) args.splice(1, 0, "--cookies", ytCookiesPath);
   return spawn("yt-dlp", args);
 }
 
@@ -570,17 +699,9 @@ fastify.get("/api/music/sc-transcoding", async (req, reply) => {
     const streamRes = await fetch(progressive.url, { headers: auth });
 
     if (!streamRes.ok) {
-      // Progressive stream unavailable (DRM-protected MONETIZE) — search YouTube via Invidious
-      const title  = track.title ?? "";
-      const artist = track.user?.username ?? "";
-      const query  = `${title} ${artist}`.trim();
-      console.log(`[sc-transcoding] progressive 404 for "${query}", searching YouTube`);
-      const ytResult = await ytFallbackSearch(query);
-      if (ytResult) {
-        console.log(`[sc-transcoding] Invidious match: ${ytResult.title} (${ytResult.videoId})`);
-        return reply.send({ ytVideoId: ytResult.videoId, ytTitle: ytResult.title });
-      }
-      return reply.status(streamRes.status).send({ error: "Stream unavailable" });
+      // Progressive stream unavailable (MONETIZE track) — use SoundCloud widget player client-side
+      console.log(`[sc-transcoding] DRM/MONETIZE track: "${track.title}"`);
+      return reply.send({ isDrm: true });
     }
 
     const { url: cdnUrl } = await streamRes.json();
@@ -634,6 +755,241 @@ fastify.get("/api/music/yt-proxy", async (req, reply) => {
   ffmpeg.on("error", err => console.error("[yt-proxy] ffmpeg:", err.message));
   return reply.send(ffmpeg.stdout);
 });
+
+// ── YouTube Video (Tube) ──────────────────────────────────────────────────────
+
+// Parse a "M:SS" or "H:MM:SS" duration string into total seconds (null if unparseable)
+function parseDurSec(str) {
+  if (!str) return null;
+  const p = str.split(":").map(Number);
+  if (p.some(isNaN)) return null;
+  if (p.length === 2) return p[0] * 60 + p[1];
+  if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+  return null;
+}
+
+// Detect whether an InnerTube videoRenderer is a YouTube Short.
+// Primary: reelWatchEndpoint present (most reliable).
+// Fallback: duration ≤ 60 s and no lengthText at all (Shorts often omit it).
+function detectIsShort(v) {
+  if (v?.navigationEndpoint?.reelWatchEndpoint) return true;
+  const secs = parseDurSec(v?.lengthText?.simpleText);
+  if (secs !== null && secs <= 60) return true;
+  return false;
+}
+
+// Build a normalised video object from a videoRenderer node
+function buildVideoResult(v) {
+  if (!v?.videoId) return null;
+  const thumbs = v.thumbnail?.thumbnails ?? [];
+  let thumb = thumbs[thumbs.length - 1]?.url
+    || `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
+  if (thumb.startsWith("//")) thumb = "https:" + thumb;
+  return {
+    id:       v.videoId,
+    title:    v.title?.runs?.[0]?.text ?? v.title?.simpleText ?? "",
+    channel:  v.ownerText?.runs?.[0]?.text ?? v.shortBylineText?.runs?.[0]?.text ?? "",
+    duration: v.lengthText?.simpleText ?? "",
+    views:    v.shortViewCountText?.simpleText ?? "",
+    thumb,
+    isShort:  detectIsShort(v),
+  };
+}
+
+// Search YouTube InnerTube API, return up to `limit` full video results
+async function ytSearchVideos(query, limit = 16) {
+  try {
+    const res = await fetch("https://www.youtube.com/youtubei/v1/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        context: { client: { clientName: "WEB", clientVersion: "2.20240101" } },
+      }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const items = data?.contents?.twoColumnSearchResultsRenderer
+      ?.primaryContents?.sectionListRenderer?.contents?.[0]
+      ?.itemSectionRenderer?.contents ?? [];
+    const results = [];
+    for (const item of items) {
+      const r = buildVideoResult(item?.videoRenderer);
+      if (!r) continue;
+      results.push(r);
+      if (results.length >= limit) break;
+    }
+    return results;
+  } catch { return []; }
+}
+
+// Get direct video URL via yt-dlp, cached 4 min so range requests don't re-run yt-dlp.
+// Format 18 = 360p progressive MP4 (combined video+audio, direct https, seekable).
+// It's the only YouTube format that doesn't require ffmpeg merging or HLS.js.
+async function ytDirectVideoUrl(videoId) {
+  const hasCookies = existsSync(ytCookiesPath);
+  return new Promise((resolve) => {
+    const args = ["--no-playlist", "--js-runtimes", `node:${process.execPath}`,
+      "-f", "18/best[ext=mp4][protocol=https][vcodec!=none][acodec!=none]",
+      "--get-url", `https://www.youtube.com/watch?v=${videoId}`];
+    if (hasCookies) args.splice(1, 0, "--cookies", ytCookiesPath);
+    execFile("yt-dlp", args, { timeout: 20000 }, (err, stdout) =>
+      resolve(err ? null : stdout.trim().split("\n")[0] || null)
+    );
+  });
+}
+const ytVideoUrlCache   = new Map(); // videoId → { url, expiresAt }
+const ytVideoUrlPending = new Map(); // videoId → Promise<string|null>  (dedup)
+async function getCachedYtVideoUrl(videoId) {
+  const hit = ytVideoUrlCache.get(videoId);
+  if (hit && hit.expiresAt > Date.now()) return hit.url;
+  // Deduplicate: if yt-dlp is already running for this ID, wait for it
+  if (ytVideoUrlPending.has(videoId)) return ytVideoUrlPending.get(videoId);
+  const promise = ytDirectVideoUrl(videoId).then(url => {
+    ytVideoUrlPending.delete(videoId);
+    if (url) ytVideoUrlCache.set(videoId, { url, expiresAt: Date.now() + 4 * 60 * 1000 });
+    return url || null;
+  });
+  ytVideoUrlPending.set(videoId, promise);
+  return promise;
+}
+
+// Pre-warm: resolve + cache the URL without streaming any video bytes.
+// Client calls this first so the proxy endpoint has an instant cache hit.
+fastify.get("/api/video/ready", async (req, reply) => {
+  const videoId = String(req.query.id || "").trim();
+  if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) return reply.send({ ok: false });
+  const url = await getCachedYtVideoUrl(videoId);
+  return reply.send({ ok: !!url });
+});
+
+fastify.get("/api/video/search", async (req, reply) => {
+  const q = String(req.query.q || "").trim();
+  if (!q) return reply.status(400).send({ error: "missing q" });
+  const results = await ytSearchVideos(q);
+  return reply.send(results);
+});
+
+// Fetch YouTube trending full-length videos (Shorts filtered out)
+async function ytTrending(limit = 24) {
+  try {
+    const res = await fetch("https://www.youtube.com/youtubei/v1/browse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        browseId: "FEtrending",
+        context: { client: { clientName: "WEB", clientVersion: "2.20240101" } },
+      }),
+    });
+    if (!res.ok) throw new Error("browse failed");
+    const data = await res.json();
+    const gridItems = data?.contents?.twoColumnBrowseResultsRenderer
+      ?.tabs?.[0]?.tabRenderer?.content?.richGridRenderer?.contents ?? [];
+    const results = [];
+    function tryAdd(v) {
+      if (results.length >= limit) return;
+      const r = buildVideoResult(v);
+      if (r && !r.isShort) results.push(r); // skip Shorts in the home grid
+    }
+    for (const item of gridItems) {
+      if (results.length >= limit) break;
+      tryAdd(item?.richItemRenderer?.content?.videoRenderer);
+      const shelf = item?.richSectionRenderer?.content?.richShelfRenderer?.contents ?? [];
+      for (const si of shelf) {
+        if (results.length >= limit) break;
+        tryAdd(si?.richItemRenderer?.content?.videoRenderer);
+      }
+    }
+    if (results.length >= 8) return results;
+  } catch { /* fall through */ }
+  // Fallback: search for popular content, exclude Shorts
+  const all = await ytSearchVideos("trending 2025", limit * 2);
+  return all.filter(r => !r.isShort).slice(0, limit);
+}
+
+fastify.get("/api/video/trending", async (_req, reply) => {
+  return reply.send(await ytTrending(24));
+});
+
+// Fetch YouTube Shorts feed via FEshorts browse, falls back to search
+async function ytShortsFeed(limit = 20) {
+  try {
+    const res = await fetch("https://www.youtube.com/youtubei/v1/browse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        browseId: "FEshorts",
+        context: { client: { clientName: "WEB", clientVersion: "2.20240101" } },
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      // FEshorts uses reelItemRenderer inside a richGridRenderer
+      const items = data?.contents?.richGridRenderer?.contents ?? [];
+      const results = [];
+      for (const item of items) {
+        if (results.length >= limit) break;
+        const reel = item?.richItemRenderer?.content?.reelItemRenderer;
+        if (!reel?.videoId) continue;
+        const thumbs = reel.thumbnail?.thumbnails ?? [];
+        let thumb = thumbs[thumbs.length - 1]?.url
+          || `https://i.ytimg.com/vi/${reel.videoId}/hqdefault.jpg`;
+        if (thumb.startsWith("//")) thumb = "https:" + thumb;
+        results.push({
+          id:      reel.videoId,
+          title:   reel.headline?.simpleText ?? reel.headline?.runs?.[0]?.text ?? "",
+          channel: reel.ownerText?.runs?.[0]?.text ?? "",
+          duration: "",
+          views:   reel.viewCountText?.simpleText ?? "",
+          thumb,
+          isShort: true,
+        });
+      }
+      if (results.length >= 5) return results;
+    }
+  } catch { /* fall through */ }
+  // Fallback: search for #shorts and keep only actual Shorts
+  const all = await ytSearchVideos("#shorts", limit * 2);
+  const shorts = all.filter(r => r.isShort);
+  if (shorts.length >= 5) return shorts.slice(0, limit);
+  // Last resort: tag everything as short and return
+  return all.slice(0, limit).map(r => ({ ...r, isShort: true }));
+}
+
+fastify.get("/api/video/shorts", async (req, reply) => {
+  const q = String(req.query.q || "").trim();
+  if (q) {
+    // Preference-targeted search: find Shorts matching a channel or keyword
+    const all = await ytSearchVideos(`${q} #shorts`, 30);
+    const shorts = all.filter(r => r.isShort);
+    return reply.send(shorts.length >= 3 ? shorts : all.slice(0, 20).map(r => ({ ...r, isShort: true })));
+  }
+  return reply.send(await ytShortsFeed(20));
+});
+
+fastify.get("/api/video/proxy", async (req, reply) => {
+  const videoId = String(req.query.id || "").trim();
+  if (!/^[A-Za-z0-9_-]{11}$/.test(videoId))
+    return reply.status(400).send({ error: "Invalid video ID" });
+  const videoUrl = await getCachedYtVideoUrl(videoId);
+  if (!videoUrl) return reply.status(503).send({ error: "yt-dlp failed" });
+  const upstreamHeaders = { "User-Agent": "Mozilla/5.0" };
+  if (req.headers.range) upstreamHeaders["range"] = req.headers.range;
+  try {
+    const upstream = await fetch(videoUrl, { headers: upstreamHeaders });
+    reply.status(req.headers.range ? upstream.status : 200);
+    reply.header("Content-Type", upstream.headers.get("content-type") || "video/mp4");
+    const cl = upstream.headers.get("content-length");
+    if (cl) reply.header("Content-Length", cl);
+    const cr = upstream.headers.get("content-range");
+    if (cr) reply.header("Content-Range", cr);
+    reply.header("Accept-Ranges", "bytes");
+    reply.header("Cache-Control", "no-store");
+    return reply.send(Readable.fromWeb(upstream.body));
+  } catch { return reply.status(500).send({ error: "proxy failed" }); }
+});
+
+fastify.get("/tube", (_req, reply) => reply.type("text/html").sendFile("tube.html"));
 
 // SoundCloud CDN audio proxy — proxies audio from a signed sndcdn.com CDN URL.
 // The URL is resolved client-side (browser IP) then passed here for proxying.
@@ -1308,6 +1664,153 @@ fastify.post("/api/premium-claim", async (req, reply) => {
 
   return reply.send({ ok: true });
 });
+
+// ── Discord OAuth2 + Member Links ─────────────────────────────────────────────
+const DISCORD_CLIENT_ID     = process.env.DISCORD_CLIENT_ID     || "";
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || "";
+const DISCORD_GUILD_ID      = process.env.DISCORD_GUILD_ID      || "";
+const SESSION_SECRET        = process.env.SESSION_SECRET        || randomBytes(32).toString("hex");
+const SESS_COOKIE           = "veil_sess";
+const SESS_TTL_MS           = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+function signSession(payload) {
+  const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const sig  = createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+  return `${data}.${sig}`;
+}
+
+function verifySession(token) {
+  if (!token || typeof token !== "string") return null;
+  const dot = token.lastIndexOf(".");
+  if (dot < 0) return null;
+  const data = token.slice(0, dot);
+  const sig  = token.slice(dot + 1);
+  const expected = createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+  try { if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null; } catch { return null; }
+  try {
+    const payload = JSON.parse(Buffer.from(data, "base64url").toString());
+    if (!payload.exp || Date.now() > payload.exp) return null;
+    return payload;
+  } catch { return null; }
+}
+
+function getSession(req) {
+  const raw = req.headers.cookie || "";
+  for (const part of raw.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq < 0) continue;
+    if (part.slice(0, eq).trim() === SESS_COOKIE) return verifySession(decodeURIComponent(part.slice(eq + 1).trim()));
+  }
+  return null;
+}
+
+function readLinks() {
+  try { return JSON.parse(readFileSync(linksPath, "utf8")); } catch { return []; }
+}
+
+// GET /auth/discord — start OAuth flow
+fastify.get("/auth/discord", (_req, reply) => {
+  if (!DISCORD_CLIENT_ID) return reply.code(503).send("Discord OAuth not configured");
+  const base     = (process.env.SERVER_URL || "http://localhost:8080").replace(/\/$/, "");
+  const redirect = encodeURIComponent(`${base}/auth/discord/callback`);
+  const scope    = encodeURIComponent("identify guilds");
+  reply.redirect(`https://discord.com/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${redirect}&response_type=code&scope=${scope}`);
+});
+
+// GET /auth/discord/callback — exchange code, verify guild, set session
+fastify.get("/auth/discord/callback", async (req, reply) => {
+  const { code } = req.query ?? {};
+  if (!code) return reply.code(400).send("Missing code");
+  if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET)
+    return reply.code(503).send("Discord OAuth not configured");
+
+  const base     = (process.env.SERVER_URL || "http://localhost:8080").replace(/\/$/, "");
+  const redirect = `${base}/auth/discord/callback`;
+
+  // Exchange code for access token
+  let tokenData;
+  try {
+    const res = await fetch("https://discord.com/api/v10/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id:     DISCORD_CLIENT_ID,
+        client_secret: DISCORD_CLIENT_SECRET,
+        grant_type:    "authorization_code",
+        code,
+        redirect_uri:  redirect,
+      }),
+    });
+    tokenData = await res.json();
+  } catch (e) {
+    console.error("[discord-oauth] token exchange failed:", e.message);
+    return reply.redirect("/links?error=token");
+  }
+  if (!tokenData.access_token) return reply.redirect("/links?error=token");
+
+  const authHeader = { "Authorization": `Bearer ${tokenData.access_token}` };
+
+  // Fetch user info
+  let user;
+  try {
+    const res = await fetch("https://discord.com/api/v10/users/@me", { headers: authHeader });
+    user = await res.json();
+  } catch { return reply.redirect("/links?error=user"); }
+  if (!user?.id) return reply.redirect("/links?error=user");
+
+  // Check guild membership
+  let inGuild = false;
+  if (DISCORD_GUILD_ID) {
+    try {
+      const res    = await fetch("https://discord.com/api/v10/users/@me/guilds", { headers: authHeader });
+      const guilds = await res.json();
+      inGuild = Array.isArray(guilds) && guilds.some(g => g.id === DISCORD_GUILD_ID);
+    } catch { /* treat as not in guild */ }
+  } else {
+    inGuild = true; // no guild configured — allow all authenticated users
+  }
+
+  if (!inGuild) return reply.redirect("/links?error=notmember");
+
+  const payload = {
+    uid:      user.id,
+    username: user.username,
+    avatar:   user.avatar,
+    exp:      Date.now() + SESS_TTL_MS,
+  };
+  const token = signSession(payload);
+  const maxAge = Math.floor(SESS_TTL_MS / 1000);
+  reply
+    .header("Set-Cookie", `${SESS_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax`)
+    .redirect("/links");
+});
+
+// GET /auth/logout
+fastify.get("/auth/logout", (_req, reply) => {
+  reply
+    .header("Set-Cookie", `${SESS_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`)
+    .redirect("/links");
+});
+
+// GET /auth/status — returns session info for frontend
+fastify.get("/auth/status", (req, reply) => {
+  const sess = getSession(req);
+  if (!sess) return reply.send({ member: false });
+  return reply.send({ member: true, uid: sess.uid, username: sess.username, avatar: sess.avatar });
+});
+
+// GET /links page
+fastify.get("/links", (_req, reply) =>
+  reply.type("text/html").sendFile("links.html")
+);
+
+// GET /api/links — return links list (members only)
+fastify.get("/api/links", (req, reply) => {
+  const sess = getSession(req);
+  if (!sess) return reply.code(401).send({ error: "Login with Discord to view links." });
+  return reply.send(readLinks());
+});
+
 
 fastify.setNotFoundHandler((_req, reply) => {
   return reply.code(404).type("text/html").sendFile("404.html");

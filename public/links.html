@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Veil — Member Links</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="stylesheet" href="/vars.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Nav ─────────────────────────────────────────────────────────── */
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(14,14,30,0.85);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-logo {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: -0.3px;
+    }
+    .nav-logo span { color: var(--accent-light); }
+    .nav-sep { flex: 1; }
+    .nav-user {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .nav-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+    .nav-username { color: var(--text); font-weight: 500; }
+    .nav-logout {
+      font-size: 12px;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      text-decoration: none;
+    }
+    .nav-logout:hover { color: var(--text); border-color: var(--muted); }
+
+    /* ── Page layout ─────────────────────────────────────────────────── */
+    .page {
+      flex: 1;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 36px 24px 60px;
+    }
+
+    /* ── Login gate ──────────────────────────────────────────────────── */
+    #login-gate {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      text-align: center;
+      gap: 20px;
+    }
+    .gate-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .gate-title { font-size: 22px; font-weight: 700; color: var(--text); }
+    .gate-sub {
+      font-size: 14px;
+      color: var(--muted);
+      max-width: 340px;
+      line-height: 1.55;
+    }
+    .btn-discord {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: #5865F2;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 11px 22px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-discord:hover { background: #4752c4; }
+    .btn-discord:active { transform: scale(0.97); }
+    .error-badge {
+      background: rgba(248,113,113,0.12);
+      border: 1px solid rgba(248,113,113,0.3);
+      color: #f87171;
+      border-radius: 8px;
+      padding: 9px 16px;
+      font-size: 13px;
+      display: none;
+    }
+    .error-badge.show { display: block; }
+
+    /* ── Links view ──────────────────────────────────────────────────── */
+    #links-view { display: none; }
+
+    .links-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .links-title { font-size: 20px; font-weight: 700; color: var(--text); }
+    .links-count {
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 2px 9px;
+    }
+
+    /* ── Search + filter bar ─────────────────────────────────────────── */
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .search-wrap {
+      flex: 1;
+      min-width: 200px;
+      position: relative;
+    }
+    .search-wrap svg {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      padding: 9px 12px 9px 36px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .search-input::placeholder { color: var(--muted); }
+    .search-input:focus { border-color: var(--accent); }
+
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 13px;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      white-space: nowrap;
+    }
+    .pill:hover { color: var(--text); border-color: var(--muted); }
+    .pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── Grid ────────────────────────────────────────────────────────── */
+    .links-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 12px;
+    }
+
+    .link-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .link-card:hover { border-color: var(--accent); background: var(--surface2); }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .card-favicon {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .card-favicon img { width: 16px; height: 16px; }
+    .card-info { flex: 1; min-width: 0; }
+    .card-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-url {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+    .type-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .type-full    { background: rgba(99,102,241,0.18); color: var(--accent-light); }
+    .type-static  { background: rgba(34,197,94,0.15);  color: #4ade80; }
+
+    /* ── Filter tags ──────────────────────────────────────────────────── */
+    .filter-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .ftag {
+      font-size: 10px;
+      font-weight: 500;
+      background: rgba(99,102,241,0.1);
+      border: 1px solid rgba(99,102,241,0.2);
+      color: var(--accent-lighter);
+      border-radius: 4px;
+      padding: 2px 6px;
+      white-space: nowrap;
+    }
+    .ftag-more {
+      font-size: 10px;
+      color: var(--accent-light);
+      padding: 2px 6px;
+      align-self: center;
+      cursor: pointer;
+      border-radius: 4px;
+      border: 1px solid rgba(99,102,241,0.3);
+      background: rgba(99,102,241,0.08);
+      white-space: nowrap;
+      transition: background 0.12s, color 0.12s;
+    }
+    .ftag-more:hover { background: rgba(99,102,241,0.18); color: var(--accent-lighter); }
+    .no-filters {
+      font-size: 11px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* ── Card actions ─────────────────────────────────────────────────── */
+    .card-actions { display: flex; gap: 6px; }
+    .card-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 7px 10px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: color 0.12s, border-color 0.12s;
+    }
+    .card-btn:hover { color: var(--text); border-color: var(--muted); }
+    .card-btn.copied { color: #34d399; border-color: #34d399; }
+    .card-btn.open-btn:hover { color: var(--accent-light); border-color: var(--accent); }
+
+    /* ── Submitter ────────────────────────────────────────────────────── */
+    .card-meta {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* ── Empty state ──────────────────────────────────────────────────── */
+    .empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .empty svg { margin-bottom: 12px; opacity: 0.4; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-logo" href="/"><span>Veil</span></a>
+  <div class="nav-sep"></div>
+  <div class="nav-user" id="nav-user" style="display:none">
+    <img class="nav-avatar" id="nav-avatar" src="" alt="" />
+    <span class="nav-username" id="nav-username"></span>
+    <a class="nav-logout" href="/auth/logout">Log out</a>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Login gate -->
+  <div id="login-gate">
+    <div class="gate-icon">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-light)">
+        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <div>
+      <div class="gate-title">Member Links</div>
+      <div class="gate-sub" style="margin-top:6px">Verify you're in the Veil Discord server to browse all active proxy links.</div>
+    </div>
+    <div id="error-msg" class="error-badge"></div>
+    <a class="btn-discord" href="/auth/discord">
+      <svg width="18" height="14" viewBox="0 0 71 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978Z" fill="white"/>
+      </svg>
+      Login with Discord
+    </a>
+  </div>
+
+  <!-- Links view (shown after auth) -->
+  <div id="links-view">
+    <div class="links-header">
+      <span class="links-title">Proxy Links</span>
+      <span class="links-count" id="links-count">0 links</span>
+    </div>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input class="search-input" id="search" type="text" placeholder="Search by name, URL, or filter…" autocomplete="off" />
+      </div>
+      <div class="filter-pills" id="pills">
+        <button class="pill active" data-filter="all">All</button>
+        <button class="pill" data-filter="full">Full proxy</button>
+        <button class="pill" data-filter="static">Static</button>
+      </div>
+    </div>
+
+    <div class="links-grid" id="links-grid"></div>
+  </div>
+
+</div>
+
+<script>
+  let allLinks = [];
+  let activeFilter = "all";
+  let searchQuery  = "";
+
+  async function init() {
+    let status;
+    try { const r = await fetch("/auth/status"); status = await r.json(); }
+    catch { status = { member: false }; }
+
+    const params = new URLSearchParams(location.search);
+    const err = params.get("error");
+    if (err) {
+      const msg = document.getElementById("error-msg");
+      msg.classList.add("show");
+      if (err === "notmember")  msg.textContent = "You need to be in the Veil Discord server to access this page.";
+      else if (err === "token") msg.textContent = "Discord login failed. Please try again.";
+      else                       msg.textContent = "Something went wrong. Please try again.";
+    }
+
+    if (!status.member) {
+      document.getElementById("login-gate").style.display = "flex";
+      return;
+    }
+
+    // Nav user info
+    const navUser = document.getElementById("nav-user");
+    navUser.style.display = "flex";
+    const avatar = document.getElementById("nav-avatar");
+    if (status.avatar) {
+      avatar.src = `https://cdn.discordapp.com/avatars/${status.uid}/${status.avatar}.png?size=56`;
+    } else {
+      try { avatar.src = `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(status.uid) >> 22n) % 6}.png`; } catch {}
+    }
+    document.getElementById("nav-username").textContent = status.username;
+
+    document.getElementById("login-gate").style.display = "none";
+    document.getElementById("links-view").style.display = "block";
+
+    await loadLinks();
+  }
+
+  async function loadLinks() {
+    try {
+      const r = await fetch("/api/links");
+      if (!r.ok) { allLinks = []; }
+      else allLinks = await r.json();
+    } catch { allLinks = []; }
+    renderGrid();
+  }
+
+  function renderGrid() {
+    const q = searchQuery.toLowerCase();
+    const filtered = allLinks.filter(l => {
+      const matchType = activeFilter === "all" || l.type === activeFilter;
+      const matchQ    = !q ||
+        (l.name  || "").toLowerCase().includes(q) ||
+        (l.url   || "").toLowerCase().includes(q) ||
+        (l.unblocked || []).some(f => f.toLowerCase().includes(q));
+      return matchType && matchQ;
+    });
+
+    document.getElementById("links-count").textContent =
+      `${filtered.length} link${filtered.length !== 1 ? "s" : ""}`;
+
+    const grid = document.getElementById("links-grid");
+    grid.innerHTML = "";
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `<div class="empty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <div>No links found</div>
+      </div>`;
+      return;
+    }
+
+    for (const link of filtered) {
+      let hostname = link.url;
+      try { hostname = new URL(link.url).hostname; } catch {}
+
+      const unblocked = Array.isArray(link.unblocked) ? link.unblocked : [];
+      const shown     = unblocked.slice(0, 4);
+      const extra     = unblocked.length - shown.length;
+
+      const filterTagsHtml = unblocked.length
+        ? shown.map(f => `<span class="ftag">${escHtml(f)}</span>`).join("") +
+          (extra > 0 ? `<span class="ftag-more" data-all="${escHtml(JSON.stringify(unblocked))}">+${extra} more</span>` : "")
+        : `<span class="no-filters">No filter data yet</span>`;
+
+      const typeClass = link.type === "static" ? "type-static" : "type-full";
+      const typeLabel = link.type === "static" ? "Static" : "Full";
+
+      const card = document.createElement("div");
+      card.className = "link-card";
+      card.innerHTML = `
+        <div class="card-top">
+          <div class="card-favicon">
+            <img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=32"
+                 alt="" onerror="this.style.display='none'" />
+          </div>
+          <div class="card-info">
+            <div class="card-name" title="${escHtml(link.name || hostname)}">${escHtml(link.name || hostname)}</div>
+            <div class="card-url" title="${escHtml(link.url)}">${escHtml(link.url)}</div>
+          </div>
+          <span class="type-badge ${typeClass}">${typeLabel}</span>
+        </div>
+        <div class="filter-tags">${filterTagsHtml}</div>
+        <div class="card-actions">
+          <button class="card-btn copy-btn" data-url="${escHtml(link.url)}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            Copy
+          </button>
+          <a class="card-btn open-btn" href="${escHtml(link.url)}" target="_blank" rel="noopener">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+            Open
+          </a>
+        </div>
+        ${link.submittedBy ? `<div class="card-meta">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+          Submitted by ${escHtml(link.submittedBy)}
+        </div>` : ""}
+      `;
+      grid.appendChild(card);
+    }
+
+    // Expand filter tags
+    grid.querySelectorAll(".ftag-more").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const all = JSON.parse(btn.dataset.all);
+        const wrap = btn.closest(".filter-tags");
+        wrap.innerHTML = all.map(f => `<span class="ftag">${escHtml(f)}</span>`).join("");
+      });
+    });
+
+    // Copy buttons
+    grid.querySelectorAll(".copy-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.url);
+          btn.classList.add("copied");
+          btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied`;
+          setTimeout(() => {
+            btn.classList.remove("copied");
+            btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy`;
+          }, 1800);
+        } catch {}
+      });
+    });
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  // Type filter pills
+  document.getElementById("pills").addEventListener("click", e => {
+    const btn = e.target.closest(".pill");
+    if (!btn) return;
+    activeFilter = btn.dataset.filter;
+    document.querySelectorAll(".pill").forEach(p => p.classList.toggle("active", p === btn));
+    renderGrid();
+  });
+
+  // Search
+  document.getElementById("search").addEventListener("input", e => {
+    searchQuery = e.target.value;
+    renderGrid();
+  });
+
+  init();
+</script>
+</body>
+</html>
